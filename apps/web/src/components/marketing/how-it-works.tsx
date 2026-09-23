@@ -37,7 +37,7 @@ export const HowItWorks = () => (
             key={step.title}
             as="li"
             delay={position * 90}
-            className="bg-card ring-foreground/10 flex flex-col gap-4 rounded-xl p-6 ring-1"
+            className="bg-card ring-foreground/10 flex min-w-0 flex-col gap-4 rounded-xl p-6 ring-1"
           >
             <span className="bg-primary/15 text-primary flex size-8 items-center justify-center rounded-md font-mono text-sm font-semibold">
               {position + 1}

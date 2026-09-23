@@ -10,28 +10,31 @@ import { Hero } from '@/components/marketing/hero';
 import { HowItWorks } from '@/components/marketing/how-it-works';
 import { orderedPlans } from '@/components/marketing/plan-copy';
 import { Pricing } from '@/components/marketing/pricing';
+import { OG_IMAGE, SITE_DESCRIPTION, SITE_TITLE } from '@/components/marketing/site-meta';
 import { publicEnv } from '@/lib/env';
 
-const TITLE = 'Parbot · Ask-AI for developer docs';
-const DESCRIPTION =
-  'Add an assistant to your developer docs with one script tag. Streamed answers with citations in a floating bubble or a ⌘K palette, and an inbox with the questions your docs did not answer.';
-
+/**
+ * The image is named explicitly: a page-level openGraph object replaces the one the root
+ * opengraph-image.tsx contributes, so without this the generated image would not be tagged.
+ */
 export const metadata: Metadata = {
-  title: { absolute: TITLE },
-  description: DESCRIPTION,
+  title: { absolute: SITE_TITLE },
+  description: SITE_DESCRIPTION,
   alternates: { canonical: '/' },
   openGraph: {
-    title: TITLE,
-    description: DESCRIPTION,
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
     url: '/',
     siteName: 'Parbot',
     type: 'website',
     locale: 'en_US',
+    images: [OG_IMAGE],
   },
   twitter: {
     card: 'summary_large_image',
-    title: TITLE,
-    description: DESCRIPTION,
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+    images: [OG_IMAGE],
   },
 };
 

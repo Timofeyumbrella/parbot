@@ -8,7 +8,7 @@ import {
   type WidgetConfig,
 } from '@parbot/shared';
 import { RotateCcw, SendHorizontal } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -86,6 +86,7 @@ export const LiveDemo = ({ demoKey }: { demoKey: string }) => {
   const [turns, setTurns] = useState<Turn[]>([]);
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
+  const inputId = useId();
   const session = useRef<{ visitorId: string; conversationId: string } | null>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -213,12 +214,12 @@ export const LiveDemo = ({ demoKey }: { demoKey: string }) => {
             void ask(draft);
           }}
         >
-          <label htmlFor="live-demo-question" className="sr-only">
+          <label htmlFor={inputId} className="sr-only">
             Ask a question
           </label>
           <Input
             ref={inputRef}
-            id="live-demo-question"
+            id={inputId}
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
             placeholder="Ask a question about the docs"

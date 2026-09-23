@@ -119,7 +119,7 @@ export const Pricing = ({ plans }: { plans: Plan[] }) => {
 
         <ul className="grid items-start gap-4 pt-2 lg:grid-cols-3" aria-label="Plans">
           {plans.map((plan, position) => (
-            <Reveal key={plan.id} as="li" delay={position * 90} className="h-full">
+            <Reveal key={plan.id} as="li" delay={position * 90} className="h-full min-w-0">
               <PlanCard plan={plan} interval={interval} />
             </Reveal>
           ))}

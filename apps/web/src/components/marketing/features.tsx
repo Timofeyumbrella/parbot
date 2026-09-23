@@ -57,7 +57,7 @@ export const Features = () => (
             key={feature.title}
             as="li"
             delay={(position % 3) * 80}
-            className="bg-card ring-foreground/10 flex flex-col gap-3 rounded-xl p-6 ring-1"
+            className="bg-card ring-foreground/10 flex min-w-0 flex-col gap-3 rounded-xl p-6 ring-1"
           >
             <span className="bg-primary/15 text-primary flex size-9 items-center justify-center rounded-md">
               <feature.icon className="size-4.5" aria-hidden="true" />

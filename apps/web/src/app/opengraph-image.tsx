@@ -1,7 +1,9 @@
 import { ImageResponse } from 'next/og';
 
-export const alt = 'Parbot: an assistant for developer docs that answers with citations';
-export const size = { width: 1200, height: 630 };
+import { OG_IMAGE } from '@/components/marketing/site-meta';
+
+export const alt = OG_IMAGE.alt;
+export const size = { width: OG_IMAGE.width, height: OG_IMAGE.height };
 export const contentType = 'image/png';
 
 /**
