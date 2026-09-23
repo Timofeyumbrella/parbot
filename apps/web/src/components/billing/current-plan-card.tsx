@@ -63,7 +63,8 @@ export const renewalLine = (account: AccountPlan) => {
 export const CurrentPlanCard = ({ account, providerName, className }: CurrentPlanCardProps) => {
   const badge = statusBadge(account);
   const isPaid = account.plan.id !== 'hobby';
-  const canManage = account.hasStripeCustomer || (providerName === 'mock' && isPaid);
+  // In test mode the portal is a card on this screen, so it is always reachable; with Stripe it needs a customer.
+  const canManage = account.hasStripeCustomer || providerName === 'mock';
   const price = account.billingInterval && isPaid ? priceLabel(account.plan, account.billingInterval) : 'Free';
 
   return (
