@@ -13,22 +13,27 @@ const { PLANS } = await load<typeof import('../src/lib/plans')>('../src/lib/plan
 const { BILLING_INTERVALS, PAID_PLAN_IDS, PRICE_ENV_KEYS, lookupKeyFor } =
   await load<typeof import('../src/lib/billing/catalog')>('../src/lib/billing/catalog.ts');
 
-const fail = (message: string): never => {
+function fail(message: string): never {
   console.error(message);
   process.exit(1);
+}
+
+/** The configured key, refused unless it is a test-mode key. This script never touches live mode. */
+const readTestKey = () => {
+  const key = process.env.STRIPE_SECRET_KEY?.trim();
+
+  if (!key) {
+    fail('STRIPE_SECRET_KEY is empty. Put a Stripe test key (sk_test_...) in .env first.');
+  }
+
+  if (!/^(sk|rk)_test_/.test(key)) {
+    fail('Refusing to seed: STRIPE_SECRET_KEY is not a test key. This script only ever runs against test mode.');
+  }
+
+  return key;
 };
 
-const key = process.env.STRIPE_SECRET_KEY?.trim();
-
-if (!key) {
-  fail('STRIPE_SECRET_KEY is empty. Put a Stripe test key (sk_test_...) in .env first.');
-}
-
-if (!/^(sk|rk)_test_/.test(key!)) {
-  fail('Refusing to seed: STRIPE_SECRET_KEY is not a test key. This script only ever runs against test mode.');
-}
-
-const stripe = new Stripe(key!, { appInfo: { name: 'Parbot seed' } });
+const stripe = new Stripe(readTestKey(), { appInfo: { name: 'Parbot seed' } });
 
 const findOrCreateProduct = async (planId: (typeof PAID_PLAN_IDS)[number]) => {
   const plan = PLANS[planId];
@@ -92,14 +97,18 @@ const findOrCreatePrice = async (
 
 const envLines: string[] = [];
 
-for (const planId of PAID_PLAN_IDS) {
-  const product = await findOrCreateProduct(planId);
+try {
+  for (const planId of PAID_PLAN_IDS) {
+    const product = await findOrCreateProduct(planId);
 
-  for (const interval of BILLING_INTERVALS) {
-    const price = await findOrCreatePrice(product.id, planId, interval);
+    for (const interval of BILLING_INTERVALS) {
+      const price = await findOrCreatePrice(product.id, planId, interval);
 
-    envLines.push(`${PRICE_ENV_KEYS[planId][interval]}=${price.id}`);
+      envLines.push(`${PRICE_ENV_KEYS[planId][interval]}=${price.id}`);
+    }
   }
+} catch (error) {
+  fail(`Stripe refused the request: ${error instanceof Error ? error.message : String(error)}`);
 }
 
 console.log('\nPaste these into .env:\n');

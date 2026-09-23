@@ -74,7 +74,7 @@ export const patchFromSnapshot = (
   return {
     plan_id: ended ? 'hobby' : (catalog?.planId ?? 'hobby'),
     status,
-    billing_interval: catalog?.interval ?? null,
+    billing_interval: ended ? null : (catalog?.interval ?? null),
     stripe_subscription_id: snapshot.id,
     ...(snapshot.customerId ? { stripe_customer_id: snapshot.customerId } : {}),
     current_period_end: snapshot.currentPeriodEnd ? new Date(snapshot.currentPeriodEnd * 1000).toISOString() : null,

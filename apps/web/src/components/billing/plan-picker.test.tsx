@@ -1,15 +1,13 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { PlanPicker, type PlanPickerProps } from './plan-picker';
 
 const push = vi.fn();
-let searchParams = new URLSearchParams();
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push }),
-  useSearchParams: () => searchParams,
 }));
 
 const baseProps: PlanPickerProps = {
@@ -25,9 +23,10 @@ const jsonResponse = (body: unknown, status = 200) =>
 
 describe('PlanPicker', () => {
   beforeEach(() => {
-    searchParams = new URLSearchParams();
     Element.prototype.scrollIntoView = vi.fn();
   });
+
+  afterEach(cleanup);
 
   it('shows the three plans with the current one marked', () => {
     render(<PlanPicker {...baseProps} />);

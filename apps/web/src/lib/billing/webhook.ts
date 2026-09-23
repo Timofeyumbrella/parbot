@@ -1,6 +1,8 @@
 import { UUID_PATTERN } from '@parbot/shared';
 import type Stripe from 'stripe';
 
+import type { Subscription } from '@/lib/db';
+
 import type { SubscriptionPatch, SubscriptionStore } from './store';
 import { patchFromSnapshot, patchMatchesRow, snapshotSubscription, type SubscriptionSnapshot } from './subscription';
 
@@ -62,41 +64,49 @@ const handleCheckoutCompleted = async (session: Stripe.Checkout.Session, deps: W
 
 type Hints = { accountId?: string | null; customerId?: string | null };
 
-const resolveAccountId = async (snapshot: SubscriptionSnapshot, hints: Hints, store: SubscriptionStore) => {
+/**
+ * The row the event belongs to. The account id Checkout attached (client_reference_id, then the
+ * subscription metadata) wins; a subscription without one is matched by the ids we stored.
+ */
+const resolveRow = async (
+  snapshot: SubscriptionSnapshot,
+  hints: Hints,
+  store: SubscriptionStore,
+  log: (message: string) => void,
+): Promise<Subscription | null> => {
   for (const candidate of [hints.accountId, snapshot.accountId]) {
-    if (candidate && UUID_PATTERN.test(candidate)) {
-      return candidate;
+    if (!candidate || !UUID_PATTERN.test(candidate)) {
+      continue;
     }
+
+    const row = await store.findByAccount(candidate);
+
+    if (row) {
+      return row;
+    }
+
+    log(`Stripe subscription ${snapshot.id} names account ${candidate}, which does not exist.`);
   }
 
   const bySubscription = await store.findByStripeSubscription(snapshot.id);
 
   if (bySubscription) {
-    return bySubscription.account_id;
+    return bySubscription;
   }
 
   const customerId = hints.customerId ?? snapshot.customerId;
-  const byCustomer = customerId ? await store.findByStripeCustomer(customerId) : null;
 
-  return byCustomer?.account_id ?? null;
+  return customerId ? store.findByStripeCustomer(customerId) : null;
 };
 
 const applySnapshot = async (snapshot: SubscriptionSnapshot, hints: Hints, deps: WebhookDeps): Promise<WebhookOutcome> => {
   const log = deps.log ?? console.warn;
-  const accountId = await resolveAccountId(snapshot, hints, deps.store);
+  const row = await resolveRow(snapshot, hints, deps.store, log);
 
-  if (!accountId) {
+  if (!row) {
     log(`Stripe subscription ${snapshot.id} could not be tied to an account; ignoring.`);
 
     return ignored('No account for this subscription.');
-  }
-
-  const row = await deps.store.findByAccount(accountId);
-
-  if (!row) {
-    log(`Stripe subscription ${snapshot.id} names account ${accountId}, which does not exist; ignoring.`);
-
-    return ignored('Unknown account.');
   }
 
   if (row.stripe_subscription_id && row.stripe_subscription_id !== snapshot.id && !hints.accountId) {
@@ -114,7 +124,7 @@ const applySnapshot = async (snapshot: SubscriptionSnapshot, hints: Hints, deps:
     return { received: true, handled: true, note: 'Already applied.' };
   }
 
-  await deps.store.save(accountId, patch);
+  await deps.store.save(row.account_id, patch);
 
   return { received: true, handled: true };
 };

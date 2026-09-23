@@ -1,13 +1,12 @@
 import Stripe from 'stripe';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { subscriptionFixture } from '@/lib/billing/subscription.test';
-import { createMemoryStore } from '@/lib/billing/test-store';
+import { createMemoryStore, PERIOD_END, subscriptionFixture } from '@/lib/billing/testing';
 
-const ACCOUNT = '00000000-0000-4000-8000-00000000abcd';
+// The fixture's subscription metadata names this account, as our Checkout sessions do.
+const ACCOUNT = '00000000-0000-4000-8000-000000000001';
 const OTHER = '00000000-0000-4000-8000-00000000ef01';
 const SECRET = 'whsec_test_secret';
-const PERIOD_END = 1_800_000_000;
 
 let memory = createMemoryStore([ACCOUNT, OTHER]);
 const retrieveSubscription = vi.fn();
@@ -206,6 +205,7 @@ describe('POST /api/stripe/webhook', () => {
     expect(memory.rows.get(ACCOUNT)).toMatchObject({
       plan_id: 'hobby',
       status: 'canceled',
+      billing_interval: null,
       cancel_at_period_end: true,
       stripe_customer_id: 'cus_1',
       stripe_subscription_id: 'sub_1',

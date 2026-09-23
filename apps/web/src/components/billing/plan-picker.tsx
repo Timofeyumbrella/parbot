@@ -60,12 +60,6 @@ export const PlanPicker = ({
     }
   }, [highlighted]);
 
-  useEffect(() => {
-    if (!pending) {
-      setPendingPlan(null);
-    }
-  }, [pending]);
-
   // A live Stripe subscription is changed in the portal so Checkout never opens a second one.
   const changeViaPortal =
     providerName === 'stripe' && hasStripeCustomer && currentPlanId !== 'hobby' && currentStatus !== 'canceled';

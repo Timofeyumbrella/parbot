@@ -1,25 +1,9 @@
-import type Stripe from 'stripe';
 import { describe, expect, it, vi } from 'vitest';
 
 import { mapSubscriptionStatus, patchFromSnapshot, patchMatchesRow, snapshotSubscription } from './subscription';
+import { PERIOD_END, subscriptionFixture } from './testing';
 
 const env = { STRIPE_PRICE_STARTER_MONTHLY: 'price_sm', STRIPE_PRICE_GROWTH_YEARLY: 'price_gy' };
-const PERIOD_END = 1_800_000_000;
-
-export const subscriptionFixture = (overrides: Record<string, unknown> = {}) =>
-  ({
-    id: 'sub_1',
-    object: 'subscription',
-    customer: 'cus_1',
-    status: 'active',
-    cancel_at_period_end: false,
-    metadata: { account_id: '00000000-0000-4000-8000-000000000001' },
-    items: {
-      object: 'list',
-      data: [{ id: 'si_1', object: 'subscription_item', price: { id: 'price_sm', object: 'price' }, current_period_end: PERIOD_END }],
-    },
-    ...overrides,
-  }) as unknown as Stripe.Subscription;
 
 describe('snapshotSubscription', () => {
   it('reads the customer, price, period end and account id', () => {
@@ -88,7 +72,7 @@ describe('patchFromSnapshot', () => {
     for (const status of ['canceled', 'unpaid', 'incomplete_expired']) {
       const patch = patchFromSnapshot(snapshotSubscription(subscriptionFixture({ status })), { env });
 
-      expect(patch).toMatchObject({ plan_id: 'hobby', status: 'canceled', stripe_subscription_id: 'sub_1' });
+      expect(patch).toMatchObject({ plan_id: 'hobby', status: 'canceled', billing_interval: null, stripe_subscription_id: 'sub_1' });
     }
   });
 

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { createMemoryStore } from '@/lib/billing/test-store';
+import { createMemoryStore } from '@/lib/billing/testing';
 
 const ACCOUNT = '00000000-0000-4000-8000-000000000001';
 const getSession = vi.fn();

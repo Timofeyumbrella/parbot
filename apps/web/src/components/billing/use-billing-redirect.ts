@@ -1,28 +1,25 @@
 'use client';
 
-import { useRouter, useSearchParams } from 'next/navigation';
-import { useCallback, useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useCallback, useState, useTransition } from 'react';
 
 type Endpoint = '/api/billing/checkout' | '/api/billing/portal';
 
 /**
  * Posts to a billing endpoint and follows the URL it returns. Same-origin destinations (the mock
- * provider) go through the router so the screen changes in the same frame; Stripe is a full load.
+ * provider) go through the router inside a transition, so the button stays busy until the new
+ * screen is on. Stripe is a full page load, so the button stays busy until the page unloads.
  */
 export const useBillingRedirect = () => {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const [pending, setPending] = useState(false);
+  const [requesting, setRequesting] = useState(false);
+  const [leaving, setLeaving] = useState(false);
+  const [navigating, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-
-  // A same-origin push keeps this component mounted, so the URL change is what ends the wait.
-  useEffect(() => {
-    setPending(false);
-  }, [searchParams]);
 
   const go = useCallback(
     async (endpoint: Endpoint, body?: Record<string, string>) => {
-      setPending(true);
+      setRequesting(true);
       setError(null);
 
       try {
@@ -35,7 +32,6 @@ export const useBillingRedirect = () => {
 
         if (!response.ok || !payload?.url) {
           setError(payload?.error ?? 'Something went wrong. Try again in a moment.');
-          setPending(false);
 
           return;
         }
@@ -43,17 +39,21 @@ export const useBillingRedirect = () => {
         const target = new URL(payload.url, window.location.href);
 
         if (target.origin === window.location.origin) {
-          router.push(`${target.pathname}${target.search}`);
+          startTransition(() => {
+            router.push(`${target.pathname}${target.search}`);
+          });
         } else {
+          setLeaving(true);
           window.location.assign(target.toString());
         }
       } catch {
         setError('The request did not reach the server. Check your connection and try again.');
-        setPending(false);
+      } finally {
+        setRequesting(false);
       }
     },
     [router],
   );
 
-  return { go, pending, error };
+  return { go, pending: requesting || navigating || leaving, error };
 };
