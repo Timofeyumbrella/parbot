@@ -58,7 +58,7 @@ export type ParseResult<Output, Field extends string> =
 export const parseForm = <Output, Field extends string>(
   schema: ZodType<Output>,
   values: Record<Field, string>,
-  secret: readonly Field[] = [],
+  secret: readonly NoInfer<Field>[] = [],
 ): ParseResult<Output, Field> => {
   const parsed = schema.safeParse(values);
 
@@ -79,7 +79,7 @@ export const parseForm = <Output, Field extends string>(
 
 export const publicValues = <Field extends string>(
   values: Record<Field, string>,
-  secret: readonly Field[] = [],
+  secret: readonly NoInfer<Field>[] = [],
 ): Partial<Record<Field, string>> => {
   const kept: Partial<Record<Field, string>> = { ...values };
 

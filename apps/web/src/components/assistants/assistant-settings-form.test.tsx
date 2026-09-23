@@ -1,6 +1,6 @@
-import { render, screen } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { FormState } from '@/lib/form';
 
@@ -13,6 +13,8 @@ const { updateAssistant, toast } = vi.hoisted(() => ({
 
 vi.mock('@/actions/assistants', () => ({ updateAssistant }));
 vi.mock('sonner', () => ({ toast }));
+
+afterEach(cleanup);
 
 const assistant = {
   id: '3fa85f64-5717-4562-b3fc-2c963f66afa6',

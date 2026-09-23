@@ -1,6 +1,6 @@
-import { render, screen } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { FormState } from '@/lib/form';
 
@@ -12,6 +12,8 @@ const { createAssistant } = vi.hoisted(() => ({
 
 vi.mock('@/actions/assistants', () => ({ createAssistant }));
 
+
+afterEach(cleanup);
 describe('CreateAssistantForm', () => {
   it('derives the slug from the name until the slug is edited by hand', async () => {
     const user = userEvent.setup();

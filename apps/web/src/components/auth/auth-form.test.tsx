@@ -1,6 +1,6 @@
-import { render, screen } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { FormState } from '@/lib/form';
 
@@ -13,6 +13,8 @@ const { signIn, signUp } = vi.hoisted(() => ({
 
 vi.mock('@/actions/auth', () => ({ signIn, signUp }));
 
+
+afterEach(cleanup);
 describe('LoginForm', () => {
   it('sends the fields and the safe next path, then shows the server message and keeps the email', async () => {
     signIn.mockResolvedValue({
