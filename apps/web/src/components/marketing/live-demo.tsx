@@ -89,9 +89,13 @@ export const LiveDemo = ({ demoKey }: { demoKey: string }) => {
   const session = useRef<{ visitorId: string; conversationId: string } | null>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  /** Aborts the config fetch and any answer still streaming when the panel unmounts. */
+  const unmounted = useRef<AbortController>(null);
 
   useEffect(() => {
     const controller = new AbortController();
+
+    unmounted.current = controller;
 
     fetch(`/api/widget/config?key=${encodeURIComponent(demoKey)}`, { signal: controller.signal })
       .then((response) => (response.ok ? response.json() : null))
@@ -153,6 +157,7 @@ export const LiveDemo = ({ demoKey }: { demoKey: string }) => {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(body),
+        signal: unmounted.current?.signal,
       });
 
       if (!response.ok && !response.headers.get('content-type')?.includes('text/event-stream')) {
@@ -184,7 +189,9 @@ export const LiveDemo = ({ demoKey }: { demoKey: string }) => {
         patch(content ? { status: 'done' } : { content: EMPTY_TEXT, status: 'error' });
       }
     } catch {
-      fail(OFFLINE_TEXT);
+      if (!unmounted.current?.signal.aborted) {
+        fail(OFFLINE_TEXT);
+      }
     } finally {
       setBusy(false);
       inputRef.current?.focus();

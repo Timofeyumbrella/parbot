@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useEffect } from 'react';
 
 import { Container } from '@/components/marketing/section';
 import { Button } from '@/components/ui/button';
@@ -12,6 +13,10 @@ type ErrorProps = {
 };
 
 export default function MarketingError({ error, retry, reset }: ErrorProps) {
+  useEffect(() => {
+    console.error(error);
+  }, [error]);
+
   return (
     <main id="main" className="flex flex-1 items-center py-20">
       <Container className="flex max-w-xl flex-col items-start gap-4">

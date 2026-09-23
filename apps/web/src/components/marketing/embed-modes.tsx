@@ -1,5 +1,6 @@
 import { Bot, Command, MessageCircle, Search } from 'lucide-react';
 
+import { plansWith } from '@/components/marketing/plan-copy';
 import { Reveal } from '@/components/marketing/reveal';
 import { Container, Section, SectionHeading } from '@/components/marketing/section';
 import { Snippet } from '@/components/marketing/snippet';
@@ -8,42 +9,44 @@ export const embedSnippet = (appUrl: string) =>
   `<script src="${appUrl.replace(/\/$/, '')}/widget.js" data-parbot="pb_your_public_key" async></script>`;
 
 /** A few lines standing in for a docs page, so both modes sit on the same backdrop. */
-const DocsPage = ({ children, dim = false }: { children?: React.ReactNode; dim?: boolean }) => (
-  <div className="bg-background ring-foreground/10 relative aspect-[4/3] overflow-hidden rounded-lg ring-1">
-    <div className="flex h-7 items-center gap-1.5 border-b px-3">
-      <span className="bg-foreground/15 size-2 rounded-full" />
-      <span className="bg-foreground/15 size-2 rounded-full" />
-      <span className="bg-foreground/15 size-2 rounded-full" />
-      <span className="bg-muted text-muted-foreground ml-2 flex h-4 flex-1 items-center rounded-sm px-2 font-mono text-[9px]">
-        docs.acme.dev/webhooks/verify
-      </span>
-    </div>
-    <div className="flex h-full gap-4 p-4">
-      <div className="hidden w-1/4 flex-col gap-2 sm:flex">
-        <span className="bg-foreground/15 h-2 w-3/4 rounded" />
-        <span className="bg-foreground/10 h-2 w-1/2 rounded" />
-        <span className="bg-foreground/10 h-2 w-2/3 rounded" />
-        <span className="bg-primary/60 h-2 w-3/5 rounded" />
-        <span className="bg-foreground/10 h-2 w-1/2 rounded" />
-        <span className="bg-foreground/10 h-2 w-2/3 rounded" />
+const DocsPage = ({ alt, children, dim = false }: { alt: string; children?: React.ReactNode; dim?: boolean }) => (
+  <div role="img" aria-label={alt} className="bg-background ring-foreground/10 relative aspect-[4/3] overflow-hidden rounded-lg ring-1">
+    <div aria-hidden="true" className="contents">
+      <div className="flex h-7 items-center gap-1.5 border-b px-3">
+        <span className="bg-foreground/15 size-2 rounded-full" />
+        <span className="bg-foreground/15 size-2 rounded-full" />
+        <span className="bg-foreground/15 size-2 rounded-full" />
+        <span className="bg-muted text-muted-foreground ml-2 flex h-4 flex-1 items-center rounded-sm px-2 font-mono text-[9px]">
+          docs.acme.dev/webhooks/verify
+        </span>
       </div>
-      <div className="flex flex-1 flex-col gap-2.5">
-        <span className="bg-foreground/25 h-3 w-2/3 rounded" />
-        <span className="bg-foreground/10 h-2 w-full rounded" />
-        <span className="bg-foreground/10 h-2 w-11/12 rounded" />
-        <span className="bg-foreground/10 h-2 w-4/5 rounded" />
-        <span className="bg-muted mt-1 h-12 w-full rounded" />
-        <span className="bg-foreground/10 h-2 w-full rounded" />
-        <span className="bg-foreground/10 h-2 w-3/4 rounded" />
+      <div className="flex h-full gap-4 p-4">
+        <div className="hidden w-1/4 flex-col gap-2 sm:flex">
+          <span className="bg-foreground/15 h-2 w-3/4 rounded" />
+          <span className="bg-foreground/10 h-2 w-1/2 rounded" />
+          <span className="bg-foreground/10 h-2 w-2/3 rounded" />
+          <span className="bg-primary/60 h-2 w-3/5 rounded" />
+          <span className="bg-foreground/10 h-2 w-1/2 rounded" />
+          <span className="bg-foreground/10 h-2 w-2/3 rounded" />
+        </div>
+        <div className="flex flex-1 flex-col gap-2.5">
+          <span className="bg-foreground/25 h-3 w-2/3 rounded" />
+          <span className="bg-foreground/10 h-2 w-full rounded" />
+          <span className="bg-foreground/10 h-2 w-11/12 rounded" />
+          <span className="bg-foreground/10 h-2 w-4/5 rounded" />
+          <span className="bg-muted mt-1 h-12 w-full rounded" />
+          <span className="bg-foreground/10 h-2 w-full rounded" />
+          <span className="bg-foreground/10 h-2 w-3/4 rounded" />
+        </div>
       </div>
+      {dim ? <div className="bg-background/70 absolute inset-0" /> : null}
+      {children}
     </div>
-    {dim ? <div className="bg-background/70 absolute inset-0" /> : null}
-    {children}
   </div>
 );
 
 const BubbleIllustration = () => (
-  <DocsPage>
+  <DocsPage alt="A docs page with a round launcher in the bottom corner and an open chat panel showing a cited answer">
     <div className="bg-card ring-foreground/10 absolute right-12 bottom-14 flex w-[62%] max-w-[15rem] flex-col rounded-lg shadow-xl shadow-black/20 ring-1 sm:right-14 sm:bottom-16">
       <div className="flex h-7 items-center gap-1.5 border-b px-2.5 text-[10px] font-medium">
         <span className="bg-primary size-1.5 rounded-full" />
@@ -74,7 +77,7 @@ const BubbleIllustration = () => (
 );
 
 const PaletteIllustration = () => (
-  <DocsPage dim>
+  <DocsPage alt="A docs page dimmed behind a command palette with a question box and three suggested questions" dim>
     <div className="bg-popover ring-foreground/10 absolute inset-x-6 top-12 flex flex-col rounded-lg shadow-xl shadow-black/20 ring-1 sm:inset-x-10 sm:top-14">
       <div className="flex h-9 items-center gap-2 border-b px-3 text-[11px]">
         <Search className="text-muted-foreground size-3.5" />
@@ -104,13 +107,12 @@ const MODES = [
   {
     name: 'Bubble',
     description:
-      'A launcher in the corner of every page. Readers open it when they have a question and keep reading while the answer streams in.',
+      'A launcher in the corner of every page. Readers open it when they have a question and keep reading while the answer streams in. Included on every plan.',
     illustration: <BubbleIllustration />,
   },
   {
     name: '⌘K palette',
-    description:
-      'Opens over the page with the shortcut developers already reach for. Suggested questions first, then the answer, with the page it came from.',
+    description: `Opens over the page with the shortcut developers already reach for, Ctrl+K on Windows and Linux. Suggested questions first, then the answer with the page it came from. On ${plansWith('palette')}.`,
     illustration: <PaletteIllustration />,
   },
 ] as const;

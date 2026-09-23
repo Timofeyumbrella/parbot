@@ -24,7 +24,7 @@ const PlanCard = ({ plan, interval }: { plan: Plan; interval: BillingInterval })
     ? 'No card needed.'
     : interval === 'monthly'
       ? 'Billed monthly. Cancel any time.'
-      : 'Twelve months for the price of ten.';
+      : 'Billed once a year. Twelve months for the price of ten.';
 
   return (
     <article
@@ -117,13 +117,13 @@ export const Pricing = ({ plans }: { plans: Plan[] }) => {
           </div>
         </Reveal>
 
-        <div className="grid items-start gap-4 pt-2 lg:grid-cols-3">
+        <ul className="grid items-start gap-4 pt-2 lg:grid-cols-3" aria-label="Plans">
           {plans.map((plan, position) => (
-            <Reveal key={plan.id} delay={position * 90} className="h-full">
+            <Reveal key={plan.id} as="li" delay={position * 90} className="h-full">
               <PlanCard plan={plan} interval={interval} />
             </Reveal>
           ))}
-        </div>
+        </ul>
 
         <Reveal>
           <p className="text-muted-foreground mx-auto max-w-2xl text-center text-sm leading-relaxed">

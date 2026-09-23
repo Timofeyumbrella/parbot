@@ -26,7 +26,8 @@ export const Hero = ({ demoKey }: { demoKey: string | null }) => (
         <p className="text-muted-foreground max-w-xl text-lg leading-relaxed text-pretty">
           Parbot reads your documentation and answers readers&apos; questions in a floating bubble or a
           ⌘K palette, streaming each answer with links to the pages it came from. When the docs do not
-          cover something, it says so, offers to take an email, and the question lands in your inbox.
+          cover something, it says so, can ask for the reader&apos;s email, and the question lands in
+          your inbox.
         </p>
         <div className="flex flex-wrap items-center gap-3">
           <Button asChild size="lg" className="px-4">
@@ -54,7 +55,7 @@ export const Hero = ({ demoKey }: { demoKey: string | null }) => (
         <p className="text-muted-foreground text-center text-xs">
           {demoKey
             ? 'A real assistant answering from its documentation. Ask it anything.'
-            : 'A scripted example. Sign up to point Parbot at your own docs.'}
+            : 'A scripted example on fictional docs. Sign up to point Parbot at your own.'}
         </p>
       </div>
     </Container>

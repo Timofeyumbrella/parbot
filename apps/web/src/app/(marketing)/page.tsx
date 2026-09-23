@@ -2,14 +2,15 @@ import type { Metadata } from 'next';
 import Script from 'next/script';
 
 import { ClosingCta } from '@/components/marketing/closing-cta';
+import { demoAssistantKey } from '@/components/marketing/demo-key';
 import { EmbedModes } from '@/components/marketing/embed-modes';
 import { Faq } from '@/components/marketing/faq';
 import { Features } from '@/components/marketing/features';
 import { Hero } from '@/components/marketing/hero';
 import { HowItWorks } from '@/components/marketing/how-it-works';
+import { orderedPlans } from '@/components/marketing/plan-copy';
 import { Pricing } from '@/components/marketing/pricing';
 import { publicEnv } from '@/lib/env';
-import { PLAN_ORDER, PLANS } from '@/lib/plans';
 
 const TITLE = 'Parbot · Ask-AI for developer docs';
 const DESCRIPTION =
@@ -34,9 +35,6 @@ export const metadata: Metadata = {
   },
 };
 
-/** Set to a public key to answer from a real assistant; leave unset for the scripted demo. */
-const demoAssistantKey = () => process.env.NEXT_PUBLIC_DEMO_ASSISTANT_KEY?.trim() || null;
-
 export default function LandingPage() {
   const demoKey = demoAssistantKey();
 
@@ -46,8 +44,8 @@ export default function LandingPage() {
       <EmbedModes appUrl={publicEnv.appUrl} />
       <HowItWorks />
       <Features />
-      <Pricing plans={PLAN_ORDER.map((id) => PLANS[id])} />
-      <Faq />
+      <Pricing plans={orderedPlans()} />
+      <Faq demoKey={demoKey} />
       <ClosingCta />
       {demoKey ? (
         <Script src="/widget.js" data-parbot={demoKey} data-mode="palette" strategy="afterInteractive" />

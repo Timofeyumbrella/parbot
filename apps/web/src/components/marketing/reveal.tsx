@@ -8,6 +8,8 @@ type RevealProps = {
   className?: string;
   /** Milliseconds to wait after entering the viewport, for staggering siblings. */
   delay?: number;
+  /** The element to render, so list items can reveal without breaking the list markup. */
+  as?: 'div' | 'li' | 'article';
 };
 
 const HIDDEN = ['opacity-0', 'translate-y-4'];
@@ -17,8 +19,8 @@ const HIDDEN = ['opacity-0', 'translate-y-4'];
  * the server and is only hidden once JavaScript confirms it is below the fold, so nothing
  * flashes and nothing is lost without a script or with reduced motion.
  */
-export const Reveal = ({ children, className, delay = 0 }: RevealProps) => {
-  const ref = useRef<HTMLDivElement>(null);
+export const Reveal = ({ children, className, delay = 0, as: Tag = 'div' }: RevealProps) => {
+  const ref = useRef<HTMLElement>(null);
 
   useEffect(() => {
     const element = ref.current;
@@ -53,12 +55,12 @@ export const Reveal = ({ children, className, delay = 0 }: RevealProps) => {
   }, []);
 
   return (
-    <div
-      ref={ref}
+    <Tag
+      ref={ref as React.Ref<HTMLDivElement & HTMLLIElement>}
       className={cn('transition-[opacity,transform] duration-700 ease-out motion-reduce:transition-none', className)}
       style={delay ? { transitionDelay: `${delay}ms` } : undefined}
     >
       {children}
-    </div>
+    </Tag>
   );
 };
