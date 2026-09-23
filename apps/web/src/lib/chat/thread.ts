@@ -15,7 +15,10 @@ export type MessageStatus =
   | 'pending'
   /** An assistant placeholder that is still receiving tokens. */
   | 'streaming'
-  /** The assistant stopped at the reader's request; the text is partial. */
+  /**
+   * The reader pressed Stop. The assistant's text is partial and the server discards the whole
+   * exchange, so both sides carry it: the pair survives a refetch but not a reload.
+   */
   | 'stopped'
   /** A user message the server refused; it can be retried. */
   | 'failed'
@@ -236,7 +239,7 @@ export const stopExchange = (thread: Thread): Thread => {
 
   return {
     messages: patchMessage(
-      patchMessage(thread.messages, active.userId, { status: 'complete' }),
+      patchMessage(thread.messages, active.userId, { status: 'stopped' }),
       active.assistantId,
       { status: 'stopped' },
     ),

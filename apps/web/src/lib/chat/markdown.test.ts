@@ -13,7 +13,11 @@ describe('splitCitations', () => {
   it('turns markers into sup elements and keeps the surrounding text', () => {
     const nodes = splitCitations('Rotate it in Settings [1]. Verify the signature [2, 3].', 3);
 
-    expect(nodes.map((node) => (node.type === 'text' ? node.value : `#${(node as { properties: { dataCitation: string } }).properties.dataCitation}`))).toEqual([
+    expect(
+      nodes.map((node) =>
+        'value' in node ? node.value : `#${(node as unknown as { properties: { dataCitation: string } }).properties.dataCitation}`,
+      ),
+    ).toEqual([
       'Rotate it in Settings ',
       '#1',
       '. Verify the signature ',
@@ -61,7 +65,7 @@ describe('rehypeStreamingCaret', () => {
 
     rehypeStreamingCaret()(tree);
 
-    const list = tree.children[1] as { children: { properties: { className: string[] } }[] };
+    const list = tree.children[1] as unknown as { children: { properties: { className: string[] } }[] };
     expect(list.children[0].properties.className).toEqual(['x', 'streaming-caret']);
     expect((tree.children[0] as { properties: Record<string, unknown> }).properties.className).toBeUndefined();
   });

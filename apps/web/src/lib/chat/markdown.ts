@@ -10,11 +10,14 @@ export type HastElement = {
   properties?: Record<string, unknown>;
   children: HastNode[];
 };
-export type HastNode = HastText | HastElement | { type: string; children?: HastNode[]; value?: string };
+export type HastParent = { type: string; children: HastNode[] };
+export type HastNode = HastText | HastElement | HastParent | { type: string };
 export type HastRoot = { type: 'root'; children: HastNode[] };
 
 const isElement = (node: HastNode): node is HastElement => node.type === 'element';
 const isText = (node: HastNode): node is HastText => node.type === 'text';
+const isParent = (node: HastNode): node is HastParent =>
+  Array.isArray((node as Partial<HastParent>).children);
 
 /** `[1]`, `[2, 3]`: the markers the engine asks the model for. */
 export const CITATION_MARKER = /\[(\d{1,2}(?:\s*,\s*\d{1,2})*)\]/g;
@@ -62,7 +65,7 @@ export const splitCitations = (value: string, max: number): HastNode[] => {
 };
 
 const walkCitations = (node: HastNode, max: number) => {
-  if (!node.children) {
+  if (!isParent(node)) {
     return;
   }
 
@@ -88,7 +91,7 @@ export const rehypeCitations = (options: { max: number }) => (tree: HastRoot) =>
 };
 
 const lastElement = (node: HastNode): HastElement | null => {
-  if (!node.children) {
+  if (!isParent(node)) {
     return null;
   }
 
@@ -130,12 +133,16 @@ export const hastText = (node: HastNode | undefined): string => {
     return node.value;
   }
 
-  return (node.children ?? []).map(hastText).join('');
+  return isParent(node) ? node.children.map(hastText).join('') : '';
 };
 
 /** The `language-*` class react-markdown puts on fenced code. */
 export const codeLanguage = (className: unknown): string | null => {
-  const classes = Array.isArray(className) ? className.map(String) : typeof className === 'string' ? className.split(/\s+/) : [];
+  const classes = Array.isArray(className)
+    ? className.map(String)
+    : typeof className === 'string'
+      ? className.split(/\s+/)
+      : [];
   const language = classes.find((name) => name.startsWith('language-'));
 
   return language ? language.slice('language-'.length) || null : null;

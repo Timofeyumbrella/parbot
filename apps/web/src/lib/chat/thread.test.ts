@@ -154,7 +154,18 @@ describe('stopExchange', () => {
 
     expect(thread.active).toBeNull();
     expect(thread.messages[1]).toMatchObject({ status: 'stopped', content: 'Half an ' });
-    expect(thread.messages[0]).toMatchObject({ status: 'complete' });
+    // The server discards a stopped exchange, so the question is not confirmed either.
+    expect(thread.messages[0]).toMatchObject({ status: 'stopped', id: 'u1' });
+  });
+
+  it('keeps a stopped pair across a refetch that does not have it', () => {
+    const stopped = stopExchange(run(started(), [meta, { type: 'token', text: 'Half' }]));
+    const merged = mergeThread(stopped, []);
+
+    expect(merged.messages.map((message) => [message.id, message.status])).toEqual([
+      ['u1', 'stopped'],
+      ['a1', 'stopped'],
+    ]);
   });
 
   it('is a no-op without an active exchange', () => {
