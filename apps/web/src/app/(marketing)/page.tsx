@@ -1,22 +1,57 @@
-import Link from 'next/link';
+import type { Metadata } from 'next';
+import Script from 'next/script';
 
-import { Button } from '@/components/ui/button';
+import { ClosingCta } from '@/components/marketing/closing-cta';
+import { EmbedModes } from '@/components/marketing/embed-modes';
+import { Faq } from '@/components/marketing/faq';
+import { Features } from '@/components/marketing/features';
+import { Hero } from '@/components/marketing/hero';
+import { HowItWorks } from '@/components/marketing/how-it-works';
+import { Pricing } from '@/components/marketing/pricing';
+import { publicEnv } from '@/lib/env';
+import { PLAN_ORDER, PLANS } from '@/lib/plans';
+
+const TITLE = 'Parbot · Ask-AI for developer docs';
+const DESCRIPTION =
+  'Add an assistant to your developer docs with one script tag. Streamed answers with citations in a floating bubble or a ⌘K palette, and an inbox with the questions your docs did not answer.';
+
+export const metadata: Metadata = {
+  title: { absolute: TITLE },
+  description: DESCRIPTION,
+  alternates: { canonical: '/' },
+  openGraph: {
+    title: TITLE,
+    description: DESCRIPTION,
+    url: '/',
+    siteName: 'Parbot',
+    type: 'website',
+    locale: 'en_US',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: TITLE,
+    description: DESCRIPTION,
+  },
+};
+
+/** Set to a public key to answer from a real assistant; leave unset for the scripted demo. */
+const demoAssistantKey = () => process.env.NEXT_PUBLIC_DEMO_ASSISTANT_KEY?.trim() || null;
 
 export default function LandingPage() {
+  const demoKey = demoAssistantKey();
+
   return (
-    <main className="flex flex-1 flex-col items-center justify-center gap-6 p-8 text-center">
-      <h1 className="text-4xl font-semibold tracking-tight">Parbot</h1>
-      <p className="text-muted-foreground max-w-md">
-        Landing page not built yet. Owner: landing.
-      </p>
-      <div className="flex gap-2">
-        <Button asChild>
-          <Link href="/signup">Start free</Link>
-        </Button>
-        <Button asChild variant="outline">
-          <Link href="/login">Sign in</Link>
-        </Button>
-      </div>
+    <main id="main" tabIndex={-1} className="flex-1 outline-none">
+      <Hero demoKey={demoKey} />
+      <EmbedModes appUrl={publicEnv.appUrl} />
+      <HowItWorks />
+      <Features />
+      <Pricing plans={PLAN_ORDER.map((id) => PLANS[id])} />
+      <Faq />
+      <ClosingCta />
+      {demoKey ? (
+        <Script src="/widget.js" data-parbot={demoKey} data-mode="palette" strategy="afterInteractive" />
+      ) : null}
     </main>
   );
 }
