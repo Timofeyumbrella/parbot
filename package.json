@@ -1,0 +1,31 @@
+{
+  "name": "parbot",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@10.11.0",
+  "engines": {
+    "node": ">=20.9"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @parbot/widget build && pnpm --filter web dev",
+    "build": "pnpm --filter @parbot/widget build && pnpm --filter web build",
+    "start": "pnpm --filter web start",
+    "lint": "pnpm -r --if-present lint",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "test": "pnpm -r --if-present test",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "widget:build": "pnpm --filter @parbot/widget build",
+    "db:start": "supabase start",
+    "db:stop": "supabase stop",
+    "db:status": "supabase status",
+    "db:reset": "supabase db reset",
+    "db:types": "supabase gen types typescript --local --schema public > apps/web/src/lib/db/types.ts"
+  },
+  "devDependencies": {
+    "prettier": "^3",
+    "prettier-plugin-tailwindcss": "^0.6",
+    "supabase": "^2",
+    "typescript": "^5"
+  }
+}

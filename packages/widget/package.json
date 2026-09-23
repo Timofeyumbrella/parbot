@@ -1,0 +1,21 @@
+{
+  "name": "@parbot/widget",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite build --watch",
+    "build": "vite build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@parbot/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "jsdom": "^27",
+    "typescript": "^5",
+    "vite": "^8",
+    "vitest": "^5"
+  }
+}
