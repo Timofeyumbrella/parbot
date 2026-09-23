@@ -51,6 +51,7 @@ describe('GET /api/widget/config', () => {
       theme: DEFAULT_WIDGET_THEME,
       hideBranding: false,
       leadCapture: false,
+      modes: ['bubble'],
     });
   });
 

@@ -81,6 +81,7 @@ export const normalizeConfig = (value: unknown): WidgetConfig | null => {
     theme: normalizeWidgetTheme(raw.theme),
     hideBranding: raw.hideBranding === true,
     leadCapture: raw.leadCapture === true,
+    modes: Array.isArray(raw.modes) ? raw.modes.filter(isWidgetMode) : undefined,
   };
 };
 

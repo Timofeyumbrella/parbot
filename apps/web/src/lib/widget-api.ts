@@ -272,6 +272,7 @@ export const widgetConfigFor = (assistant: WidgetAssistant, plan: PlanLimits): W
   theme: plan.customTheme ? normalizeWidgetTheme(assistant.theme) : { ...DEFAULT_WIDGET_THEME },
   hideBranding: plan.hideBranding && assistant.hide_branding,
   leadCapture: plan.leadCapture && assistant.lead_capture,
+  modes: plan.palette ? ['bubble', 'palette'] : ['bubble'],
 });
 
 // ---------------------------------------------------------------------------

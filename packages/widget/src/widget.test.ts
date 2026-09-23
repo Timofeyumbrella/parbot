@@ -208,6 +208,38 @@ describe('widget', () => {
     expect(shadowOf(hidden!).querySelector<HTMLElement>('.pb-launcher')?.style.display).toBe('none');
   });
 
+  it('ignores a data-mode override and setMode outside the modes the plan allows', async () => {
+    installFetch({ mode: 'bubble', modes: ['bubble'] });
+    const widget = await boot(mountScript({ 'data-mode': 'palette' }));
+
+    expect(widget!.currentMode).toBe('bubble');
+    expect(shadowOf(widget!).querySelector('.pb-launcher')?.className).toContain('pb-round');
+
+    widget!.setMode('palette');
+    expect(widget!.currentMode).toBe('bubble');
+
+    resetForTests();
+    document.head.innerHTML = '';
+
+    // A config without the list (an older server) still honours the override.
+    installFetch({ mode: 'bubble', modes: undefined });
+    const open = await boot(mountScript({ 'data-mode': 'palette' }));
+    expect(open!.currentMode).toBe('palette');
+  });
+
+  it('gives focus to the launcher when the panel was opened from it', async () => {
+    installFetch();
+    const widget = await boot(mountScript());
+    const shadow = shadowOf(widget!);
+    const launcher = shadow.querySelector<HTMLButtonElement>('.pb-launcher')!;
+
+    launcher.focus();
+    launcher.click();
+    press(document, 'Escape');
+
+    expect(shadow.activeElement).toBe(launcher);
+  });
+
   it('shows a lead form after an unanswered question when lead capture is on', async () => {
     const fetchMock = installFetch({ leadCapture: true }, false);
     const widget = await boot(mountScript());

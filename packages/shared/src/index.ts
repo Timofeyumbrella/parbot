@@ -59,6 +59,8 @@ export type WidgetConfig = {
   theme: WidgetTheme;
   hideBranding: boolean;
   leadCapture: boolean;
+  /** The modes the owner's plan allows; a data-mode override outside this list is ignored. */
+  modes?: WidgetMode[];
 };
 
 export type WidgetChatRequest = {

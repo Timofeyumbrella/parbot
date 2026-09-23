@@ -121,7 +121,7 @@ export class ParbotWidget {
     this.key = options.key;
     this.api = options.api;
     this.config = options.config;
-    this.mode = options.mode ?? options.config.mode;
+    this.mode = options.mode && this.allows(options.mode) ? options.mode : options.config.mode;
     this.showLauncher = options.launcher !== false;
     this.visitorId = getVisitorId(this.key);
     this.conversationId = getConversationId(this.key);
@@ -220,10 +220,19 @@ export class ParbotWidget {
   }
 
   setMode(mode: WidgetMode) {
+    if (!this.allows(mode)) {
+      return;
+    }
+
     this.mode = mode;
     this.root.dataset.mode = mode;
     this.panel.setAttribute('aria-modal', mode === 'palette' ? 'true' : 'false');
     this.renderLauncher();
+  }
+
+  /** The plan decides which modes exist; an older config without the list allows both. */
+  private allows(mode: WidgetMode) {
+    return !this.config.modes || this.config.modes.includes(mode);
   }
 
   ask(question: string) {

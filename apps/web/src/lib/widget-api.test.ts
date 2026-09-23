@@ -155,6 +155,7 @@ describe('widgetConfigFor', () => {
       theme: DEFAULT_WIDGET_THEME,
       hideBranding: false,
       leadCapture: false,
+      modes: ['bubble'],
     });
   });
 
@@ -164,6 +165,7 @@ describe('widgetConfigFor', () => {
       theme: { scheme: 'dark', accent: '#2563eb', position: 'left', radius: 'lg' },
       hideBranding: true,
       leadCapture: true,
+      modes: ['bubble', 'palette'],
     });
   });
 
