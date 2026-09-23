@@ -16,3 +16,4 @@ supabase/.temp
 supabase/.branches
 apps/web/public/widget.js
 apps/web/public/widget.js.map
+.claude/
