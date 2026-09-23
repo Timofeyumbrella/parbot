@@ -1,7 +1,8 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
-import { CONVERSATION_COLUMNS, ConversationList, PAGE_SIZE } from '@/components/inbox/conversation-list';
+import { ConversationList } from '@/components/inbox/conversation-list';
+import { conversationPage } from '@/components/inbox/conversation-query';
 import { ConversationFilters, InboxTabs } from '@/components/inbox/inbox-nav';
 import { LeadsTable } from '@/components/inbox/leads-table';
 import { PageContainer, PageHeader } from '@/components/page-header';
@@ -26,33 +27,22 @@ export default async function InboxPage({ params, searchParams }: PageProps<'/a/
   // One request-scoped clock so every relative time on the page agrees.
   const now = new Date().getTime();
 
-  let conversations = supabase
-    .from('conversations')
-    .select(CONVERSATION_COLUMNS)
-    .eq('assistant_id', assistantId)
-    .order('last_message_at', { ascending: false, nullsFirst: false })
-    .order('created_at', { ascending: false })
-    .limit(tab === 'conversations' ? PAGE_SIZE : 0);
-
-  if (filter === 'widget' || filter === 'app') {
-    conversations = conversations.eq('channel', filter);
-  } else if (filter === 'unanswered') {
-    conversations = conversations.gt('unanswered_count', 0);
-  }
-
-  const [rows, leads, conversationCount, leadCount] = await Promise.all([
-    conversations,
-    supabase
-      .from('leads')
-      .select('id, email, note, page_url, status, created_at, conversation_id')
-      .eq('assistant_id', assistantId)
-      .order('created_at', { ascending: false })
-      .limit(tab === 'leads' ? LEAD_ROWS : 0),
+  // Only the open tab's rows are fetched; both counts are cheap and label the tabs.
+  const [conversations, leads, conversationCount, leadCount] = await Promise.all([
+    tab === 'conversations' ? conversationPage(supabase, assistantId, filter) : null,
+    tab === 'leads'
+      ? supabase
+          .from('leads')
+          .select('id, email, note, page_url, status, created_at, conversation_id')
+          .eq('assistant_id', assistantId)
+          .order('created_at', { ascending: false })
+          .limit(LEAD_ROWS)
+      : null,
     supabase.from('conversations').select('id', { count: 'exact', head: true }).eq('assistant_id', assistantId),
     supabase.from('leads').select('id', { count: 'exact', head: true }).eq('assistant_id', assistantId),
   ]);
 
-  const failure = [rows, leads, conversationCount, leadCount].find((result) => result.error)?.error;
+  const failure = [conversations, leads, conversationCount, leadCount].find((result) => result?.error)?.error;
 
   return (
     <PageContainer>
@@ -72,7 +62,7 @@ export default async function InboxPage({ params, searchParams }: PageProps<'/a/
           </p>
         </div>
       ) : tab === 'leads' ? (
-        <LeadsTable rows={leads.data ?? []} assistantId={assistantId} now={now} />
+        <LeadsTable rows={leads?.data ?? []} assistantId={assistantId} now={now} />
       ) : (
         <>
           <ConversationFilters assistantId={assistantId} filter={filter} />
@@ -80,7 +70,7 @@ export default async function InboxPage({ params, searchParams }: PageProps<'/a/
             key={filter}
             assistantId={assistantId}
             filter={filter}
-            initialRows={rows.data ?? []}
+            initialRows={conversations?.data ?? []}
             now={now}
           />
         </>

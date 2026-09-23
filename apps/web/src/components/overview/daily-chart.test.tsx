@@ -1,9 +1,11 @@
-import { render, screen, within } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { cleanup, render, screen, within } from '@testing-library/react';
+import { afterEach, describe, expect, it } from 'vitest';
 
 import { bucketDaily, periodStart } from '@/lib/analytics';
 
 import { DailyChart } from './daily-chart';
+
+afterEach(cleanup);
 
 const NOW = new Date('2026-09-23T12:00:00Z');
 

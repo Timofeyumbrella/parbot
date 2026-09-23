@@ -1,7 +1,9 @@
-import { render, screen, within } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { cleanup, render, screen, within } from '@testing-library/react';
+import { afterEach, describe, expect, it } from 'vitest';
 
 import { StatTiles } from './stat-tiles';
+
+afterEach(cleanup);
 
 describe('StatTiles', () => {
   it('shows the four headline numbers with formatted values and captions', () => {

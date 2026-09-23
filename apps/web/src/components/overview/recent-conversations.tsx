@@ -2,7 +2,7 @@ import { ArrowUpRight } from 'lucide-react';
 import Link from 'next/link';
 
 import { ChannelBadge, UnansweredDot } from '@/components/inbox/channel-badge';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { absoluteTime, relativeTime } from '@/lib/analytics';
 import type { Conversation } from '@/lib/db';
 
@@ -24,7 +24,7 @@ export const RecentConversations = ({
     <CardHeader className="border-b pb-(--card-spacing)">
       <CardTitle>Recent conversations</CardTitle>
       <CardDescription>From the widget and from Chat, newest first.</CardDescription>
-      <div className="col-start-2 row-span-2 row-start-1 self-start justify-self-end" data-slot="card-action">
+      <CardAction>
         <Link
           href={`/a/${assistantId}/inbox`}
           prefetch
@@ -33,7 +33,7 @@ export const RecentConversations = ({
           Open inbox
           <ArrowUpRight aria-hidden="true" className="size-3.5" />
         </Link>
-      </div>
+      </CardAction>
     </CardHeader>
     <CardContent className="p-0">
       {rows.length === 0 ? (

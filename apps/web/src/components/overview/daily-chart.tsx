@@ -1,4 +1,4 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { type DailyRow, dayLabel, formatCount, niceTicks } from '@/lib/analytics';
 
 const WIDTH = 720;
@@ -66,9 +66,9 @@ export const DailyChart = ({ rows, days }: DailyChartProps) => {
       <CardHeader className="border-b">
         <CardTitle>Questions per day</CardTitle>
         <CardDescription>Answered and unanswered, over the last {days} days.</CardDescription>
-        <div className="col-start-2 row-span-2 row-start-1 self-start justify-self-end" data-slot="card-action">
+        <CardAction>
           <Legend />
-        </div>
+        </CardAction>
       </CardHeader>
       <CardContent>
         {empty ? (

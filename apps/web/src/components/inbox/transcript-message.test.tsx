@@ -1,7 +1,9 @@
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { cleanup, render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it } from 'vitest';
 
 import { parseCitations, TranscriptMessage } from './transcript-message';
+
+afterEach(cleanup);
 
 const NOW = new Date('2026-09-23T12:00:00Z').getTime();
 

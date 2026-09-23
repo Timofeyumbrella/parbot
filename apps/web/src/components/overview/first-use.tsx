@@ -35,7 +35,7 @@ export const FirstUse = ({ assistantId, assistantName }: { assistantId: string; 
           Install the widget
         </div>
         <p className="text-muted-foreground text-sm">
-          Drop one script tag on your docs site and visitors can ask there. Their questions land in this inbox.
+          Drop one script tag on your docs site and visitors can ask there. Their questions land in the Inbox.
         </p>
         <Button asChild size="sm" variant="outline" className="mt-auto w-fit">
           <Link href={`/a/${assistantId}/widget`} prefetch>

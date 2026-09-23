@@ -1,48 +1,27 @@
 'use client';
 
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
-import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
+import { type InfiniteData, useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { cn } from 'cn';
 import { MessageSquare } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useState, useSyncExternalStore } from 'react';
 
 import { ChannelBadge, UnansweredBadge } from '@/components/inbox/channel-badge';
+import {
+  activityStamp,
+  conversationListKey,
+  conversationPage,
+  type ConversationRow,
+  matchesFilter,
+  nextCursor,
+} from '@/components/inbox/conversation-query';
 import { Button } from '@/components/ui/button';
 import { absoluteTime, type ConversationFilter, formatCount, hostnameOf, relativeTime } from '@/lib/analytics';
-import type { Conversation } from '@/lib/db';
 import { getSupabaseBrowserClient } from '@/lib/supabase/client';
 
-export const CONVERSATION_COLUMNS =
-  'id, title, channel, page_url, message_count, unanswered_count, last_message_at, created_at' as const;
-
-export type ConversationRow = Pick<
-  Conversation,
-  'id' | 'title' | 'channel' | 'page_url' | 'message_count' | 'unanswered_count' | 'last_message_at' | 'created_at'
->;
-
-export const PAGE_SIZE = 30;
-
 type Page = { rows: ConversationRow[]; cursor: string | null };
-
-const matchesFilter = (row: ConversationRow, filter: ConversationFilter) => {
-  switch (filter) {
-    case 'widget':
-      return row.channel === 'widget';
-    case 'app':
-      return row.channel === 'app';
-    case 'unanswered':
-      return row.unanswered_count > 0;
-    default:
-      return true;
-  }
-};
-
-/** The cursor for the next page: rows without a message sit last, so a null cursor ends paging. */
-export const nextCursor = (rows: ConversationRow[]) =>
-  rows.length === PAGE_SIZE ? (rows[rows.length - 1]?.last_message_at ?? null) : null;
-
-const listKey = (assistantId: string, filter: ConversationFilter) => ['conversations', assistantId, filter] as const;
+type ListData = InfiniteData<Page, string | null>;
 
 const CLOCK_MS = 30_000;
 
@@ -61,31 +40,63 @@ const clockSnapshot = () => Math.floor(Date.now() / CLOCK_MS) * CLOCK_MS;
 const useNow = (initial: number) => useSyncExternalStore(subscribeClock, clockSnapshot, () => initial);
 
 const fetchPage = async (assistantId: string, filter: ConversationFilter, cursor: string | null): Promise<Page> => {
-  let query = getSupabaseBrowserClient()
-    .from('conversations')
-    .select(CONVERSATION_COLUMNS)
-    .eq('assistant_id', assistantId)
-    .order('last_message_at', { ascending: false, nullsFirst: false })
-    .order('created_at', { ascending: false })
-    .limit(PAGE_SIZE);
-
-  if (filter === 'widget' || filter === 'app') {
-    query = query.eq('channel', filter);
-  } else if (filter === 'unanswered') {
-    query = query.gt('unanswered_count', 0);
-  }
-
-  if (cursor) {
-    query = query.lt('last_message_at', cursor);
-  }
-
-  const { data, error } = await query;
+  const { data, error } = await conversationPage(getSupabaseBrowserClient(), assistantId, filter, cursor);
 
   if (error) {
     throw new Error(error.message);
   }
 
   return { rows: data ?? [], cursor: nextCursor(data ?? []) };
+};
+
+/** Applies one Realtime change to the cached pages. Returns the same object when nothing applies. */
+export const applyChange = (
+  data: ListData,
+  payload: RealtimePostgresChangesPayload<ConversationRow>,
+  filter: ConversationFilter,
+): { data: ListData; added: string | null } => {
+  if (payload.eventType === 'DELETE') {
+    const id = payload.old.id;
+
+    if (!id) {
+      return { data, added: null };
+    }
+
+    return {
+      data: { ...data, pages: data.pages.map((page) => ({ ...page, rows: page.rows.filter((row) => row.id !== id) })) },
+      added: null,
+    };
+  }
+
+  const row = payload.new;
+  const known = data.pages.some((page) => page.rows.some((existing) => existing.id === row.id));
+  const fits = matchesFilter(row, filter);
+
+  if (known) {
+    return {
+      data: {
+        ...data,
+        pages: data.pages.map((page) => ({
+          ...page,
+          rows: fits
+            ? page.rows.map((existing) => (existing.id === row.id ? { ...existing, ...row } : existing))
+            : page.rows.filter((existing) => existing.id !== row.id),
+        })),
+      },
+      added: null,
+    };
+  }
+
+  if (!fits) {
+    return { data, added: null };
+  }
+
+  const [first, ...rest] = data.pages;
+
+  return {
+    data: { ...data, pages: [{ ...(first ?? { cursor: null }), rows: [row, ...(first?.rows ?? [])] }, ...rest] },
+    added: row.id,
+  };
 };
 
 export type ConversationListProps = {
@@ -120,9 +131,9 @@ const EMPTY_COPY: Record<ConversationFilter, { title: string; body: string }> = 
  */
 export const ConversationList = ({ assistantId, filter, initialRows, now: initialNow }: ConversationListProps) => {
   const queryClient = useQueryClient();
-  const key = listKey(assistantId, filter);
+  const key = conversationListKey(assistantId, filter);
   const now = useNow(initialNow);
-  const [fresh, setFresh] = useState<Set<string>>(() => new Set());
+  const [fresh, setFresh] = useState<ReadonlySet<string>>(() => new Set());
 
   const query = useInfiniteQuery({
     queryKey: key,
@@ -136,64 +147,28 @@ export const ConversationList = ({ assistantId, filter, initialRows, now: initia
   // The page mounts one list per filter, so the subscription simply closes over this filter.
   useEffect(() => {
     const supabase = getSupabaseBrowserClient();
-    const currentKey = listKey(assistantId, filter);
+    const currentKey = conversationListKey(assistantId, filter);
     const channel = supabase
       .channel(`inbox:${assistantId}:${filter}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'conversations', filter: `assistant_id=eq.${assistantId}` },
         (payload: RealtimePostgresChangesPayload<ConversationRow>) => {
-          if (payload.eventType === 'DELETE') {
-            const id = payload.old.id;
+          const current = queryClient.getQueryData<ListData>(currentKey);
 
-            if (!id) {
-              return;
-            }
-
-            queryClient.setQueryData<{ pages: Page[]; pageParams: (string | null)[] }>(currentKey, (data) =>
-              data
-                ? { ...data, pages: data.pages.map((page) => ({ ...page, rows: page.rows.filter((row) => row.id !== id) })) }
-                : data,
-            );
-
+          if (!current) {
             return;
           }
 
-          const row = payload.new;
+          const { data, added } = applyChange(current, payload, filter);
 
-          queryClient.setQueryData<{ pages: Page[]; pageParams: (string | null)[] }>(currentKey, (data) => {
-            if (!data) {
-              return data;
-            }
+          if (data !== current) {
+            queryClient.setQueryData<ListData>(currentKey, data);
+          }
 
-            const known = data.pages.some((page) => page.rows.some((existing) => existing.id === row.id));
-            const fits = matchesFilter(row, filter);
-
-            if (known) {
-              return {
-                ...data,
-                pages: data.pages.map((page) => ({
-                  ...page,
-                  rows: fits
-                    ? page.rows.map((existing) => (existing.id === row.id ? { ...existing, ...row } : existing))
-                    : page.rows.filter((existing) => existing.id !== row.id),
-                })),
-              };
-            }
-
-            if (!fits) {
-              return data;
-            }
-
-            setFresh((current) => new Set(current).add(row.id));
-
-            const [first, ...rest] = data.pages;
-
-            return {
-              ...data,
-              pages: [{ ...(first ?? { cursor: null }), rows: [row, ...(first?.rows ?? [])] }, ...rest],
-            };
-          });
+          if (added) {
+            setFresh((marked) => new Set(marked).add(added));
+          }
         },
       )
       .subscribe();
@@ -204,15 +179,19 @@ export const ConversationList = ({ assistantId, filter, initialRows, now: initia
   }, [assistantId, filter, queryClient]);
 
   const seen = new Set<string>();
-  const rows = query.data.pages.flatMap((page) => page.rows).filter((row) => {
-    if (seen.has(row.id)) {
-      return false;
-    }
+  const rows = query.data.pages
+    .flatMap((page) => page.rows)
+    .filter((row) => {
+      if (seen.has(row.id)) {
+        return false;
+      }
 
-    seen.add(row.id);
+      seen.add(row.id);
 
-    return true;
-  });
+      return true;
+    })
+    // Live updates change a row's last message in place; keep the newest activity on top.
+    .sort((a, b) => activityStamp(b).localeCompare(activityStamp(a)));
 
   if (rows.length === 0) {
     const copy = EMPTY_COPY[filter];
@@ -252,7 +231,7 @@ export const ConversationList = ({ assistantId, filter, initialRows, now: initia
     <div className="flex flex-col gap-3">
       <ul className="divide-y overflow-hidden rounded-lg border" data-testid="conversation-list">
         {rows.map((row) => {
-          const stamp = row.last_message_at ?? row.created_at;
+          const stamp = activityStamp(row);
           const host = row.channel === 'widget' ? hostnameOf(row.page_url) : null;
           const isNew = fresh.has(row.id);
 
@@ -269,7 +248,7 @@ export const ConversationList = ({ assistantId, filter, initialRows, now: initia
                 <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                   <div className="flex min-w-0 items-center gap-2">
                     {isNew ? (
-                      <span className="text-primary inline-flex shrink-0 items-center gap-1 text-[11px] font-medium uppercase tracking-wide">
+                      <span className="text-primary inline-flex shrink-0 items-center gap-1 text-[11px] font-medium tracking-wide uppercase">
                         <span aria-hidden="true" className="bg-primary size-1.5 rounded-full" />
                         New
                       </span>

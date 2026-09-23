@@ -1,6 +1,5 @@
 'use server';
 
-import { redirect } from 'next/navigation';
 import { z } from 'zod';
 
 import { getSession } from '@/lib/session';
@@ -10,12 +9,13 @@ const deleteSchema = z.object({
   conversationId: z.uuid(),
 });
 
-export type DeleteConversationState = { error?: string };
+export type DeleteConversationState = { error?: string; deleted?: boolean };
 
 /**
  * Removes a conversation and, through the cascade, its messages. Runs as the visitor so row
  * level security keeps it to their own rows; the assistant id is checked too so a stale form
- * cannot delete across assistants. Redirects to the inbox on success.
+ * cannot delete across assistants. The caller navigates on success, after it has dropped the
+ * inbox lists it holds in cache.
  */
 export const deleteConversation = async (
   _state: DeleteConversationState,
@@ -51,5 +51,5 @@ export const deleteConversation = async (
     return { error: 'That conversation no longer exists.' };
   }
 
-  redirect(`/a/${parsed.data.assistantId}/inbox`);
+  return { deleted: true };
 };
