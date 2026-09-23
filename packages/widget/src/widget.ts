@@ -200,8 +200,12 @@ export class ParbotWidget {
       this.launcher.innerHTML = ICONS.chat;
     }
 
-    if (this.lastFocus instanceof HTMLElement) {
+    // Opening from the launcher leaves the host as the active element, which cannot take focus
+    // back; the launcher is the visible control the visitor came from.
+    if (this.lastFocus instanceof HTMLElement && this.lastFocus !== this.host) {
       this.lastFocus.focus();
+    } else if (this.showLauncher) {
+      this.launcher.focus();
     }
 
     this.lastFocus = null;

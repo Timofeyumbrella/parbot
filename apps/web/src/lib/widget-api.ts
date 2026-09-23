@@ -68,6 +68,19 @@ export const readJson = async (request: Request): Promise<unknown> => {
   }
 };
 
+/** One readable sentence for a failed validation, naming the field when there is one. */
+export const firstIssue = (error: z.ZodError, fallback = 'Check the request and try again.') => {
+  const issue = error.issues[0];
+
+  if (!issue) {
+    return fallback;
+  }
+
+  const path = issue.path.map(String).join('.');
+
+  return path ? `${path}: ${issue.message}` : issue.message;
+};
+
 // ---------------------------------------------------------------------------
 // Origins
 // ---------------------------------------------------------------------------
