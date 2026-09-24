@@ -17,6 +17,8 @@ type DemoWindowProps = {
   bodyRef?: React.Ref<HTMLDivElement>;
   /** "off" for the scripted loop, so screen readers are not read every streamed word. */
   ariaLive?: 'polite' | 'off';
+  /** True while an answer streams, so assistive tech announces the whole reply once it settles. */
+  ariaBusy?: boolean;
 };
 
 /** The chat window chrome shared by the scripted and the live hero demos. */
@@ -28,6 +30,7 @@ export const DemoWindow = ({
   className,
   bodyRef,
   ariaLive = 'polite',
+  ariaBusy = false,
 }: DemoWindowProps) => (
   <div
     className={cn(
@@ -48,6 +51,7 @@ export const DemoWindow = ({
       ref={bodyRef}
       className="flex h-[22rem] flex-col gap-4 overflow-y-auto p-4 sm:h-[24rem]"
       aria-live={ariaLive}
+      aria-busy={ariaBusy}
     >
       {children}
     </div>

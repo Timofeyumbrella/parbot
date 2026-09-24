@@ -206,6 +206,7 @@ export const LiveDemo = ({ demoKey }: { demoKey: string }) => {
       label="Live"
       title={config.name}
       bodyRef={bodyRef}
+      ariaBusy={busy}
       footer={
         <form
           className="flex items-center gap-2"

@@ -21,26 +21,6 @@ const palette = {
   primaryForeground: '#260f00',
 };
 
-const Marker = ({ index }: { index: number }) => (
-  <span
-    style={{
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      width: 30,
-      height: 30,
-      marginLeft: 8,
-      borderRadius: 6,
-      background: 'rgba(249, 173, 38, 0.18)',
-      color: palette.primary,
-      fontSize: 18,
-      fontWeight: 600,
-    }}
-  >
-    {index}
-  </span>
-);
-
 export default function Image() {
   return new ImageResponse(
     (
@@ -86,7 +66,7 @@ export default function Image() {
               Give your docs an assistant that cites its sources.
             </div>
             <div style={{ color: palette.mutedForeground, fontSize: 24, lineHeight: 1.4 }}>
-              One script tag. A bubble or a ⌘K palette. Every answer links to the page it came from.
+              One script tag. A bubble or a command palette. Every answer links to the page it came from.
             </div>
           </div>
 
@@ -125,10 +105,7 @@ export default function Image() {
               >
                 How do I rotate an API key?
               </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center' }}>
-                Open Settings, then API keys, and choose Rotate next to the key.
-                <Marker index={1} />
-              </div>
+              <div style={{ display: 'flex' }}>Open Settings, then API keys, and choose Rotate next to the key [1].</div>
               <div
                 style={{
                   display: 'flex',
