@@ -181,3 +181,6 @@ export const inboxHref = (assistantId: string, tab: InboxTab, filter: Conversati
 
   return `/a/${assistantId}/inbox${query ? `?${query}` : ''}`;
 };
+
+/** True for a conversation URL (/a/[assistantId]/inbox/[conversationId]), false for the list. */
+export const isConversationPath = (pathname: string) => /\/inbox\/[^/?#]+\/?$/.test(pathname);
