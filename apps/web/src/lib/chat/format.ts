@@ -1,44 +1,4 @@
-const MINUTE = 60_000;
-const HOUR = 60 * MINUTE;
-const DAY = 24 * HOUR;
-
-/** Compact relative time for list rows: "now", "5m", "3h", "2d", then a short date. */
-export const relativeTime = (iso: string | null, now = Date.now()) => {
-  if (!iso) {
-    return '';
-  }
-
-  const then = Date.parse(iso);
-
-  if (Number.isNaN(then)) {
-    return '';
-  }
-
-  const elapsed = Math.max(now - then, 0);
-
-  if (elapsed < MINUTE) {
-    return 'now';
-  }
-
-  if (elapsed < HOUR) {
-    return `${Math.floor(elapsed / MINUTE)}m`;
-  }
-
-  if (elapsed < DAY) {
-    return `${Math.floor(elapsed / HOUR)}h`;
-  }
-
-  if (elapsed < 7 * DAY) {
-    return `${Math.floor(elapsed / DAY)}d`;
-  }
-
-  const date = new Date(then);
-  const sameYear = date.getFullYear() === new Date(now).getFullYear();
-
-  return date.toLocaleDateString('en-US', sameYear ? { month: 'short', day: 'numeric' } : { month: 'short', day: 'numeric', year: 'numeric' });
-};
-
-/** Latency for the answer footer: "0.8s", "12s". */
+/** Latency for the answer footer: "0.8s", "12s". Dates come from `lib/format`, not from here. */
 export const formatLatency = (ms: number | null) => {
   if (ms === null || ms < 0) {
     return '';

@@ -107,11 +107,10 @@ describe('Composer', () => {
     expect(box()).toHaveValue('');
   });
 
-  it('shows the remaining characters as the limit approaches', async () => {
-    const user = userEvent.setup();
-
+  it('shows the remaining characters as the limit approaches', () => {
     render(<Composer draftKey="c1" onSend={vi.fn()} />);
-    await user.type(box(), 'x'.repeat(1850));
+    // One change event, not 1,850 keystrokes: a paste is what a reader does with text this long.
+    fireEvent.change(box(), { target: { value: 'x'.repeat(1850) } });
 
     expect(screen.getByText('150 left')).toBeVisible();
   });

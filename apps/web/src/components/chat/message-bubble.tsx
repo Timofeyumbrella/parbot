@@ -9,6 +9,7 @@ import { memo } from 'react';
 import { AnswerMarkdown } from '@/components/chat/answer-markdown';
 import { CopyButton } from '@/components/chat/code-block';
 import { Button } from '@/components/ui/button';
+import { canRetry, errorAction } from '@/lib/chat/errors';
 import { formatLatency, hostnameOf } from '@/lib/chat/format';
 import type { ThreadMessage } from '@/lib/chat/thread';
 
@@ -34,6 +35,41 @@ const UserBubble = ({ message }: { message: ThreadMessage }) => (
     ) : null}
   </div>
 );
+
+type ErrorNoticeProps = {
+  error: NonNullable<ThreadMessage['error']>;
+  onRetry?: () => void;
+};
+
+/** What went wrong, a way to fix it when there is one, and Retry when sending again can help. */
+const ErrorNotice = ({ error, onRetry }: ErrorNoticeProps) => {
+  const action = errorAction(error);
+  const retry = onRetry && canRetry(error);
+
+  return (
+    <div className="border-destructive/30 bg-destructive/10 flex flex-col gap-2 rounded-lg border px-3 py-2.5 text-sm" role="alert">
+      <div className="flex items-start gap-2">
+        <AlertCircle className="text-destructive mt-0.5 size-4 shrink-0" />
+        <span>{error.message}</span>
+      </div>
+      {retry || action ? (
+        <div className="flex flex-wrap items-center gap-2">
+          {retry ? (
+            <Button type="button" variant="outline" size="sm" onClick={onRetry}>
+              <RotateCcw data-icon="inline-start" />
+              Retry
+            </Button>
+          ) : null}
+          {action ? (
+            <Button asChild variant={retry ? 'ghost' : 'outline'} size="sm">
+              <Link href={action.href}>{action.label}</Link>
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+};
 
 const Thinking = () => (
   <div className="text-muted-foreground flex h-6 items-center gap-1" aria-label="Thinking" role="status">
@@ -95,20 +131,10 @@ const AssistantBubble = ({ message, assistantId, assistantName, onFeedback, onRe
         <div className="text-muted-foreground text-xs font-medium">{assistantName}</div>
 
         {message.status === 'error' ? (
-          <div className="flex flex-col gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm" role="alert">
-            <div className="flex items-start gap-2">
-              <AlertCircle className="text-destructive mt-0.5 size-4 shrink-0" />
-              <span>{message.error?.message ?? 'The answer could not be produced.'}</span>
-            </div>
-            {onRetry && questionId ? (
-              <div>
-                <Button type="button" variant="outline" size="sm" onClick={() => onRetry(questionId)}>
-                  <RotateCcw data-icon="inline-start" />
-                  Retry
-                </Button>
-              </div>
-            ) : null}
-          </div>
+          <ErrorNotice
+            error={message.error ?? { code: 'internal', message: 'The answer could not be produced.' }}
+            onRetry={onRetry && questionId ? () => onRetry(questionId) : undefined}
+          />
         ) : streaming && !message.content ? (
           <Thinking />
         ) : (
@@ -137,7 +163,8 @@ const AssistantBubble = ({ message, assistantId, assistantName, onFeedback, onRe
           <div
             className={cn(
               'text-muted-foreground -ml-1.5 flex h-6 items-center gap-0.5 text-xs transition-opacity',
-              'opacity-0 group-hover:opacity-100 focus-within:opacity-100',
+              // Hover reveals it on a pointer device; a touch screen has no hover, so it stays visible there.
+              'pointer-coarse:opacity-100 opacity-0 group-hover:opacity-100 focus-within:opacity-100',
               (message.feedback !== null || message.status === 'stopped') && 'opacity-100',
             )}
           >

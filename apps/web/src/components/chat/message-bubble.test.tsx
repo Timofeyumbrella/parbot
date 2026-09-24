@@ -190,6 +190,43 @@ describe('MessageBubble for the assistant', () => {
     expect(onRetry).toHaveBeenCalledWith('u1');
   });
 
+  it('points a quota error at Billing and drops Retry when resending cannot help', () => {
+    renderBubble({
+      onRetry: vi.fn(),
+      questionId: 'u1',
+      message: message({
+        content: '',
+        citations: [],
+        status: 'error',
+        error: { code: 'quota_exceeded', message: 'This account has used its 200 answers for the month.' },
+      }),
+    });
+
+    expect(screen.getByRole('link', { name: 'Upgrade in Billing' })).toHaveAttribute('href', '/billing');
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+
+    renderBubble({
+      onRetry: vi.fn(),
+      questionId: 'u1',
+      message: message({
+        id: 'a2',
+        content: '',
+        citations: [],
+        status: 'error',
+        error: { code: 'unauthorized', message: 'Your session has ended.' },
+      }),
+    });
+
+    expect(screen.getByRole('link', { name: 'Sign in' })).toHaveAttribute('href', '/login');
+    expect(screen.getAllByRole('button', { name: 'Retry' })).toHaveLength(1);
+  });
+
+  it('keeps the footer reachable on a touch screen', () => {
+    const { container } = renderBubble();
+
+    expect(container.querySelector('[data-role="assistant"] .pointer-coarse\\:opacity-100')).not.toBeNull();
+  });
+
   it('labels a stopped answer and keeps its partial text', () => {
     renderBubble({ message: message({ content: 'Partial', citations: [], status: 'stopped', latency_ms: null }) });
 

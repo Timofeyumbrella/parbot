@@ -284,21 +284,55 @@ describe('sendMessage', () => {
     expect(thread()?.messages[1]).toMatchObject({
       status: 'error',
       content: 'Part',
-      error: { code: 'internal', message: 'The connection closed before the answer finished.' },
+      error: { code: 'internal', message: 'The connection closed before the answer finished. Try again.' },
     });
     expect(thread()?.messages[0]).toMatchObject({ status: 'failed' });
   });
 
-  it('turns a network failure into an error bubble', async () => {
+  it('turns a network failure into an error bubble without echoing the browser', async () => {
     vi.stubGlobal('fetch', vi.fn(() => Promise.reject(new TypeError('Failed to fetch'))));
 
     await sendMessage(queryClient, ASSISTANT, { conversationId: CONVERSATION, content: 'Hello?' });
 
     expect(thread()?.messages[1]).toMatchObject({
       status: 'error',
-      error: { code: 'internal', message: 'The request failed: Failed to fetch' },
+      error: { code: 'internal', message: 'The message did not reach the server. Check your connection and try again.' },
     });
+    expect(thread()?.messages[0]).toMatchObject({ status: 'failed' });
     expect(streamRegistry.isStreaming(CONVERSATION)).toBe(false);
+  });
+
+  it('reports a response that is not an event stream by its status', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('<html>Internal Server Error</html>', { status: 500, headers: { 'content-type': 'text/html' } })),
+    );
+
+    await sendMessage(queryClient, ASSISTANT, { conversationId: CONVERSATION, content: 'Hello?' });
+
+    expect(thread()?.messages[1]).toMatchObject({
+      status: 'error',
+      error: { code: 'internal', message: 'The server could not answer (500). Try again in a moment.' },
+    });
+    expect(thread()?.active).toBeNull();
+    expect(streamRegistry.isStreaming(CONVERSATION)).toBe(false);
+  });
+
+  it('tells the inbox to refetch once the exchange is saved', async () => {
+    const chat = fakeChat();
+    const invalidate = vi.spyOn(queryClient, 'invalidateQueries');
+
+    vi.stubGlobal('fetch', chat.fetch);
+
+    const pending = sendMessage(queryClient, ASSISTANT, { conversationId: CONVERSATION, content: 'Hello?' });
+
+    chat.push(meta);
+    expect(invalidate).not.toHaveBeenCalled();
+    chat.push({ type: 'done', answered: true, latencyMs: 3 });
+    chat.close();
+    await pending;
+
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['inbox'] });
   });
 
   it('ignores an empty message', async () => {

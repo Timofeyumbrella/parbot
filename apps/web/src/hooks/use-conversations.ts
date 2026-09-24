@@ -1,6 +1,6 @@
 'use client';
 
-import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
+import type { RealtimeChannel, RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
@@ -9,89 +9,146 @@ import { deleteConversation, renameConversation } from '@/actions/conversations'
 import {
   applyServerRow,
   type ConversationRow,
+  type ConversationSnapshot,
   mergeConversationLists,
+  mergeSnapshot,
   removeConversationRow,
   renameConversationRow,
 } from '@/lib/chat/conversations';
-import { conversationsKey, fetchConversations, threadKey } from '@/lib/chat/queries';
+import { conversationsKey, fetchConversations, INBOX_NAMESPACE, threadKey } from '@/lib/chat/queries';
+import { streamRegistry } from '@/lib/chat/streams';
 import type { Conversation } from '@/lib/db';
-import { getSupabaseBrowserClient } from '@/lib/supabase/client';
+import { getSupabaseBrowserClient, realtimeReadyClient } from '@/lib/supabase/client';
 
 /**
- * The assistant's conversation list. The layout hands over the first page from the server; from
- * then on the cache is the truth and the browser client refreshes it when it goes stale.
+ * The server clock of the newest snapshot folded into each assistant's list. The router can hand
+ * the layout's payload over more than once (two panes, a cached navigation); a snapshot that is
+ * not newer than the last one applied is a replay and is ignored.
  */
-export const useConversations = (assistantId: string, initial?: ConversationRow[]) => {
+const appliedSnapshots = new Map<string, number>();
+
+/** Test hook. */
+export const resetAppliedSnapshots = () => {
+  appliedSnapshots.clear();
+};
+
+/**
+ * The assistant's conversation list. The layout hands over a snapshot from the server; from then
+ * on the cache is the truth, refreshed through the browser client when it goes stale and folded
+ * together with any newer snapshot a later visit brings.
+ */
+export const useConversations = (assistantId: string, snapshot?: ConversationSnapshot) => {
   const queryClient = useQueryClient();
   const key = conversationsKey(assistantId);
 
   useEffect(() => {
-    // A later visit brings newer rows from the server than the cache holds; fold them in.
-    if (initial) {
-      queryClient.setQueryData<ConversationRow[]>(conversationsKey(assistantId), (rows) =>
-        rows ? mergeConversationLists(rows, initial) : rows,
-      );
+    if (!snapshot) {
+      return;
     }
-  }, [initial, assistantId, queryClient]);
+
+    const applied = appliedSnapshots.get(assistantId) ?? 0;
+
+    if (snapshot.fetchedAt <= applied) {
+      return;
+    }
+
+    appliedSnapshots.set(assistantId, snapshot.fetchedAt);
+    queryClient.setQueryData<ConversationRow[]>(conversationsKey(assistantId), (rows) =>
+      mergeSnapshot(rows, snapshot.rows),
+    );
+  }, [snapshot, assistantId, queryClient]);
 
   return useQuery({
     queryKey: key,
-    queryFn: () =>
-      fetchConversations(getSupabaseBrowserClient(), assistantId, queryClient.getQueryData<ConversationRow[]>(key)),
-    initialData: initial,
-    initialDataUpdatedAt: initial ? Date.now : undefined,
+    queryFn: async () =>
+      mergeConversationLists(
+        queryClient.getQueryData<ConversationRow[]>(key),
+        await fetchConversations(getSupabaseBrowserClient(), assistantId),
+      ),
+    initialData: snapshot ? () => mergeSnapshot(undefined, snapshot.rows) : undefined,
+    initialDataUpdatedAt: snapshot ? Date.now : undefined,
   });
 };
 
-/** Keeps the list fresh from the database: titles the engine sets, activity, deletions. */
+/** One row from the list cache, for a header that names the open conversation. Never fetches. */
+export const useConversationRow = (assistantId: string, conversationId: string | null) => {
+  const { data } = useQuery<ConversationRow[]>({ queryKey: conversationsKey(assistantId), enabled: false });
+
+  return conversationId ? (data?.find((row) => row.id === conversationId) ?? null) : null;
+};
+
+/**
+ * Keeps the list fresh from the database: titles the engine sets, activity, rows created in
+ * another tab. The channel joins only once the session is loaded, because a join without the
+ * user's token runs as anon and the server rejects the filter without a word.
+ */
 export const useConversationsRealtime = (assistantId: string) => {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    const supabase = getSupabaseBrowserClient();
     const key = conversationsKey(assistantId);
-    const channel = supabase
-      .channel(`conversations:${assistantId}:${Math.random().toString(36).slice(2)}`)
-      .on<Conversation>(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'conversations', filter: `assistant_id=eq.${assistantId}` },
-        (payload: RealtimePostgresChangesPayload<Conversation>) => {
-          if (payload.eventType === 'DELETE') {
-            const id = payload.old.id;
+    let cancelled = false;
+    let channel: RealtimeChannel | null = null;
 
-            if (id) {
-              queryClient.setQueryData<ConversationRow[]>(key, (rows) => (rows ? removeConversationRow(rows, id) : rows));
+    void realtimeReadyClient().then((supabase) => {
+      if (cancelled) {
+        return;
+      }
+
+      channel = supabase
+        .channel(`chat:conversations:${assistantId}:${Math.random().toString(36).slice(2)}`)
+        .on<Conversation>(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'conversations', filter: `assistant_id=eq.${assistantId}` },
+          (payload: RealtimePostgresChangesPayload<Conversation>) => {
+            if (payload.eventType === 'DELETE') {
+              const id = payload.old.id;
+
+              if (id) {
+                queryClient.setQueryData<ConversationRow[]>(key, (rows) => (rows ? removeConversationRow(rows, id) : rows));
+              }
+
+              return;
             }
 
-            return;
+            const row = payload.new;
+
+            if (row.channel !== 'app') {
+              return;
+            }
+
+            queryClient.setQueryData<ConversationRow[]>(key, (rows) =>
+              applyServerRow(rows ?? [], {
+                id: row.id,
+                title: row.title,
+                last_message_at: row.last_message_at,
+                message_count: row.message_count,
+                unanswered_count: row.unanswered_count,
+              }),
+            );
+          },
+        )
+        .subscribe((status, error) => {
+          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+            console.warn(`Chat: the conversations channel did not join (${status}).`, error?.message ?? '');
           }
-
-          const row = payload.new;
-
-          if (row.channel !== 'app') {
-            return;
-          }
-
-          queryClient.setQueryData<ConversationRow[]>(key, (rows) =>
-            applyServerRow(rows ?? [], {
-              id: row.id,
-              title: row.title,
-              last_message_at: row.last_message_at,
-              message_count: row.message_count,
-              unanswered_count: row.unanswered_count,
-            }),
-          );
-        },
-      )
-      .subscribe();
+        });
+    });
 
     return () => {
-      void supabase.removeChannel(channel);
+      cancelled = true;
+
+      if (channel) {
+        void getSupabaseBrowserClient().removeChannel(channel);
+      }
     };
   }, [assistantId, queryClient]);
 };
 
-/** Rename and delete, applied to the cache first and rolled back if the action fails. */
+/**
+ * Rename and delete, applied to the cache first and rolled back if the action fails. Both tell
+ * the inbox to refetch, since it lists the same rows under its own keys.
+ */
 export const useConversationActions = (assistantId: string) => {
   const queryClient = useQueryClient();
   const key = conversationsKey(assistantId);
@@ -116,27 +173,42 @@ export const useConversationActions = (assistantId: string) => {
         return false;
       }
 
+      void queryClient.invalidateQueries({ queryKey: INBOX_NAMESPACE });
+
       return true;
     },
     [queryClient, key],
   );
 
+  /**
+   * The row and its thread leave the cache at once, and the action is dispatched before the
+   * caller navigates: a navigation started afterwards takes priority in the router's queue, so
+   * the screen moves on while the delete is still in flight.
+   */
   const remove = useCallback(
     async (id: string) => {
       const previous = queryClient.getQueryData<ConversationRow[]>(key);
+      const thread = queryClient.getQueryData(threadKey(id));
 
+      streamRegistry.stop(id);
       queryClient.setQueryData<ConversationRow[]>(key, (rows) => removeConversationRow(rows ?? [], id));
+      queryClient.removeQueries({ queryKey: threadKey(id) });
 
       const result = await deleteConversation({ id });
 
       if (!result.ok) {
         queryClient.setQueryData<ConversationRow[]>(key, previous);
+
+        if (thread) {
+          queryClient.setQueryData(threadKey(id), thread);
+        }
+
         toast.error(result.error);
 
         return false;
       }
 
-      queryClient.removeQueries({ queryKey: threadKey(id) });
+      void queryClient.invalidateQueries({ queryKey: INBOX_NAMESPACE });
 
       return true;
     },

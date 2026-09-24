@@ -3,6 +3,7 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { resetAppliedSnapshots } from '@/hooks/use-conversations';
 import { type ConversationRow } from '@/lib/chat/conversations';
 import { conversationsKey } from '@/lib/chat/queries';
 
@@ -24,7 +25,10 @@ vi.mock('next/navigation', () => ({
 }));
 
 vi.mock('@/actions/conversations', () => actions);
-vi.mock('@/lib/supabase/client', () => ({ getSupabaseBrowserClient: () => ({}) }));
+vi.mock('@/lib/supabase/client', () => ({
+  getSupabaseBrowserClient: () => ({}),
+  realtimeReadyClient: () => new Promise(() => {}),
+}));
 vi.mock('sonner', () => ({ toast: { error: vi.fn() } }));
 
 const NOW = Date.parse('2026-09-23T12:00:00.000Z');
@@ -42,7 +46,7 @@ const renderList = (initial = rows) => {
 
   return render(
     <QueryClientProvider client={queryClient}>
-      <ConversationList assistantId="asst" initial={initial} />
+      <ConversationList assistantId="asst" snapshot={{ rows: initial, fetchedAt: NOW }} />
     </QueryClientProvider>,
   );
 };
@@ -52,6 +56,7 @@ const cached = () => queryClient.getQueryData<ConversationRow[]>(conversationsKe
 beforeEach(() => {
   vi.useFakeTimers({ now: NOW, toFake: ['Date'] });
   navigation.params.conversationId = undefined;
+  resetAppliedSnapshots();
 });
 
 describe('ConversationList', () => {
@@ -62,9 +67,9 @@ describe('ConversationList', () => {
     const items = within(screen.getByRole('navigation', { name: 'Conversations' })).getAllByRole('listitem');
 
     expect(items.map((item) => within(item).getByRole('link').textContent)).toEqual([
-      'Rotate an API key5m',
-      'New chat3h',
-      'Webhook signatures2d',
+      'Rotate an API key5 min ago',
+      'New chat3 hr ago',
+      'Webhook signatures2 days ago',
     ]);
     expect(within(items[1]!).getByLabelText('1 unanswered')).toBeInTheDocument();
     expect(within(items[1]!).getByRole('link')).toHaveAttribute('aria-current', 'page');
@@ -152,5 +157,21 @@ describe('ConversationList', () => {
     expect(cached()?.map((row) => row.id)).toEqual(['c2', 'c3']);
     expect(actions.deleteConversation).toHaveBeenCalledWith({ id: 'c1' });
     expect(navigation.push).toHaveBeenCalledWith('/a/asst/chat');
+    // The action is dispatched before the navigation, so the router lets the navigation take priority.
+    expect(actions.deleteConversation.mock.invocationCallOrder[0]).toBeLessThan(navigation.push.mock.invocationCallOrder[0]!);
+  });
+
+  it('does not leave a conversation that is not the open one when it is deleted', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+    navigation.params.conversationId = 'c1';
+    renderList();
+
+    await user.click(screen.getByRole('button', { name: 'Actions for Webhook signatures' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Delete' }));
+    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Delete' }));
+
+    expect(cached()?.map((row) => row.id)).toEqual(['c1', 'c2']);
+    expect(navigation.push).not.toHaveBeenCalled();
   });
 });

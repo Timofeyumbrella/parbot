@@ -8,6 +8,7 @@ import {
   draftTitle,
   filterConversations,
   mergeConversationLists,
+  mergeSnapshot,
   removeConversationRow,
   renameConversationRow,
   sortConversations,
@@ -76,6 +77,13 @@ describe('list transitions', () => {
     expect(mergeConversationLists(undefined, [row('x', null)]).map((item) => item.id)).toEqual(['x']);
   });
 
+  it('lets a fresh read drop rows deleted elsewhere but not rows still in flight', () => {
+    const cached = [row('new', '2026-05-01T00:00:00Z', { pending: true }), row('confirmed', '2026-04-01T00:00:00Z'), row('old', '2026-01-01T00:00:00Z')];
+    const merged = mergeConversationLists(cached, [row('old', '2026-01-01T00:00:00Z')]);
+
+    expect(merged.map((item) => item.id)).toEqual(['new', 'old']);
+  });
+
   it('filters by title, treating untitled rows as "New chat"', () => {
     const list = [row('a', null, { title: 'Billing cycle' }), row('b', null, { title: null })];
 
@@ -83,5 +91,47 @@ describe('list transitions', () => {
     expect(filterConversations(list, 'new').map((item) => item.id)).toEqual(['b']);
     expect(filterConversations(list, '  ')).toBe(list);
     expect(conversationLabel({ title: '  ' })).toBe('New chat');
+  });
+});
+
+describe('mergeSnapshot', () => {
+  it('seeds an empty cache', () => {
+    expect(mergeSnapshot(undefined, [row('b', null), row('a', '2026-01-01T00:00:00Z')]).map((item) => item.id)).toEqual(['a', 'b']);
+  });
+
+  it('keeps a conversation the browser started that an older snapshot lacks', () => {
+    // Regression: ask, open Knowledge, come back. The layout's payload predates the new chat.
+    const cached = [row('started', '2026-05-01T00:00:00Z'), row('old', '2026-01-01T00:00:00Z')];
+    const merged = mergeSnapshot(cached, [row('old', '2026-01-01T00:00:00Z')]);
+
+    expect(merged.map((item) => item.id)).toEqual(['started', 'old']);
+  });
+
+  it('adds rows the cache has never seen', () => {
+    const merged = mergeSnapshot([row('a', '2026-01-01T00:00:00Z')], [row('a', '2026-01-01T00:00:00Z'), row('b', '2026-02-01T00:00:00Z')]);
+
+    expect(merged.map((item) => item.id)).toEqual(['b', 'a']);
+  });
+
+  it('takes the snapshot copy when it is at least as recent, and the cached copy when the cache is newer', () => {
+    const cached = [
+      row('renamed', '2026-01-01T00:00:00Z', { title: 'Server title' }),
+      row('busy', '2026-03-01T00:00:00Z', { message_count: 6 }),
+    ];
+    const merged = mergeSnapshot(cached, [
+      row('renamed', '2026-01-01T00:00:00Z', { title: 'Renamed on the server' }),
+      row('busy', '2026-02-01T00:00:00Z', { message_count: 4 }),
+    ]);
+
+    expect(merged.find((item) => item.id === 'renamed')?.title).toBe('Renamed on the server');
+    expect(merged.find((item) => item.id === 'busy')).toMatchObject({ message_count: 6, last_message_at: '2026-03-01T00:00:00Z' });
+  });
+
+  it('never touches a pending row and keeps an optimistic title the snapshot lacks', () => {
+    const cached = [row('p', '2026-05-01T00:00:00Z', { pending: true, title: 'Optimistic' }), row('t', '2026-01-01T00:00:00Z', { title: 'Kept' })];
+    const merged = mergeSnapshot(cached, [row('p', '2026-06-01T00:00:00Z', { title: null }), row('t', '2026-01-01T00:00:00Z', { title: null })]);
+
+    expect(merged.find((item) => item.id === 'p')).toMatchObject({ pending: true, title: 'Optimistic', last_message_at: '2026-05-01T00:00:00Z' });
+    expect(merged.find((item) => item.id === 't')).toMatchObject({ title: 'Kept', pending: false });
   });
 });

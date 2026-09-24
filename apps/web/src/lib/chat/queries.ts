@@ -6,21 +6,26 @@ import {
   CONVERSATION_COLUMNS,
   CONVERSATION_LIST_LIMIT,
   type ConversationRow,
-  mergeConversationLists,
+  type ConversationSnapshot,
 } from './conversations';
 import { mergeThread, type MessageRow, type Thread, THREAD_MESSAGE_COLUMNS } from './thread';
 
 type Client = SupabaseClient<Database>;
 
-export const conversationsKey = (assistantId: string) => ['conversations', assistantId, 'app'] as const;
-export const threadKey = (conversationId: string) => ['thread', conversationId] as const;
+/**
+ * Every chat query lives under one namespace, so no other screen can collide with the shapes
+ * stored here, and the whole chat cache can be dropped in one call.
+ */
+export const CHAT_NAMESPACE = ['chat'] as const;
+
+/** The inbox keeps its own conversation caches; a chat mutation tells it to refetch. */
+export const INBOX_NAMESPACE = ['inbox'] as const;
+
+export const conversationsKey = (assistantId: string) => [...CHAT_NAMESPACE, 'conversations', assistantId] as const;
+export const threadKey = (conversationId: string) => [...CHAT_NAMESPACE, 'thread', conversationId] as const;
 
 /** The assistant's in-app conversations, newest first. Works with the server and the browser client. */
-export const fetchConversations = async (
-  client: Client,
-  assistantId: string,
-  previous?: ConversationRow[],
-): Promise<ConversationRow[]> => {
+export const fetchConversations = async (client: Client, assistantId: string): Promise<ConversationRow[]> => {
   const { data, error } = await client
     .from('conversations')
     .select(CONVERSATION_COLUMNS)
@@ -33,7 +38,14 @@ export const fetchConversations = async (
     throw new Error(error.message);
   }
 
-  return mergeConversationLists(previous, data ?? []);
+  return data ?? [];
+};
+
+/** The list plus the clock it was read at, so the client can tell a newer snapshot from a replay. */
+export const readConversationSnapshot = async (client: Client, assistantId: string): Promise<ConversationSnapshot> => {
+  const rows = await fetchConversations(client, assistantId);
+
+  return { rows, fetchedAt: Date.now() };
 };
 
 /** A conversation's messages oldest first, merged with whatever the cache holds in flight. */

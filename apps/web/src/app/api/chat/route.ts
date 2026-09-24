@@ -18,6 +18,21 @@ const requestSchema = z.object({
   message: z.string().trim().min(1).max(MAX_MESSAGE_LENGTH),
 });
 
+/** Says which part of the request was wrong, so a broken link reads differently from a long message. */
+const validationMessage = (error: z.ZodError) => {
+  const fields = new Set(error.issues.map((issue) => String(issue.path[0] ?? '')));
+
+  if (fields.has('assistantId')) {
+    return 'That assistant link is not valid. Open the assistant from the dashboard and try again.';
+  }
+
+  if (fields.has('conversationId')) {
+    return 'That conversation link is not valid. Start a new chat.';
+  }
+
+  return `Ask something between 1 and ${MAX_MESSAGE_LENGTH.toLocaleString('en-US')} characters.`;
+};
+
 /** Early failures still arrive as a stream, so the client has one code path. */
 const fail = (status: number, event: ChatStreamEvent) => streamResponse(errorStream(event), { status });
 
@@ -33,11 +48,7 @@ export async function POST(request: NextRequest) {
   const parsed = requestSchema.safeParse(body);
 
   if (!parsed.success) {
-    return fail(400, {
-      type: 'error',
-      code: 'bad_request',
-      message: `Ask something between 1 and ${MAX_MESSAGE_LENGTH} characters.`,
-    });
+    return fail(400, { type: 'error', code: 'bad_request', message: validationMessage(parsed.error) });
   }
 
   const { supabase, user } = await getSession();

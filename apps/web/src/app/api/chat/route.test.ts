@@ -78,10 +78,17 @@ describe('POST /api/chat', () => {
     expect(await events(response)).toEqual([{ type: 'error', code: 'bad_request', message: expect.any(String) }]);
   });
 
-  it('validates ids and the message length', async () => {
-    expect((await post({ assistantId: 'x', conversationId: CONVERSATION, message: 'hi' })).status).toBe(400);
-    expect((await post({ assistantId: ASSISTANT, conversationId: CONVERSATION, message: '   ' })).status).toBe(400);
-    expect((await post({ assistantId: ASSISTANT, conversationId: CONVERSATION, message: 'x'.repeat(2001) })).status).toBe(400);
+  it('validates ids and the message length, naming what was wrong', async () => {
+    const badAssistant = await post({ assistantId: 'x', conversationId: CONVERSATION, message: 'hi' });
+    const badConversation = await post({ assistantId: ASSISTANT, conversationId: 'nope', message: 'hi' });
+    const empty = await post({ assistantId: ASSISTANT, conversationId: CONVERSATION, message: '   ' });
+    const long = await post({ assistantId: ASSISTANT, conversationId: CONVERSATION, message: 'x'.repeat(2001) });
+
+    expect([badAssistant.status, badConversation.status, empty.status, long.status]).toEqual([400, 400, 400, 400]);
+    expect((await events(badAssistant))[0]).toMatchObject({ code: 'bad_request', message: expect.stringMatching(/assistant link/) });
+    expect((await events(badConversation))[0]).toMatchObject({ code: 'bad_request', message: 'That conversation link is not valid. Start a new chat.' });
+    expect((await events(empty))[0]).toMatchObject({ message: 'Ask something between 1 and 2,000 characters.' });
+    expect((await events(long))[0]).toMatchObject({ message: 'Ask something between 1 and 2,000 characters.' });
     expect(engine.streamAnswer).not.toHaveBeenCalled();
   });
 

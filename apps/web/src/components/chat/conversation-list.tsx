@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
+import { useChatPane } from '@/components/chat/chat-shell';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -26,17 +27,16 @@ import { useConversationActions, useConversations } from '@/hooks/use-conversati
 import {
   conversationLabel,
   type ConversationRow,
+  type ConversationSnapshot,
   filterConversations,
   MAX_TITLE_LENGTH,
 } from '@/lib/chat/conversations';
-import { relativeTime } from '@/lib/chat/format';
+import { relativeTime } from '@/lib/format';
 
 export type ConversationListProps = {
   assistantId: string;
-  /** The first page, rendered by the server; seeds the cache. */
-  initial?: ConversationRow[];
-  /** Called when a link is followed, so a sheet can close. */
-  onNavigate?: () => void;
+  /** The first page, read by the server; seeds the cache. */
+  snapshot?: ConversationSnapshot;
 };
 
 type RenameInputProps = {
@@ -88,6 +88,13 @@ const RenameInput = ({ initial, onSubmit, onCancel }: RenameInputProps) => {
   );
 };
 
+/** Relative times depend on the clock, so the server's text is replaced after hydration. */
+const RowTime = ({ at }: { at: string | null }) => (
+  <span className="text-muted-foreground ml-auto shrink-0 text-[11px] tabular-nums" suppressHydrationWarning>
+    {at ? relativeTime(at) : ''}
+  </span>
+);
+
 type RowProps = {
   row: ConversationRow;
   href: string;
@@ -119,7 +126,6 @@ const Row = ({ row, href, active, renaming, onNavigate, onRename, onRenameSubmit
     >
       <Link
         href={href}
-        prefetch
         onClick={onNavigate}
         aria-current={active ? 'page' : undefined}
         className="flex min-w-0 flex-1 items-center gap-2 self-stretch pr-1 pl-2.5 text-sm outline-none focus-visible:underline"
@@ -132,9 +138,7 @@ const Row = ({ row, href, active, renaming, onNavigate, onRename, onRenameSubmit
           />
         ) : null}
         <span className={cn('truncate', active ? 'font-medium' : 'text-foreground/90')}>{label}</span>
-        <span className="text-muted-foreground ml-auto shrink-0 text-[11px] tabular-nums" suppressHydrationWarning>
-          {relativeTime(row.last_message_at)}
-        </span>
+        <RowTime at={row.last_message_at} />
       </Link>
       <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
         <DropdownMenuTrigger asChild>
@@ -142,7 +146,7 @@ const Row = ({ row, href, active, renaming, onNavigate, onRename, onRenameSubmit
             variant="ghost"
             size="icon-xs"
             aria-label={`Actions for ${label}`}
-            className="mr-1 shrink-0 opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 data-[state=open]:opacity-100"
+            className="pointer-coarse:opacity-100 mr-1 shrink-0 opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 data-[state=open]:opacity-100"
           >
             <MoreHorizontal />
           </Button>
@@ -166,11 +170,12 @@ const Row = ({ row, href, active, renaming, onNavigate, onRename, onRenameSubmit
  * The left pane: filter, New chat, and one row per conversation. Rows come from the cache the
  * layout seeded, so the list never loads; rename and delete update it before the server answers.
  */
-export const ConversationList = ({ assistantId, initial, onNavigate }: ConversationListProps) => {
+export const ConversationList = ({ assistantId, snapshot }: ConversationListProps) => {
   const params = useParams<{ conversationId?: string }>();
   const router = useRouter();
+  const { onNavigate } = useChatPane();
   const activeId = params.conversationId ?? null;
-  const { data, isError, error, refetch } = useConversations(assistantId, initial);
+  const { data, isError, error, refetch } = useConversations(assistantId, snapshot);
   const { rename, remove } = useConversationActions(assistantId);
   const [query, setQuery] = useState('');
   const [renamingId, setRenamingId] = useState<string | null>(null);
@@ -202,18 +207,19 @@ export const ConversationList = ({ assistantId, initial, onNavigate }: Conversat
 
     setPendingDelete(null);
 
+    // The action goes out first; the navigation that follows takes priority over it in the router.
+    void remove(target.id);
+
     if (target.id === activeId) {
       router.push(base);
     }
-
-    void remove(target.id);
   };
 
   return (
     <div className="flex h-full min-h-0 flex-col" data-testid="conversation-list">
       <div className="flex flex-col gap-2 p-2">
         <Button asChild variant="outline" className="justify-start">
-          <Link href={base} prefetch onClick={onNavigate}>
+          <Link href={base} onClick={onNavigate}>
             <Plus data-icon="inline-start" />
             New chat
           </Link>

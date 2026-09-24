@@ -5,7 +5,8 @@ import { type QueryClient, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useMemo } from 'react';
 
 import { confirmConversation, type ConversationRow, draftTitle, upsertConversation } from '@/lib/chat/conversations';
-import { conversationsKey, threadKey } from '@/lib/chat/queries';
+import { errorEvent, httpFailure, NETWORK_FAILURE, STREAM_CUT_SHORT } from '@/lib/chat/errors';
+import { conversationsKey, INBOX_NAMESPACE, threadKey } from '@/lib/chat/queries';
 import { streamRegistry } from '@/lib/chat/streams';
 import {
   applyStreamEvent,
@@ -29,6 +30,9 @@ const cancelFrame =
   typeof cancelAnimationFrame === 'function'
     ? (handle: number) => cancelAnimationFrame(handle)
     : (handle: number) => clearTimeout(handle);
+
+const isEventStream = (response: Response) =>
+  (response.headers.get('content-type') ?? '').includes('text/event-stream');
 
 /**
  * Sends one message. The reader's bubble and an empty answer land in the cache before the request
@@ -104,6 +108,13 @@ export const sendMessage = async (queryClient: QueryClient, assistantId: string,
       signal: controller.signal,
     });
 
+    // The route answers every case as an event stream, so anything else came from in between.
+    if (!isEventStream(response)) {
+      settle(errorEvent(httpFailure(response.status)));
+
+      return;
+    }
+
     for await (const event of readChatStream(response)) {
       if (controller.signal.aborted) {
         break;
@@ -136,6 +147,8 @@ export const sendMessage = async (queryClient: QueryClient, assistantId: string,
               : row,
           ),
         );
+        // The inbox and the overview count this exchange too; they read under their own keys.
+        void queryClient.invalidateQueries({ queryKey: INBOX_NAMESPACE });
       }
     }
 
@@ -145,22 +158,15 @@ export const sendMessage = async (queryClient: QueryClient, assistantId: string,
       queryClient.setQueryData<Thread>(key, (thread) => (thread ? stopExchange(thread) : thread));
     } else if (queryClient.getQueryData<Thread>(key)?.active) {
       // The server closed the stream without a final event: treat it as a failure the reader can retry.
-      apply({ type: 'error', code: 'internal', message: 'The connection closed before the answer finished.' });
+      apply(errorEvent(STREAM_CUT_SHORT));
     }
-  } catch (cause) {
+  } catch {
     flush();
 
     if (controller.signal.aborted) {
       queryClient.setQueryData<Thread>(key, (thread) => (thread ? stopExchange(thread) : thread));
     } else {
-      apply({
-        type: 'error',
-        code: 'internal',
-        message:
-          cause instanceof Error && cause.message
-            ? `The request failed: ${cause.message}`
-            : 'The request failed. Check your connection and try again.',
-      });
+      apply(errorEvent(NETWORK_FAILURE));
     }
   } finally {
     streamRegistry.finish(conversationId, controller);

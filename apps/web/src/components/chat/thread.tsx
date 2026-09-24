@@ -62,9 +62,7 @@ export const Thread = ({ conversationId }: ThreadProps) => {
           Pick one from the list, or start a new chat.
         </p>
         <Button asChild variant="outline" size="sm">
-          <Link href={`/a/${assistant.id}/chat`} prefetch>
-            New chat
-          </Link>
+          <Link href={`/a/${assistant.id}/chat`}>New chat</Link>
         </Button>
       </div>
     );
