@@ -1,5 +1,32 @@
-import { Placeholder } from '@/components/placeholder';
+import type { Metadata } from 'next';
+import Link from 'next/link';
 
-export default function Page() {
-  return <Placeholder title="Sign in" owner="auth-and-assistants" />;
+import { AuthCard } from '@/components/auth/auth-card';
+import { LoginForm } from '@/components/auth/auth-form';
+import { safeNextPath } from '@/lib/form';
+
+export const metadata: Metadata = { title: 'Sign in' };
+
+const first = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value);
+
+export default async function LoginPage({ searchParams }: PageProps<'/login'>) {
+  const params = await searchParams;
+  const next = safeNextPath(first(params.next)) ?? undefined;
+
+  return (
+    <AuthCard
+      title="Sign in"
+      description="Welcome back. Your assistants are where you left them."
+      footer={
+        <>
+          New to Parbot?{' '}
+          <Link href="/signup" className="text-foreground underline underline-offset-4">
+            Create an account
+          </Link>
+        </>
+      }
+    >
+      <LoginForm next={next} />
+    </AuthCard>
+  );
 }

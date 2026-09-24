@@ -9,6 +9,7 @@ import {
   Code2,
   CreditCard,
   Inbox,
+  LayoutGrid,
   LogOut,
   Menu,
   MessageSquare,
@@ -110,6 +111,20 @@ const SidebarBody = ({ assistants, email, planName, onNavigate }: AppSidebarProp
       </DropdownMenu>
 
       <nav className="flex flex-col gap-0.5" aria-label="Assistant">
+        <Link
+          href="/dashboard"
+          onClick={onNavigate}
+          prefetch
+          className={cn(
+            'mb-1 flex h-8 items-center gap-2.5 rounded-md px-2.5 text-sm transition-colors',
+            isActive('/dashboard', true)
+              ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
+              : 'text-muted-foreground hover:bg-sidebar-accent/60 hover:text-foreground',
+          )}
+        >
+          <LayoutGrid className="size-4" />
+          All assistants
+        </Link>
         {active
           ? assistantNav(active.id).map((item) => (
               <Link
