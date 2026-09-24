@@ -37,7 +37,6 @@
     "**/*.mts"
   ],
   "exclude": [
-    "node_modules",
-    "scripts/seed-demo.ts"
+    "node_modules"
   ]
 }

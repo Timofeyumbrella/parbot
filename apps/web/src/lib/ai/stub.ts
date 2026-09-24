@@ -77,7 +77,8 @@ export const createStubProvider = (): AiProvider => {
 
     for (let index = 0; index < words.length; index += 1) {
       if (input.signal?.aborted) {
-        break;
+        // Match the real provider: a stopped stream is an error, so the engine rolls back.
+        throw new DOMException('The answer was stopped.', 'AbortError');
       }
 
       yield { text: index === 0 ? words[index]! : ` ${words[index]}` };
