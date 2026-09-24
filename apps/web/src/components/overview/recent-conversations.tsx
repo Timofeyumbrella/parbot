@@ -57,7 +57,7 @@ export const RecentConversations = ({
                 <LocalTime
                   value={row.last_message_at ?? row.created_at}
                   now={now}
-                  className="text-muted-foreground w-16 shrink-0 text-right text-xs"
+                  className="text-muted-foreground min-w-16 shrink-0 text-right text-xs whitespace-nowrap"
                 />
               </Link>
             </li>

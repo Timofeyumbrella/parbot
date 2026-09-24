@@ -44,7 +44,7 @@ const Row = ({
         {formatCount(asks)}
         {asks === 1 ? ' time' : ' times'}
       </span>
-      <LocalTime value={lastAskedAt} now={now} className="text-muted-foreground w-16 shrink-0 text-right text-xs" />
+      <LocalTime value={lastAskedAt} now={now} className="text-muted-foreground min-w-16 shrink-0 text-right text-xs whitespace-nowrap" />
     </>
   );
 

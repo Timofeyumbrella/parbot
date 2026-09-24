@@ -301,7 +301,7 @@ export const ConversationList = ({ assistantId, filter, initialRows, now }: Conv
                 <LocalTime
                   value={activityStamp(row)}
                   now={now}
-                  className="text-muted-foreground w-16 shrink-0 text-right text-xs"
+                  className="text-muted-foreground min-w-16 shrink-0 text-right text-xs whitespace-nowrap"
                 />
               </Link>
             </li>
