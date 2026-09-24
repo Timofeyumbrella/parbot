@@ -1,7 +1,8 @@
 /**
  * Pure helpers behind the Overview and the Inbox: period maths, percentages, bucketing a
- * daily series into a gap-free range, and the small formatters the cards share. Nothing in
+ * daily series into a gap-free range, axis ticks and the search-param parsers. Nothing in
  * here touches the database, so it is cheap to test and safe to import from client code.
+ * Dates and counts are formatted with `lib/format.ts`, never here.
  */
 
 export const PERIODS = [7, 30] as const;
@@ -30,10 +31,6 @@ export const periodStart = (days: number, now = new Date()) => {
 /** Whole-number percentage, 0 when there is nothing to divide by. */
 export const percentage = (part: number, total: number) =>
   total > 0 ? Math.round((Math.max(part, 0) / total) * 100) : 0;
-
-export const formatCount = (value: number) => Math.round(value).toLocaleString('en-US');
-
-export const formatPercent = (value: number) => `${Math.round(value)}%`;
 
 export type DailyRow = {
   day: string;
@@ -102,61 +99,33 @@ export const niceTicks = (max: number): number[] => {
 };
 
 /**
- * Short relative time for lists: "just now", "5m ago", "3h ago", "2d ago", then a date.
- * Both arguments are explicit so the server and the client render the same string.
+ * Which day indexes get an axis label when `count` bars share `width` pixels: the first, the
+ * last, and every n-th in between so that labels never sit closer than `minGap` pixels.
  */
-export const relativeTime = (value: string | Date | null | undefined, now: number | Date = Date.now()) => {
-  if (!value) {
-    return '';
+export const labelIndexes = (count: number, width: number, minGap = 44): number[] => {
+  if (count <= 0) {
+    return [];
   }
 
-  const date = typeof value === 'string' ? new Date(value) : value;
-  const time = date.getTime();
+  const slot = width / count;
+  const every = Math.max(1, Math.ceil(minGap / Math.max(slot, 1)));
+  const last = count - 1;
+  const picked: number[] = [];
 
-  if (Number.isNaN(time)) {
-    return '';
+  for (let index = 0; index < count; index += every) {
+    // Skip a label that would collide with the always-present last one.
+    if (index !== last && (last - index) * slot < minGap) {
+      continue;
+    }
+
+    picked.push(index);
   }
 
-  const reference = typeof now === 'number' ? now : now.getTime();
-  const diff = Math.max(reference - time, 0);
-  const minutes = Math.floor(diff / 60_000);
-  const hours = Math.floor(diff / 3_600_000);
-  const daysAgo = Math.floor(diff / DAY_MS);
-
-  if (minutes < 1) {
-    return 'just now';
+  if (picked[picked.length - 1] !== last) {
+    picked.push(last);
   }
 
-  if (minutes < 60) {
-    return `${minutes}m ago`;
-  }
-
-  if (hours < 24) {
-    return `${hours}h ago`;
-  }
-
-  if (daysAgo < 7) {
-    return `${daysAgo}d ago`;
-  }
-
-  const sameYear = date.getUTCFullYear() === new Date(reference).getUTCFullYear();
-
-  return sameYear ? dayLabel(date) : `${dayLabel(date)}, ${date.getUTCFullYear()}`;
-};
-
-/** A readable absolute timestamp for titles and detail panels. */
-export const absoluteTime = (value: string | Date) => {
-  const date = typeof value === 'string' ? new Date(value) : value;
-
-  if (Number.isNaN(date.getTime())) {
-    return '';
-  }
-
-  return date.toLocaleString('en-US', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-    timeZone: 'UTC',
-  });
+  return picked;
 };
 
 /** The host of a page URL for compact display, or null when it is not a URL. */
@@ -194,4 +163,21 @@ export const parseInboxTab = (value: string | string[] | undefined): InboxTab =>
   const raw = Array.isArray(value) ? value[0] : value;
 
   return INBOX_TABS.find((tab) => tab === raw) ?? 'conversations';
+};
+
+/** The Inbox URL for a tab and, on the conversations tab, a filter. Defaults are left out. */
+export const inboxHref = (assistantId: string, tab: InboxTab, filter: ConversationFilter = 'all') => {
+  const params = new URLSearchParams();
+
+  if (tab !== 'conversations') {
+    params.set('tab', tab);
+  }
+
+  if (tab === 'conversations' && filter !== 'all') {
+    params.set('filter', filter);
+  }
+
+  const query = params.toString();
+
+  return `/a/${assistantId}/inbox${query ? `?${query}` : ''}`;
 };

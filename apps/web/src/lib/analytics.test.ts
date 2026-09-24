@@ -1,19 +1,17 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  absoluteTime,
   bucketDaily,
   dayLabel,
-  formatCount,
-  formatPercent,
   hostnameOf,
+  inboxHref,
+  labelIndexes,
   niceTicks,
   parseConversationFilter,
   parseDays,
   parseInboxTab,
   percentage,
   periodStart,
-  relativeTime,
 } from './analytics';
 
 const NOW = new Date('2026-09-23T15:30:00Z');
@@ -48,16 +46,11 @@ describe('percentage', () => {
   });
 });
 
-describe('formatters', () => {
-  it('formats counts and percentages for display', () => {
-    expect(formatCount(1234567)).toBe('1,234,567');
-    expect(formatCount(0)).toBe('0');
-    expect(formatPercent(66.6)).toBe('67%');
+describe('dayLabel', () => {
+  it('names the day in UTC to match the buckets', () => {
     expect(dayLabel('2026-09-03')).toBe('Sep 3');
     expect(dayLabel(new Date('2026-12-25T00:00:00Z'))).toBe('Dec 25');
     expect(dayLabel('not a date')).toBe('');
-    expect(absoluteTime('2026-09-03T14:05:00Z')).toBe('Sep 3, 2026, 2:05 PM');
-    expect(absoluteTime('nope')).toBe('');
   });
 });
 
@@ -112,17 +105,29 @@ describe('niceTicks', () => {
   });
 });
 
-describe('relativeTime', () => {
-  it('speaks in minutes, hours and days before falling back to a date', () => {
-    expect(relativeTime('2026-09-23T15:29:40Z', NOW)).toBe('just now');
-    expect(relativeTime('2026-09-23T15:25:00Z', NOW)).toBe('5m ago');
-    expect(relativeTime('2026-09-23T12:30:00Z', NOW)).toBe('3h ago');
-    expect(relativeTime('2026-09-21T15:30:00Z', NOW)).toBe('2d ago');
-    expect(relativeTime('2026-09-01T15:30:00Z', NOW)).toBe('Sep 1');
-    expect(relativeTime('2025-12-31T15:30:00Z', NOW)).toBe('Dec 31, 2025');
-    expect(relativeTime('2026-09-23T16:30:00Z', NOW)).toBe('just now');
-    expect(relativeTime(null, NOW)).toBe('');
-    expect(relativeTime('garbage', NOW)).toBe('');
+describe('labelIndexes', () => {
+  it('labels every day when there is room and thins out when there is not', () => {
+    expect(labelIndexes(7, 700)).toEqual([0, 1, 2, 3, 4, 5, 6]);
+    expect(labelIndexes(30, 700)).toEqual([0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 29]);
+    expect(labelIndexes(0, 700)).toEqual([]);
+  });
+
+  it('keeps the first and last day readable on a phone', () => {
+    const narrow = labelIndexes(30, 320);
+
+    expect(narrow[0]).toBe(0);
+    expect(narrow[narrow.length - 1]).toBe(29);
+    expect(narrow.length).toBeLessThanOrEqual(8);
+
+    // No two labels sit closer than the gap, including the last one.
+    const slot = 320 / 30;
+    narrow.forEach((index, position) => {
+      const next = narrow[position + 1];
+
+      if (next !== undefined) {
+        expect((next - index) * slot).toBeGreaterThanOrEqual(44);
+      }
+    });
   });
 });
 
@@ -144,5 +149,12 @@ describe('search param parsers', () => {
     expect(parseInboxTab('leads')).toBe('leads');
     expect(parseInboxTab(['leads'])).toBe('leads');
     expect(parseInboxTab('other')).toBe('conversations');
+  });
+
+  it('builds inbox links without default params', () => {
+    expect(inboxHref('a1', 'conversations')).toBe('/a/a1/inbox');
+    expect(inboxHref('a1', 'conversations', 'widget')).toBe('/a/a1/inbox?filter=widget');
+    expect(inboxHref('a1', 'leads')).toBe('/a/a1/inbox?tab=leads');
+    expect(inboxHref('a1', 'leads', 'widget')).toBe('/a/a1/inbox?tab=leads');
   });
 });
