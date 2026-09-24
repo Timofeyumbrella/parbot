@@ -193,9 +193,29 @@ export const cleanTitle = (title: string, heading: string | null, siteName: stri
   return trimmed;
 };
 
-const pageTitle = (document: Document) => {
-  const heading = document.querySelector('h1')?.textContent ?? null;
-  const siteName = document.querySelector('meta[property="og:site_name"]')?.getAttribute('content') ?? null;
+const hostOf = (baseUrl?: string) => {
+  try {
+    return baseUrl ? new URL(baseUrl).hostname.replace(/^www\./, '').toLowerCase() : null;
+  } catch {
+    return null;
+  }
+};
+
+/** True when a heading names the site rather than the page: the site name, or the host itself. */
+const isSiteName = (text: string, siteName: string | null, host: string | null) => {
+  const value = collapse(text).toLowerCase();
+
+  return Boolean(value) && (value === collapse(siteName ?? '').toLowerCase() || value === host || value === `www.${host}`);
+};
+
+const pageTitle = (document: Document, host: string | null) => {
+  const headings = Array.from(document.querySelectorAll('h1'))
+    .map((element) => collapse(element.textContent ?? ''))
+    .filter(Boolean);
+  const declaredSite = document.querySelector('meta[property="og:site_name"]')?.getAttribute('content') ?? null;
+  // Many sites put their logo in an h1; that heading names the site, and the page heading comes after it.
+  const siteName = declaredSite ?? headings.find((text) => isSiteName(text, null, host)) ?? null;
+  const heading = headings.find((text) => !isSiteName(text, siteName, host)) ?? null;
   const candidates = [
     document.querySelector('meta[property="og:title"]')?.getAttribute('content'),
     document.querySelector('title')?.textContent,
@@ -244,7 +264,7 @@ export const htmlToMarkdown = (html: string, options: HtmlOptions = {}): Extract
   const links = Array.from(document.querySelectorAll('a[href]'))
     .map((anchor) => anchor.getAttribute('href') ?? '')
     .filter(Boolean);
-  const title = pageTitle(document);
+  const title = pageTitle(document, hostOf(options.baseUrl));
 
   for (const node of Array.from(document.querySelectorAll(NOISE_SELECTOR))) {
     node.remove();

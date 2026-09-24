@@ -110,6 +110,18 @@ describe('cleanTitle', () => {
     expect(cleanTitle('A | B', null, null)).toBe('A | B');
   });
 
+  it('does not mistake a logo h1 for the page name', () => {
+    const html = `<html><head><title>sitemaps.org - Protocol</title></head>
+      <body><div id="header"><h1><a href="/">sitemaps.org</a></h1></div>
+      <main><h1>Sitemaps XML format</h1><p>This document describes the XML schema for the Sitemap protocol in detail.</p>
+      <h2>Entity escaping</h2><p>Your Sitemap file must be UTF-8 encoded and entity escaped.</p></main></body></html>`;
+    const result = htmlToMarkdown(html, { baseUrl: 'https://www.sitemaps.org/protocol.html' });
+
+    expect(result.title).toBe('Protocol');
+    expect(result.markdown).toContain('# Sitemaps XML format');
+    expect(result.markdown).toContain('## Entity escaping');
+  });
+
   it('shapes the heading path and document title of a real page', () => {
     const html = `<html><head><title>Setup | AuditDocs</title><meta property="og:site_name" content="AuditDocs"></head>
       <body><main><article><h1>Setup</h1><p>Install the package with your package manager of choice and run it.</p>
