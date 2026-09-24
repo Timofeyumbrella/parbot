@@ -12,7 +12,9 @@ describe('UsageMeter', () => {
     render(<UsageMeter label="Indexed pages" used={12} limit={2000} />);
 
     expect(screen.getByText('12 of 2,000')).toBeInTheDocument();
-    expect(screen.getByRole('progressbar', { name: 'Indexed pages: 12 of 2,000' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('progressbar', { name: 'Indexed pages: 12 of 2,000' }),
+    ).toBeInTheDocument();
     expect(screen.queryByText(/Close to the limit/)).not.toBeInTheDocument();
   });
 
@@ -33,7 +35,12 @@ describe('UsageMeter', () => {
 
 describe('UsageMeters', () => {
   it('renders the three limits of the plan', () => {
-    render(<UsageMeters plan={PLANS.starter} usage={{ assistants: 2, pages: 150, messagesThisMonth: 40 }} />);
+    render(
+      <UsageMeters
+        plan={PLANS.starter}
+        usage={{ assistants: 2, pages: 150, messagesThisMonth: 40 }}
+      />,
+    );
 
     expect(screen.getByText('2 of 3')).toBeInTheDocument();
     expect(screen.getByText('150 of 2,000')).toBeInTheDocument();

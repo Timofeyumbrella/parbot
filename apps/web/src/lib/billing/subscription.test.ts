@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { mapSubscriptionStatus, patchFromSnapshot, patchMatchesRow, snapshotSubscription } from './subscription';
+import {
+  mapSubscriptionStatus,
+  patchFromSnapshot,
+  patchMatchesRow,
+  snapshotSubscription,
+} from './subscription';
 import { PERIOD_END, subscriptionFixture } from './testing';
 
 const env = { STRIPE_PRICE_STARTER_MONTHLY: 'price_sm', STRIPE_PRICE_GROWTH_YEARLY: 'price_gy' };
@@ -21,18 +26,26 @@ describe('snapshotSubscription', () => {
   it('reads the period end from the subscription itself on an older API version', () => {
     const legacy = subscriptionFixture({
       current_period_end: PERIOD_END + 60,
-      items: { object: 'list', data: [{ id: 'si_1', object: 'subscription_item', price: { id: 'price_sm' } }] },
+      items: {
+        object: 'list',
+        data: [{ id: 'si_1', object: 'subscription_item', price: { id: 'price_sm' } }],
+      },
     });
 
     expect(snapshotSubscription(legacy).currentPeriodEnd).toBe(PERIOD_END + 60);
-    expect(snapshotSubscription(subscriptionFixture({ current_period_end: PERIOD_END + 60 })).currentPeriodEnd).toBe(
-      PERIOD_END,
-    );
+    expect(
+      snapshotSubscription(subscriptionFixture({ current_period_end: PERIOD_END + 60 }))
+        .currentPeriodEnd,
+    ).toBe(PERIOD_END);
   });
 
   it('accepts an expanded customer and a missing item', () => {
     const snapshot = snapshotSubscription(
-      subscriptionFixture({ customer: { id: 'cus_2', object: 'customer' }, items: { object: 'list', data: [] }, metadata: {} }),
+      subscriptionFixture({
+        customer: { id: 'cus_2', object: 'customer' },
+        items: { object: 'list', data: [] },
+        metadata: {},
+      }),
     );
 
     expect(snapshot.customerId).toBe('cus_2');
@@ -69,29 +82,56 @@ describe('patchFromSnapshot', () => {
   });
 
   it('keeps the plan and marks it past due', () => {
-    const patch = patchFromSnapshot(snapshotSubscription(subscriptionFixture({ status: 'past_due' })), { env });
+    const patch = patchFromSnapshot(
+      snapshotSubscription(subscriptionFixture({ status: 'past_due' })),
+      { env },
+    );
 
     expect(patch).toMatchObject({ plan_id: 'starter', status: 'past_due' });
   });
 
   it('copies cancel_at_period_end while the plan runs out', () => {
-    const patch = patchFromSnapshot(snapshotSubscription(subscriptionFixture({ cancel_at_period_end: true })), { env });
+    const patch = patchFromSnapshot(
+      snapshotSubscription(subscriptionFixture({ cancel_at_period_end: true })),
+      { env },
+    );
 
-    expect(patch).toMatchObject({ plan_id: 'starter', status: 'active', cancel_at_period_end: true });
+    expect(patch).toMatchObject({
+      plan_id: 'starter',
+      status: 'active',
+      cancel_at_period_end: true,
+    });
   });
 
   it('drops to Hobby when the subscription ends', () => {
     for (const status of ['canceled', 'unpaid', 'incomplete_expired']) {
-      const patch = patchFromSnapshot(snapshotSubscription(subscriptionFixture({ status })), { env });
+      const patch = patchFromSnapshot(snapshotSubscription(subscriptionFixture({ status })), {
+        env,
+      });
 
-      expect(patch).toMatchObject({ plan_id: 'hobby', status: 'canceled', billing_interval: null, stripe_subscription_id: 'sub_1' });
+      expect(patch).toMatchObject({
+        plan_id: 'hobby',
+        status: 'canceled',
+        billing_interval: null,
+        stripe_subscription_id: 'sub_1',
+      });
     }
   });
 
   it('falls back to Hobby and logs when the price is unknown', () => {
     const log = vi.fn();
     const fixture = subscriptionFixture({
-      items: { object: 'list', data: [{ id: 'si', object: 'subscription_item', price: { id: 'price_zz' }, current_period_end: PERIOD_END }] },
+      items: {
+        object: 'list',
+        data: [
+          {
+            id: 'si',
+            object: 'subscription_item',
+            price: { id: 'price_zz' },
+            current_period_end: PERIOD_END,
+          },
+        ],
+      },
     });
     const patch = patchFromSnapshot(snapshotSubscription(fixture), { env, log });
 

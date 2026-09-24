@@ -34,12 +34,18 @@ export default async function BillingPage({ searchParams }: PageProps<'/billing'
   const preselectPlan = first(params.plan);
   const preselectInterval = first(params.interval);
   const preselect = isPlanId(preselectPlan)
-    ? { planId: preselectPlan, interval: isBillingInterval(preselectInterval) ? preselectInterval : null }
+    ? {
+        planId: preselectPlan,
+        interval: isBillingInterval(preselectInterval) ? preselectInterval : null,
+      }
     : null;
 
   return (
     <PageContainer>
-      <PageHeader title="Billing" description="Your plan, what you have used of it, and the plans you can move to." />
+      <PageHeader
+        title="Billing"
+        description="Your plan, what you have used of it, and the plans you can move to."
+      />
 
       {isMock ? <TestModeBanner /> : null}
 
@@ -66,10 +72,15 @@ export default async function BillingPage({ searchParams }: PageProps<'/billing'
       ) : null}
 
       {showMockPlan ? (
-        <MockPlanConfirm planId={showMockPlan} interval={isBillingInterval(mockInterval) ? mockInterval : 'monthly'} />
+        <MockPlanConfirm
+          planId={showMockPlan}
+          interval={isBillingInterval(mockInterval) ? mockInterval : 'monthly'}
+        />
       ) : null}
 
-      {showMockPortal ? <MockPortalCard currentPlanName={account.plan.name} isHobby={account.plan.id === 'hobby'} /> : null}
+      {showMockPortal ? (
+        <MockPortalCard currentPlanName={account.plan.name} isHobby={account.plan.id === 'hobby'} />
+      ) : null}
 
       <div className="grid gap-4 lg:grid-cols-5">
         <CurrentPlanCard account={account} providerName={providerName} className="lg:col-span-2" />

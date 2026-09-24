@@ -40,7 +40,12 @@ describe.skipIf(!serviceKey)('subscription store against the local database', ()
   it('starts every account on Hobby', async () => {
     const row = await store.findByAccount(accountId);
 
-    expect(row).toMatchObject({ account_id: accountId, plan_id: 'hobby', status: 'active', stripe_customer_id: null });
+    expect(row).toMatchObject({
+      account_id: accountId,
+      plan_id: 'hobby',
+      status: 'active',
+      stripe_customer_id: null,
+    });
   });
 
   it('saves a patch and finds the row by its Stripe ids', async () => {
@@ -55,8 +60,12 @@ describe.skipIf(!serviceKey)('subscription store against the local database', ()
     });
 
     expect(saved).toMatchObject({ plan_id: 'growth', billing_interval: 'yearly' });
-    expect(await store.findByStripeSubscription(`sub_${stamp}`)).toMatchObject({ account_id: accountId });
-    expect(await store.findByStripeCustomer(`cus_${stamp}`)).toMatchObject({ account_id: accountId });
+    expect(await store.findByStripeSubscription(`sub_${stamp}`)).toMatchObject({
+      account_id: accountId,
+    });
+    expect(await store.findByStripeCustomer(`cus_${stamp}`)).toMatchObject({
+      account_id: accountId,
+    });
     expect(await store.findByStripeSubscription('sub_nobody')).toBeNull();
   });
 
@@ -72,6 +81,8 @@ describe.skipIf(!serviceKey)('subscription store against the local database', ()
   });
 
   it('refuses a paid plan without an interval', async () => {
-    await expect(store.save(accountId, { plan_id: 'starter', billing_interval: null })).rejects.toThrow(/saved/);
+    await expect(
+      store.save(accountId, { plan_id: 'starter', billing_interval: null }),
+    ).rejects.toThrow(/saved/);
   });
 });

@@ -15,7 +15,9 @@ export const getStripe = (): Stripe => {
   const key = serverEnv().stripeSecretKey;
 
   if (!key) {
-    throw new Error('STRIPE_SECRET_KEY is not set. Add a Stripe test key or set BILLING_PROVIDER=mock.');
+    throw new Error(
+      'STRIPE_SECRET_KEY is not set. Add a Stripe test key or set BILLING_PROVIDER=mock.',
+    );
   }
 
   if (cached?.key !== key) {
@@ -25,7 +27,8 @@ export const getStripe = (): Stripe => {
   return cached.client;
 };
 
-export const retrieveSubscription = (subscriptionId: string) => getStripe().subscriptions.retrieve(subscriptionId);
+export const retrieveSubscription = (subscriptionId: string) =>
+  getStripe().subscriptions.retrieve(subscriptionId);
 
 type StripeProviderDeps = {
   stripe?: () => Stripe;
@@ -71,7 +74,9 @@ export const createStripeProvider = ({
     const existing = await store().findByAccount(accountId);
 
     if (!existing?.stripe_customer_id) {
-      throw new BillingError('This account has no Stripe customer yet. Choose a plan first, then manage it here.');
+      throw new BillingError(
+        'This account has no Stripe customer yet. Choose a plan first, then manage it here.',
+      );
     }
 
     const session = await stripe().billingPortal.sessions.create({

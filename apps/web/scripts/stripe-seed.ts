@@ -10,8 +10,9 @@ import Stripe from 'stripe';
 const load = <T>(relative: string) => import(new URL(relative, import.meta.url).href) as Promise<T>;
 
 const { PLANS } = await load<typeof import('../src/lib/plans')>('../src/lib/plans.ts');
-const { BILLING_INTERVALS, PAID_PLAN_IDS, PRICE_ENV_KEYS, lookupKeyFor } =
-  await load<typeof import('../src/lib/billing/catalog')>('../src/lib/billing/catalog.ts');
+const { BILLING_INTERVALS, PAID_PLAN_IDS, PRICE_ENV_KEYS, lookupKeyFor } = await load<
+  typeof import('../src/lib/billing/catalog')
+>('../src/lib/billing/catalog.ts');
 
 function fail(message: string): never {
   console.error(message);
@@ -27,7 +28,9 @@ const readTestKey = () => {
   }
 
   if (!/^(sk|rk)_test_/.test(key)) {
-    fail('Refusing to seed: STRIPE_SECRET_KEY is not a test key. This script only ever runs against test mode.');
+    fail(
+      'Refusing to seed: STRIPE_SECRET_KEY is not a test key. This script only ever runs against test mode.',
+    );
   }
 
   return key;

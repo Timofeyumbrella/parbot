@@ -20,14 +20,20 @@ export async function POST(request: Request) {
   const parsed = bodySchema.safeParse(await request.json().catch(() => null));
 
   if (!parsed.success) {
-    return NextResponse.json({ error: 'Send a planId of starter or growth and an interval of monthly or yearly.' }, { status: 400 });
+    return NextResponse.json(
+      { error: 'Send a planId of starter or growth and an interval of monthly or yearly.' },
+      { status: 400 },
+    );
   }
 
   const { planId, interval } = parsed.data;
 
   if (planId === 'hobby') {
     return NextResponse.json(
-      { error: 'Hobby is free and needs no checkout. To move down to Hobby, manage your subscription.' },
+      {
+        error:
+          'Hobby is free and needs no checkout. To move down to Hobby, manage your subscription.',
+      },
       { status: 400 },
     );
   }
@@ -46,7 +52,12 @@ export async function POST(request: Request) {
     console.error('Checkout could not be started', error);
 
     return NextResponse.json(
-      { error: error instanceof BillingError ? error.message : 'Checkout could not be started. Try again in a moment.' },
+      {
+        error:
+          error instanceof BillingError
+            ? error.message
+            : 'Checkout could not be started. Try again in a moment.',
+      },
       { status: 502 },
     );
   }

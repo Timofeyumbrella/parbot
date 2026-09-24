@@ -20,10 +20,19 @@ export const UsageMeter = ({ label, used, limit }: MeterProps) => {
   const warning = !full && percent >= USAGE_WARNING_PERCENT;
 
   return (
-    <div className="flex flex-col gap-1.5" data-testid={`meter-${label.toLowerCase().replace(/\s+/g, '-')}`}>
+    <div
+      className="flex flex-col gap-1.5"
+      data-testid={`meter-${label.toLowerCase().replace(/\s+/g, '-')}`}
+    >
       <div className="flex items-baseline justify-between gap-3 text-sm">
         <span className="font-medium">{label}</span>
-        <span className={cn('text-muted-foreground tabular-nums', warning && 'text-warning', full && 'text-destructive')}>
+        <span
+          className={cn(
+            'text-muted-foreground tabular-nums',
+            warning && 'text-warning',
+            full && 'text-destructive',
+          )}
+        >
           {format(used)} of {format(limit)}
         </span>
       </div>
@@ -37,7 +46,9 @@ export const UsageMeter = ({ label, used, limit }: MeterProps) => {
         )}
       />
       {full ? (
-        <p className="text-destructive text-xs">At the limit. Move to a bigger plan to keep going.</p>
+        <p className="text-destructive text-xs">
+          At the limit. Move to a bigger plan to keep going.
+        </p>
       ) : warning ? (
         <p className="text-warning text-xs">Close to the limit.</p>
       ) : null}
@@ -56,12 +67,18 @@ export const UsageMeters = ({ usage, plan, className }: UsageMetersProps) => (
   <Card className={className}>
     <CardHeader>
       <CardTitle>Usage</CardTitle>
-      <CardDescription>Against the {plan.name} limits. Answers reset on the first of the month.</CardDescription>
+      <CardDescription>
+        Against the {plan.name} limits. Answers reset on the first of the month.
+      </CardDescription>
     </CardHeader>
     <CardContent className="flex flex-col gap-4">
       <UsageMeter label="Assistants" used={usage.assistants} limit={plan.assistants} />
       <UsageMeter label="Indexed pages" used={usage.pages} limit={plan.pages} />
-      <UsageMeter label="Answers this month" used={usage.messagesThisMonth} limit={plan.messagesPerMonth} />
+      <UsageMeter
+        label="Answers this month"
+        used={usage.messagesThisMonth}
+        limit={plan.messagesPerMonth}
+      />
     </CardContent>
   </Card>
 );

@@ -10,7 +10,11 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { AccountPlan } from '@/lib/account';
 import { priceLabel, yearlyNote } from '@/lib/billing/pricing';
-import { type BillingInterval, type BillingProviderName, isBillingInterval } from '@/lib/billing/types';
+import {
+  type BillingInterval,
+  type BillingProviderName,
+  isBillingInterval,
+} from '@/lib/billing/types';
 import { formatPrice, PLAN_ORDER, PLANS, type Plan } from '@/lib/plans';
 
 import { useBillingRedirect } from './use-billing-redirect';
@@ -62,7 +66,10 @@ export const PlanPicker = ({
 
   // A live Stripe subscription is changed in the portal so Checkout never opens a second one.
   const changeViaPortal =
-    providerName === 'stripe' && hasStripeCustomer && currentPlanId !== 'hobby' && currentStatus !== 'canceled';
+    providerName === 'stripe' &&
+    hasStripeCustomer &&
+    currentPlanId !== 'hobby' &&
+    currentStatus !== 'canceled';
 
   const choose = (plan: Plan) => {
     setPendingPlan(plan.id);
@@ -83,7 +90,9 @@ export const PlanPicker = ({
           <h2 id="plans-heading" className="text-base font-semibold">
             Plans
           </h2>
-          <p className="text-muted-foreground text-sm">Yearly billing is ten months for the price of twelve.</p>
+          <p className="text-muted-foreground text-sm">
+            Yearly billing is ten months for the price of twelve.
+          </p>
         </div>
         <Tabs
           value={interval}
@@ -103,7 +112,8 @@ export const PlanPicker = ({
       <div className="grid gap-4 md:grid-cols-3">
         {PLAN_ORDER.map((planId) => {
           const plan = PLANS[planId];
-          const isCurrent = planId === currentPlanId && (planId === 'hobby' || currentInterval === interval);
+          const isCurrent =
+            planId === currentPlanId && (planId === 'hobby' || currentInterval === interval);
           const isCurrentPlan = planId === currentPlanId;
           const note = interval === 'yearly' ? yearlyNote(plan) : null;
           const busy = pending && pendingPlan === planId;
@@ -137,15 +147,20 @@ export const PlanPicker = ({
 
               <div className="flex flex-col gap-0.5">
                 <div className="flex items-baseline gap-1">
-                  <span className="text-3xl font-semibold tracking-tight tabular-nums">
+                  <span className="text-3xl font-semibold tabular-nums tracking-tight">
                     {formatPrice(interval === 'yearly' ? plan.yearlyCents : plan.monthlyCents)}
                   </span>
                   {plan.monthlyCents > 0 ? (
-                    <span className="text-muted-foreground text-sm">{interval === 'yearly' ? 'a year' : 'a month'}</span>
+                    <span className="text-muted-foreground text-sm">
+                      {interval === 'yearly' ? 'a year' : 'a month'}
+                    </span>
                   ) : null}
                 </div>
                 <p className="text-muted-foreground min-h-4 text-xs">
-                  {note ?? (plan.monthlyCents > 0 ? `${priceLabel(plan, 'monthly')}, cancel any time` : 'No card needed')}
+                  {note ??
+                    (plan.monthlyCents > 0
+                      ? `${priceLabel(plan, 'monthly')}, cancel any time`
+                      : 'No card needed')}
                 </p>
               </div>
 

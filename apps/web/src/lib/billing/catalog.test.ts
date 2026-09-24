@@ -33,9 +33,9 @@ describe('price catalog', () => {
   });
 
   it('names the missing variable when a price is not configured', () => {
-    expect(() => priceIdFor('growth', 'yearly', { ...env, STRIPE_PRICE_GROWTH_YEARLY: '' })).toThrow(
-      /STRIPE_PRICE_GROWTH_YEARLY/,
-    );
+    expect(() =>
+      priceIdFor('growth', 'yearly', { ...env, STRIPE_PRICE_GROWTH_YEARLY: '' }),
+    ).toThrow(/STRIPE_PRICE_GROWTH_YEARLY/);
   });
 
   it('lists only the configured entries', () => {

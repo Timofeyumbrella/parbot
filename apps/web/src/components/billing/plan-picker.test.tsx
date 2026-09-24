@@ -60,7 +60,11 @@ describe('PlanPicker', () => {
     const user = userEvent.setup();
     const fetchMock = vi
       .spyOn(globalThis, 'fetch')
-      .mockResolvedValue(jsonResponse({ url: 'http://localhost:3000/billing?mock_plan=starter&mock_interval=yearly' }));
+      .mockResolvedValue(
+        jsonResponse({
+          url: 'http://localhost:3000/billing?mock_plan=starter&mock_interval=yearly',
+        }),
+      );
     render(<PlanPicker {...baseProps} />);
 
     await user.click(screen.getByRole('tab', { name: 'Yearly' }));
@@ -68,14 +72,21 @@ describe('PlanPicker', () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       '/api/billing/checkout',
-      expect.objectContaining({ method: 'POST', body: JSON.stringify({ planId: 'starter', interval: 'yearly' }) }),
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ planId: 'starter', interval: 'yearly' }),
+      }),
     );
-    await waitFor(() => expect(push).toHaveBeenCalledWith('/billing?mock_plan=starter&mock_interval=yearly'));
+    await waitFor(() =>
+      expect(push).toHaveBeenCalledWith('/billing?mock_plan=starter&mock_interval=yearly'),
+    );
   });
 
   it('shows the server error when checkout cannot start', async () => {
     const user = userEvent.setup();
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ error: 'Stripe is having a moment.' }, 502));
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse({ error: 'Stripe is having a moment.' }, 502),
+    );
     render(<PlanPicker {...baseProps} />);
 
     await user.click(screen.getByRole('button', { name: 'Choose Growth' }));
@@ -86,19 +97,32 @@ describe('PlanPicker', () => {
 
   it('sends a paid account to the portal for Hobby', async () => {
     const user = userEvent.setup();
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ url: 'http://localhost:3000/billing?mock_portal=1' }));
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(jsonResponse({ url: 'http://localhost:3000/billing?mock_portal=1' }));
     render(<PlanPicker {...baseProps} currentPlanId="starter" currentInterval="monthly" />);
 
-    expect(within(screen.getByTestId('plan-starter')).getByRole('button', { name: 'Current plan' })).toBeDisabled();
+    expect(
+      within(screen.getByTestId('plan-starter')).getByRole('button', { name: 'Current plan' }),
+    ).toBeDisabled();
     await user.click(screen.getByRole('button', { name: 'Switch to Hobby' }));
 
-    expect(fetchMock).toHaveBeenCalledWith('/api/billing/portal', expect.objectContaining({ method: 'POST' }));
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/billing/portal',
+      expect.objectContaining({ method: 'POST' }),
+    );
     await waitFor(() => expect(push).toHaveBeenCalledWith('/billing?mock_portal=1'));
   });
 
   it('routes plan changes through the portal for a live Stripe subscription', () => {
     render(
-      <PlanPicker {...baseProps} providerName="stripe" hasStripeCustomer currentPlanId="starter" currentInterval="monthly" />,
+      <PlanPicker
+        {...baseProps}
+        providerName="stripe"
+        hasStripeCustomer
+        currentPlanId="starter"
+        currentInterval="monthly"
+      />,
     );
 
     expect(screen.getByRole('button', { name: 'Change to Growth in portal' })).toBeEnabled();

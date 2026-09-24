@@ -23,7 +23,10 @@ const post = () =>
 
 describe('POST /api/billing/portal', () => {
   beforeEach(() => {
-    getSession.mockResolvedValue({ user: { id: '00000000-0000-4000-8000-000000000001', email: 'demo@parbot.dev' }, supabase: {} });
+    getSession.mockResolvedValue({
+      user: { id: '00000000-0000-4000-8000-000000000001', email: 'demo@parbot.dev' },
+      supabase: {},
+    });
   });
 
   it('rejects signed-out visitors', async () => {
@@ -36,6 +39,8 @@ describe('POST /api/billing/portal', () => {
     const response = await post();
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({ url: 'http://localhost:3106/billing?mock_portal=1' });
+    await expect(response.json()).resolves.toEqual({
+      url: 'http://localhost:3106/billing?mock_portal=1',
+    });
   });
 });

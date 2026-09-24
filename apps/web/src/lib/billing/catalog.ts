@@ -28,7 +28,11 @@ export const priceCatalog = (env: Env = process.env): CatalogEntry[] =>
     }),
   );
 
-export const priceIdFor = (plan: PlanId, interval: BillingInterval, env: Env = process.env): string => {
+export const priceIdFor = (
+  plan: PlanId,
+  interval: BillingInterval,
+  env: Env = process.env,
+): string => {
   if (plan === 'hobby') {
     throw new Error('Hobby is free and has no Stripe price.');
   }

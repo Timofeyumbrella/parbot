@@ -4,7 +4,12 @@ import type Stripe from 'stripe';
 import type { Subscription } from '@/lib/db';
 
 import type { SubscriptionPatch, SubscriptionStore } from './store';
-import { patchFromSnapshot, patchMatchesRow, snapshotSubscription, type SubscriptionSnapshot } from './subscription';
+import {
+  patchFromSnapshot,
+  patchMatchesRow,
+  snapshotSubscription,
+  type SubscriptionSnapshot,
+} from './subscription';
 
 export type WebhookDeps = {
   store: SubscriptionStore;
@@ -30,7 +35,10 @@ const idOf = (value: string | { id: string } | null | undefined) =>
  * derived state, so replaying an event is a no-op and out-of-order events for an old
  * subscription do not clobber a newer one.
  */
-export const handleStripeEvent = async (event: Stripe.Event, deps: WebhookDeps): Promise<WebhookOutcome> => {
+export const handleStripeEvent = async (
+  event: Stripe.Event,
+  deps: WebhookDeps,
+): Promise<WebhookOutcome> => {
   switch (event.type) {
     case 'checkout.session.completed':
       return handleCheckoutCompleted(event.data.object, deps);
@@ -106,13 +114,21 @@ const resolveRow = async (
  * a lifecycle event for an old subscription, such as it ending after the account moved to a new
  * one, which must not clobber the current row.
  */
-const concernsCurrentSubscription = (row: Subscription, snapshot: SubscriptionSnapshot, hints: Hints) =>
+const concernsCurrentSubscription = (
+  row: Subscription,
+  snapshot: SubscriptionSnapshot,
+  hints: Hints,
+) =>
   Boolean(hints.accountId) ||
   !row.stripe_subscription_id ||
   row.stripe_subscription_id === snapshot.id ||
   row.status === 'canceled';
 
-const applySnapshot = async (snapshot: SubscriptionSnapshot, hints: Hints, deps: WebhookDeps): Promise<WebhookOutcome> => {
+const applySnapshot = async (
+  snapshot: SubscriptionSnapshot,
+  hints: Hints,
+  deps: WebhookDeps,
+): Promise<WebhookOutcome> => {
   const log = deps.log ?? console.warn;
   const row = await resolveRow(snapshot, hints, deps.store, log);
 

@@ -28,7 +28,10 @@ export const useBillingRedirect = () => {
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify(body ?? {}),
         });
-        const payload = (await response.json().catch(() => null)) as { url?: string; error?: string } | null;
+        const payload = (await response.json().catch(() => null)) as {
+          url?: string;
+          error?: string;
+        } | null;
 
         if (!response.ok || !payload?.url) {
           setError(payload?.error ?? 'Something went wrong. Try again in a moment.');

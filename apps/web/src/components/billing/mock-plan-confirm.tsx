@@ -6,7 +6,14 @@ import { useActionState } from 'react';
 
 import { applyMockPlan, type BillingActionState } from '@/actions/billing';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { priceLabel } from '@/lib/billing/pricing';
 import type { BillingInterval, PaidPlanId } from '@/lib/billing/types';
 import { PLANS } from '@/lib/plans';
@@ -31,14 +38,15 @@ export const MockPlanConfirm = ({ planId, interval }: MockPlanConfirmProps) => {
           Apply {plan.name} in test mode
         </CardTitle>
         <CardDescription>
-          {priceLabel(plan, interval)}, billed {interval}. No card is charged and the plan renews in 30 days.
+          {priceLabel(plan, interval)}, billed {interval}. No card is charged and the plan renews in
+          30 days.
         </CardDescription>
       </CardHeader>
       <CardContent>
         <p className="text-muted-foreground text-sm">
-          This is what Stripe Checkout would do: your account moves to {plan.name} with {plan.assistants} assistants,{' '}
-          {plan.pages.toLocaleString('en-US')} indexed pages and {plan.messagesPerMonth.toLocaleString('en-US')} answers
-          a month.
+          This is what Stripe Checkout would do: your account moves to {plan.name} with{' '}
+          {plan.assistants} assistants, {plan.pages.toLocaleString('en-US')} indexed pages and{' '}
+          {plan.messagesPerMonth.toLocaleString('en-US')} answers a month.
         </p>
         {state.error ? (
           <p role="alert" className="text-destructive mt-3 text-sm">

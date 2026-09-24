@@ -28,8 +28,15 @@ export type SubscriptionStore = {
 export const createSubscriptionStore = (
   service = createSupabaseServiceClient(),
 ): SubscriptionStore => {
-  const findBy = async (column: 'account_id' | 'stripe_subscription_id' | 'stripe_customer_id', value: string) => {
-    const { data, error } = await service.from('subscriptions').select('*').eq(column, value).maybeSingle();
+  const findBy = async (
+    column: 'account_id' | 'stripe_subscription_id' | 'stripe_customer_id',
+    value: string,
+  ) => {
+    const { data, error } = await service
+      .from('subscriptions')
+      .select('*')
+      .eq(column, value)
+      .maybeSingle();
 
     if (error) {
       throw new Error(`Subscription lookup failed: ${error.message}`);

@@ -55,16 +55,24 @@ const checkoutSession = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
-const post = async (payload: unknown, { secret = SECRET, header }: { secret?: string; header?: string | null } = {}) => {
+const post = async (
+  payload: unknown,
+  { secret = SECRET, header }: { secret?: string; header?: string | null } = {},
+) => {
   const body = JSON.stringify(payload);
-  const signature = header === undefined ? await stripe.webhooks.generateTestHeaderStringAsync({ payload: body, secret }) : header;
+  const signature =
+    header === undefined
+      ? await stripe.webhooks.generateTestHeaderStringAsync({ payload: body, secret })
+      : header;
   const headers = new Headers({ 'content-type': 'application/json' });
 
   if (signature) {
     headers.set('stripe-signature', signature);
   }
 
-  return POST(new Request('http://localhost/api/stripe/webhook', { method: 'POST', headers, body }));
+  return POST(
+    new Request('http://localhost/api/stripe/webhook', { method: 'POST', headers, body }),
+  );
 };
 
 describe('POST /api/stripe/webhook', () => {
@@ -75,7 +83,9 @@ describe('POST /api/stripe/webhook', () => {
   });
 
   it('rejects a request without a signature', async () => {
-    const response = await post(eventFixture('checkout.session.completed', checkoutSession()), { header: null });
+    const response = await post(eventFixture('checkout.session.completed', checkoutSession()), {
+      header: null,
+    });
 
     expect(response.status).toBe(400);
     expect(memory.saves).toHaveLength(0);
@@ -92,7 +102,9 @@ describe('POST /api/stripe/webhook', () => {
   });
 
   it('rejects a signature made with another secret', async () => {
-    const response = await post(eventFixture('checkout.session.completed', checkoutSession()), { secret: 'whsec_wrong' });
+    const response = await post(eventFixture('checkout.session.completed', checkoutSession()), {
+      secret: 'whsec_wrong',
+    });
 
     expect(response.status).toBe(400);
     expect(memory.saves).toHaveLength(0);
@@ -100,7 +112,10 @@ describe('POST /api/stripe/webhook', () => {
 
   it('rejects a tampered body', async () => {
     const payload = JSON.stringify(eventFixture('checkout.session.completed', checkoutSession()));
-    const signature = await stripe.webhooks.generateTestHeaderStringAsync({ payload, secret: SECRET });
+    const signature = await stripe.webhooks.generateTestHeaderStringAsync({
+      payload,
+      secret: SECRET,
+    });
     const response = await POST(
       new Request('http://localhost/api/stripe/webhook', {
         method: 'POST',
@@ -129,15 +144,28 @@ describe('POST /api/stripe/webhook', () => {
       current_period_end: new Date(PERIOD_END * 1000).toISOString(),
       cancel_at_period_end: false,
     });
-    expect(memory.rows.get(OTHER)).toMatchObject({ plan_id: 'hobby', stripe_subscription_id: null });
+    expect(memory.rows.get(OTHER)).toMatchObject({
+      plan_id: 'hobby',
+      stripe_subscription_id: null,
+    });
   });
 
   it('falls back to the subscription metadata when the session carries no reference', async () => {
-    retrieveSubscription.mockResolvedValue(subscriptionFixture({ metadata: { account_id: ACCOUNT } }));
+    retrieveSubscription.mockResolvedValue(
+      subscriptionFixture({ metadata: { account_id: ACCOUNT } }),
+    );
 
-    await post(eventFixture('checkout.session.completed', checkoutSession({ client_reference_id: null, metadata: {} })));
+    await post(
+      eventFixture(
+        'checkout.session.completed',
+        checkoutSession({ client_reference_id: null, metadata: {} }),
+      ),
+    );
 
-    expect(memory.rows.get(ACCOUNT)).toMatchObject({ plan_id: 'starter', stripe_subscription_id: 'sub_1' });
+    expect(memory.rows.get(ACCOUNT)).toMatchObject({
+      plan_id: 'starter',
+      stripe_subscription_id: 'sub_1',
+    });
   });
 
   it('changes nothing when the same event is delivered twice', async () => {
@@ -157,7 +185,11 @@ describe('POST /api/stripe/webhook', () => {
     await post(eventFixture('checkout.session.completed', checkoutSession()));
 
     const response = await post(
-      eventFixture('customer.subscription.updated', subscriptionFixture({ status: 'past_due' }), 'evt_2'),
+      eventFixture(
+        'customer.subscription.updated',
+        subscriptionFixture({ status: 'past_due' }),
+        'evt_2',
+      ),
     );
 
     expect(response.status).toBe(200);
@@ -174,7 +206,10 @@ describe('POST /api/stripe/webhook', () => {
         'customer.subscription.updated',
         subscriptionFixture({
           cancel_at_period_end: true,
-          items: { object: 'list', data: [{ id: 'si_1', price: { id: 'price_sm' }, current_period_end: later }] },
+          items: {
+            object: 'list',
+            data: [{ id: 'si_1', price: { id: 'price_sm' }, current_period_end: later }],
+          },
         }),
         'evt_3',
       ),
@@ -195,12 +230,21 @@ describe('POST /api/stripe/webhook', () => {
     await post(
       eventFixture(
         'customer.subscription.updated',
-        subscriptionFixture({ items: { object: 'list', data: [{ id: 'si_1', price: { id: 'price_gy' }, current_period_end: PERIOD_END }] } }),
+        subscriptionFixture({
+          items: {
+            object: 'list',
+            data: [{ id: 'si_1', price: { id: 'price_gy' }, current_period_end: PERIOD_END }],
+          },
+        }),
         'evt_4',
       ),
     );
 
-    expect(memory.rows.get(ACCOUNT)).toMatchObject({ plan_id: 'growth', billing_interval: 'yearly', status: 'active' });
+    expect(memory.rows.get(ACCOUNT)).toMatchObject({
+      plan_id: 'growth',
+      billing_interval: 'yearly',
+      status: 'active',
+    });
   });
 
   it('drops to Hobby when the subscription is deleted', async () => {
@@ -208,7 +252,11 @@ describe('POST /api/stripe/webhook', () => {
     await post(eventFixture('checkout.session.completed', checkoutSession()));
 
     const response = await post(
-      eventFixture('customer.subscription.deleted', subscriptionFixture({ status: 'canceled', cancel_at_period_end: true }), 'evt_5'),
+      eventFixture(
+        'customer.subscription.deleted',
+        subscriptionFixture({ status: 'canceled', cancel_at_period_end: true }),
+        'evt_5',
+      ),
     );
 
     expect(response.status).toBe(200);
@@ -226,26 +274,56 @@ describe('POST /api/stripe/webhook', () => {
     retrieveSubscription.mockResolvedValue(subscriptionFixture());
     await post(eventFixture('checkout.session.completed', checkoutSession()));
 
-    await post(eventFixture('customer.subscription.updated', subscriptionFixture({ status: 'past_due', metadata: {} }), 'evt_6'));
+    await post(
+      eventFixture(
+        'customer.subscription.updated',
+        subscriptionFixture({ status: 'past_due', metadata: {} }),
+        'evt_6',
+      ),
+    );
 
     expect(memory.rows.get(ACCOUNT)).toMatchObject({ status: 'past_due' });
   });
 
   it('ignores lifecycle events for a subscription the account has moved on from', async () => {
     retrieveSubscription.mockResolvedValue(subscriptionFixture({ id: 'sub_new', metadata: {} }));
-    await post(eventFixture('checkout.session.completed', checkoutSession({ subscription: 'sub_new' })));
+    await post(
+      eventFixture('checkout.session.completed', checkoutSession({ subscription: 'sub_new' })),
+    );
 
-    await post(eventFixture('customer.subscription.deleted', subscriptionFixture({ id: 'sub_old', status: 'canceled' }), 'evt_7'));
+    await post(
+      eventFixture(
+        'customer.subscription.deleted',
+        subscriptionFixture({ id: 'sub_old', status: 'canceled' }),
+        'evt_7',
+      ),
+    );
 
-    expect(memory.rows.get(ACCOUNT)).toMatchObject({ plan_id: 'starter', status: 'active', stripe_subscription_id: 'sub_new' });
+    expect(memory.rows.get(ACCOUNT)).toMatchObject({
+      plan_id: 'starter',
+      status: 'active',
+      stripe_subscription_id: 'sub_new',
+    });
   });
 
   it('adopts a new subscription once the previous one has ended', async () => {
     retrieveSubscription.mockResolvedValue(subscriptionFixture({ id: 'sub_old' }));
-    await post(eventFixture('checkout.session.completed', checkoutSession({ subscription: 'sub_old' })));
-    await post(eventFixture('customer.subscription.deleted', subscriptionFixture({ id: 'sub_old', status: 'canceled' }), 'evt_8'));
+    await post(
+      eventFixture('checkout.session.completed', checkoutSession({ subscription: 'sub_old' })),
+    );
+    await post(
+      eventFixture(
+        'customer.subscription.deleted',
+        subscriptionFixture({ id: 'sub_old', status: 'canceled' }),
+        'evt_8',
+      ),
+    );
 
-    expect(memory.rows.get(ACCOUNT)).toMatchObject({ plan_id: 'hobby', status: 'canceled', stripe_subscription_id: 'sub_old' });
+    expect(memory.rows.get(ACCOUNT)).toMatchObject({
+      plan_id: 'hobby',
+      status: 'canceled',
+      stripe_subscription_id: 'sub_old',
+    });
 
     // Resubscribing through the portal creates a subscription without our metadata; the customer id ties it back.
     await post(
@@ -254,7 +332,10 @@ describe('POST /api/stripe/webhook', () => {
         subscriptionFixture({
           id: 'sub_again',
           metadata: {},
-          items: { object: 'list', data: [{ id: 'si_2', price: { id: 'price_gm' }, current_period_end: PERIOD_END }] },
+          items: {
+            object: 'list',
+            data: [{ id: 'si_2', price: { id: 'price_gm' }, current_period_end: PERIOD_END }],
+          },
         }),
         'evt_9',
       ),
@@ -271,12 +352,21 @@ describe('POST /api/stripe/webhook', () => {
 
   it('falls back to Hobby and logs when the price is unknown', async () => {
     retrieveSubscription.mockResolvedValue(
-      subscriptionFixture({ items: { object: 'list', data: [{ id: 'si_1', price: { id: 'price_mystery' }, current_period_end: PERIOD_END }] } }),
+      subscriptionFixture({
+        items: {
+          object: 'list',
+          data: [{ id: 'si_1', price: { id: 'price_mystery' }, current_period_end: PERIOD_END }],
+        },
+      }),
     );
 
     await post(eventFixture('checkout.session.completed', checkoutSession()));
 
-    expect(memory.rows.get(ACCOUNT)).toMatchObject({ plan_id: 'hobby', status: 'active', stripe_subscription_id: 'sub_1' });
+    expect(memory.rows.get(ACCOUNT)).toMatchObject({
+      plan_id: 'hobby',
+      status: 'active',
+      stripe_subscription_id: 'sub_1',
+    });
     expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('price_mystery'));
   });
 
@@ -284,7 +374,13 @@ describe('POST /api/stripe/webhook', () => {
     retrieveSubscription.mockResolvedValue(subscriptionFixture({ metadata: {} }));
 
     const response = await post(
-      eventFixture('checkout.session.completed', checkoutSession({ client_reference_id: '00000000-0000-4000-8000-0000000000ff', metadata: {} })),
+      eventFixture(
+        'checkout.session.completed',
+        checkoutSession({
+          client_reference_id: '00000000-0000-4000-8000-0000000000ff',
+          metadata: {},
+        }),
+      ),
     );
 
     expect(response.status).toBe(200);

@@ -4,7 +4,11 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
 
-import { billingProviderName, createSubscriptionStore, type SubscriptionPatch } from '@/lib/billing';
+import {
+  billingProviderName,
+  createSubscriptionStore,
+  type SubscriptionPatch,
+} from '@/lib/billing';
 import { getSession } from '@/lib/session';
 
 export type BillingActionState = { error?: string };
@@ -19,7 +23,10 @@ const mockPlanSchema = z.object({
 /** Writes the signed-in account's row through the service role. Only the account's own row. */
 const applyToOwnAccount = async (patch: SubscriptionPatch): Promise<BillingActionState> => {
   if (billingProviderName() !== 'mock') {
-    return { error: 'Test-mode plan changes are only available on the mock billing provider. Use the Stripe portal instead.' };
+    return {
+      error:
+        'Test-mode plan changes are only available on the mock billing provider. Use the Stripe portal instead.',
+    };
   }
 
   const { user } = await getSession();
@@ -42,8 +49,14 @@ const applyToOwnAccount = async (patch: SubscriptionPatch): Promise<BillingActio
 };
 
 /** The "Apply <Plan> in test mode" confirm card. */
-export const applyMockPlan = async (_state: BillingActionState, formData: FormData): Promise<BillingActionState> => {
-  const parsed = mockPlanSchema.safeParse({ planId: formData.get('planId'), interval: formData.get('interval') });
+export const applyMockPlan = async (
+  _state: BillingActionState,
+  formData: FormData,
+): Promise<BillingActionState> => {
+  const parsed = mockPlanSchema.safeParse({
+    planId: formData.get('planId'),
+    interval: formData.get('interval'),
+  });
 
   if (!parsed.success) {
     return { error: 'Pick Starter or Growth, billed monthly or yearly.' };

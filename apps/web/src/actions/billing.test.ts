@@ -37,7 +37,9 @@ describe('applyMockPlan', () => {
   });
 
   it('refuses a plan it does not know', async () => {
-    await expect(applyMockPlan({}, form({ planId: 'hobby', interval: 'monthly' }))).resolves.toEqual({
+    await expect(
+      applyMockPlan({}, form({ planId: 'hobby', interval: 'monthly' })),
+    ).resolves.toEqual({
       error: expect.stringMatching(/Starter or Growth/),
     });
     expect(memory.saves).toHaveLength(0);
@@ -46,7 +48,9 @@ describe('applyMockPlan', () => {
   it('refuses signed-out visitors', async () => {
     getSession.mockResolvedValue({ user: null, supabase: {} });
 
-    await expect(applyMockPlan({}, form({ planId: 'starter', interval: 'monthly' }))).resolves.toEqual({
+    await expect(
+      applyMockPlan({}, form({ planId: 'starter', interval: 'monthly' })),
+    ).resolves.toEqual({
       error: expect.stringMatching(/Sign in/),
     });
     expect(memory.saves).toHaveLength(0);
@@ -81,7 +85,9 @@ describe('applyMockPlan', () => {
     };
     vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    await expect(applyMockPlan({}, form({ planId: 'starter', interval: 'monthly' }))).resolves.toEqual({
+    await expect(
+      applyMockPlan({}, form({ planId: 'starter', interval: 'monthly' })),
+    ).resolves.toEqual({
       error: expect.stringMatching(/could not be saved/),
     });
     expect(redirect).not.toHaveBeenCalled();
@@ -95,7 +101,11 @@ describe('switchToHobbyMock', () => {
   });
 
   it('puts the account back on Hobby with no period end', async () => {
-    await memory.store.save(ACCOUNT, { plan_id: 'starter', billing_interval: 'monthly', current_period_end: '2027-01-01T00:00:00Z' });
+    await memory.store.save(ACCOUNT, {
+      plan_id: 'starter',
+      billing_interval: 'monthly',
+      current_period_end: '2027-01-01T00:00:00Z',
+    });
 
     await expect(switchToHobbyMock()).rejects.toThrow('NEXT_REDIRECT:/billing?checkout=success');
 

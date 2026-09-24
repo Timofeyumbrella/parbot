@@ -22,7 +22,12 @@ export async function POST(request: Request) {
     console.error('Portal could not be opened', error);
 
     return NextResponse.json(
-      { error: error instanceof BillingError ? error.message : 'The portal could not be opened. Try again in a moment.' },
+      {
+        error:
+          error instanceof BillingError
+            ? error.message
+            : 'The portal could not be opened. Try again in a moment.',
+      },
       { status: error instanceof BillingError ? 409 : 502 },
     );
   }

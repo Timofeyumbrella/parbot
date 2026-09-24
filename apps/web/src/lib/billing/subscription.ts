@@ -18,7 +18,8 @@ export type SubscriptionSnapshot = {
   accountId: string | null;
 };
 
-const unixSeconds = (value: unknown) => (typeof value === 'number' && Number.isFinite(value) ? value : null);
+const unixSeconds = (value: unknown) =>
+  typeof value === 'number' && Number.isFinite(value) ? value : null;
 
 export const snapshotSubscription = (subscription: Stripe.Subscription): SubscriptionSnapshot => {
   const item = subscription.items?.data?.[0];
@@ -42,7 +43,9 @@ export const snapshotSubscription = (subscription: Stripe.Subscription): Subscri
  * Stripe statuses that keep the plan versus the ones that end it. `paused` is not in our enum;
  * a paused subscription no longer entitles the account, so it ends like a cancellation.
  */
-export const mapSubscriptionStatus = (status: Stripe.Subscription.Status): Enums<'subscription_status'> => {
+export const mapSubscriptionStatus = (
+  status: Stripe.Subscription.Status,
+): Enums<'subscription_status'> => {
   switch (status) {
     case 'active':
       return 'active';
@@ -70,7 +73,9 @@ export const patchFromSnapshot = (
   const catalog = planForPriceId(snapshot.priceId, env);
 
   if (!catalog && snapshot.priceId) {
-    log(`Stripe price ${snapshot.priceId} on subscription ${snapshot.id} is not in the catalog; treating it as Hobby.`);
+    log(
+      `Stripe price ${snapshot.priceId} on subscription ${snapshot.id} is not in the catalog; treating it as Hobby.`,
+    );
   }
 
   const status = mapSubscriptionStatus(snapshot.status);
@@ -82,7 +87,9 @@ export const patchFromSnapshot = (
     billing_interval: ended ? null : (catalog?.interval ?? null),
     stripe_subscription_id: snapshot.id,
     ...(snapshot.customerId ? { stripe_customer_id: snapshot.customerId } : {}),
-    current_period_end: snapshot.currentPeriodEnd ? new Date(snapshot.currentPeriodEnd * 1000).toISOString() : null,
+    current_period_end: snapshot.currentPeriodEnd
+      ? new Date(snapshot.currentPeriodEnd * 1000).toISOString()
+      : null,
     cancel_at_period_end: snapshot.cancelAtPeriodEnd,
   };
 };

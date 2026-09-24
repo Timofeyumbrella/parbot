@@ -24,7 +24,8 @@ export const createMemoryStore = (accountIds: string[]) => {
   }
 
   const saves: Array<{ accountId: string; patch: SubscriptionPatch }> = [];
-  const find = (predicate: (row: Subscription) => boolean) => [...rows.values()].find(predicate) ?? null;
+  const find = (predicate: (row: Subscription) => boolean) =>
+    [...rows.values()].find(predicate) ?? null;
 
   const store: SubscriptionStore = {
     findByAccount: async (accountId) => rows.get(accountId) ?? null,

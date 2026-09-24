@@ -39,7 +39,9 @@ export const billingProviderName = (): BillingProviderName => {
 
   if (env.billingProvider === 'stripe' && !warnedAboutMissingKey) {
     warnedAboutMissingKey = true;
-    console.warn('BILLING_PROVIDER=stripe but STRIPE_SECRET_KEY is empty; billing runs on the mock provider.');
+    console.warn(
+      'BILLING_PROVIDER=stripe but STRIPE_SECRET_KEY is empty; billing runs on the mock provider.',
+    );
   }
 
   return 'mock';

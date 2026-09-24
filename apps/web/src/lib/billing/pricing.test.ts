@@ -2,7 +2,13 @@ import { describe, expect, it } from 'vitest';
 
 import { PLANS } from '@/lib/plans';
 
-import { formatPeriodEnd, priceLabel, usagePercent, yearlyNote, yearlySavingCents } from './pricing';
+import {
+  formatPeriodEnd,
+  priceLabel,
+  usagePercent,
+  yearlyNote,
+  yearlySavingCents,
+} from './pricing';
 
 describe('pricing labels', () => {
   it('prices each interval and calls the free plan free', () => {

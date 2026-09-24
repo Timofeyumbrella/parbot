@@ -1,7 +1,12 @@
 import { NextResponse } from 'next/server';
 import type Stripe from 'stripe';
 
-import { createSubscriptionStore, getStripe, handleStripeEvent, retrieveSubscription } from '@/lib/billing';
+import {
+  createSubscriptionStore,
+  getStripe,
+  handleStripeEvent,
+  retrieveSubscription,
+} from '@/lib/billing';
 import { serverEnv } from '@/lib/env';
 
 /**

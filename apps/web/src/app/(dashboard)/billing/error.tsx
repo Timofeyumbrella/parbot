@@ -6,7 +6,13 @@ import { useEffect } from 'react';
 import { PageContainer, PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
 
-export default function BillingError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+export default function BillingError({
+  error,
+  reset,
+}: {
+  error: Error & { digest?: string };
+  reset: () => void;
+}) {
   useEffect(() => {
     console.error('Billing screen failed', error);
   }, [error]);
@@ -23,7 +29,9 @@ export default function BillingError({ error, reset }: { error: Error & { digest
           </Button>
         }
       />
-      {error.digest ? <p className="text-muted-foreground text-xs">Reference: {error.digest}</p> : null}
+      {error.digest ? (
+        <p className="text-muted-foreground text-xs">Reference: {error.digest}</p>
+      ) : null}
     </PageContainer>
   );
 }

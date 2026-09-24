@@ -35,7 +35,10 @@ describe('mock billing provider', () => {
   });
 
   it('sends the portal back with the mock portal flag', async () => {
-    const { url } = await provider.createPortal({ accountId: 'acc', returnUrl: 'http://localhost:3000/billing' });
+    const { url } = await provider.createPortal({
+      accountId: 'acc',
+      returnUrl: 'http://localhost:3000/billing',
+    });
 
     expect(url).toBe('http://localhost:3000/billing?mock_portal=1');
   });

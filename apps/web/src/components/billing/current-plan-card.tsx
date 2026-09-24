@@ -1,5 +1,13 @@
 import { Badge } from '@/components/ui/badge';
-import { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import type { AccountPlan } from '@/lib/account';
 import { formatPeriodEnd, priceLabel } from '@/lib/billing/pricing';
 import type { BillingProviderName } from '@/lib/billing/types';
@@ -54,7 +62,9 @@ export const renewalLine = (account: AccountPlan) => {
   }
 
   if (account.cancelAtPeriodEnd) {
-    return date ? `Ends on ${date}. You keep the plan until then.` : 'Ends at the close of the current period.';
+    return date
+      ? `Ends on ${date}. You keep the plan until then.`
+      : 'Ends at the close of the current period.';
   }
 
   return date ? `Renews on ${date}.` : 'Renews automatically.';
@@ -65,7 +75,8 @@ export const CurrentPlanCard = ({ account, providerName, className }: CurrentPla
   const isPaid = account.plan.id !== 'hobby';
   // In test mode the portal is a card on this screen, so it is always reachable; with Stripe it needs a customer.
   const canManage = account.hasStripeCustomer || providerName === 'mock';
-  const price = account.billingInterval && isPaid ? priceLabel(account.plan, account.billingInterval) : 'Free';
+  const price =
+    account.billingInterval && isPaid ? priceLabel(account.plan, account.billingInterval) : 'Free';
 
   return (
     <Card className={className}>
@@ -87,7 +98,9 @@ export const CurrentPlanCard = ({ account, providerName, className }: CurrentPla
         {canManage ? (
           <ManageSubscriptionButton />
         ) : (
-          <p className="text-muted-foreground text-sm">Nothing to manage yet. Pick a plan below when you are ready.</p>
+          <p className="text-muted-foreground text-sm">
+            Nothing to manage yet. Pick a plan below when you are ready.
+          </p>
         )}
       </CardFooter>
     </Card>
