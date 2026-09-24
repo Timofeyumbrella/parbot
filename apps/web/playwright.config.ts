@@ -1,8 +1,11 @@
+import path from 'node:path';
+
 import { defineConfig, devices } from '@playwright/test';
 
 // The specs clean up after themselves with the service role key from apps/web/.env.
+// Playwright loads this file as CommonJS, so __dirname is available and import.meta is not.
 try {
-  process.loadEnvFile(new URL('./.env', import.meta.url));
+  process.loadEnvFile(path.resolve(__dirname, '.env'));
 } catch {
   // No env file: the dev server still starts, cleanup is skipped.
 }
