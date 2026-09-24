@@ -13,13 +13,15 @@ const DEMO_USER = '00000000-0000-4000-8000-000000000001';
 
 // Runs against the local Supabase stack; skipped where there is none.
 describe.skipIf(!serviceKey)('streamAnswer against the local database', () => {
-  const service = createClient<Database>(url, serviceKey ?? '', {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
+  let service: ReturnType<typeof createClient<Database>>;
   const provider = createStubProvider();
   let assistantId = '';
 
   beforeAll(async () => {
+    service = createClient<Database>(url, serviceKey ?? '', {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+
     const { data: assistant, error } = await service
       .from('assistants')
       .insert({ owner_id: DEMO_USER, name: 'Test assistant', slug: `test-${Date.now()}` })
