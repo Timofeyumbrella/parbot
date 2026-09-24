@@ -1,5 +1,10 @@
-import { Placeholder } from '@/components/placeholder';
+import type { Metadata } from 'next';
 
-export default function Page() {
-  return <Placeholder title="Chat" owner="chat" />;
+import { NewChat } from '@/components/chat/new-chat';
+
+export const metadata: Metadata = { title: 'Chat' };
+
+/** The "new chat" screen. Nothing is read here: the assistant comes from the layout above. */
+export default function ChatPage() {
+  return <NewChat />;
 }
