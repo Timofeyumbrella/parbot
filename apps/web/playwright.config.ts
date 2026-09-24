@@ -15,7 +15,9 @@ const port = Number(process.env.E2E_PORT ?? 3210);
 export default defineConfig({
   testDir: './e2e',
   timeout: 60_000,
+  // Specs share one dev server and one local database; one file at a time keeps them honest.
   fullyParallel: false,
+  workers: 1,
   retries: 0,
   reporter: [['list'], ['html', { open: 'never' }]],
   use: {
