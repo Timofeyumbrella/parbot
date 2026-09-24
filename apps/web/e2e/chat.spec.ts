@@ -430,6 +430,116 @@ test.describe('the in-app chat', () => {
     await phone.close();
   });
 
+  test('a rich answer renders code, tables and chips, and Jump to latest settles at once', async () => {
+    const conversationId = crypto.randomUUID();
+    const answer = [
+      'Rotate the key in **Settings** [1]. The old key keeps working for an hour [2].',
+      '',
+      '```bash',
+      'acme keys rotate --id 42',
+      '```',
+      '',
+      '| Plan | Keys |',
+      '| --- | --- |',
+      '| Hobby | 2 |',
+      '| Starter | 10 |',
+      '',
+      '- Keep the old key until every service has the new one.',
+      '- Revoke it afterwards.',
+    ].join('\n');
+    const citations = [
+      { index: 1, documentId: 'd1', title: 'Authentication', url: 'https://docs.acme.test/auth', snippet: 'API keys are created in Settings.' },
+      { index: 2, documentId: 'd2', title: 'Pasted notes', url: null, snippet: 'Rotate keys monthly.' },
+    ];
+
+    const { error: conversationError } = await service.from('conversations').insert({
+      id: conversationId,
+      assistant_id: assistantId,
+      owner_id: DEMO_USER,
+      channel: 'app',
+      title: 'Seeded rotation thread',
+    });
+
+    expect(conversationError).toBeNull();
+
+    for (let index = 0; index < 8; index += 1) {
+      const { error: messageError } = await service.from('messages').insert([
+        // A bulk insert sends null for keys one row lacks, so the user row names its empty citations.
+        { conversation_id: conversationId, assistant_id: assistantId, owner_id: DEMO_USER, role: 'user', content: `Question ${index + 1}: how do I rotate a key?`, citations: [] },
+        {
+          conversation_id: conversationId,
+          assistant_id: assistantId,
+          owner_id: DEMO_USER,
+          role: 'assistant',
+          content: answer,
+          citations,
+          answered: true,
+          latency_ms: 820,
+        },
+      ]);
+
+      expect(messageError).toBeNull();
+    }
+
+    await page.goto(`/a/${assistantId}/chat/${conversationId}`);
+
+    const last = assistantBubble(page, 'complete').last();
+
+    await expect(last).toBeVisible();
+    await expect(last.getByTestId('code-block')).toContainText('bash');
+    await expect(last.getByTestId('code-block').locator('pre code')).toContainText('acme keys rotate --id 42');
+    await expect(last.getByTestId('code-block').getByRole('button', { name: 'Copy' })).toBeVisible();
+    await expect(last.getByRole('table')).toBeVisible();
+    await expect(last.getByRole('columnheader', { name: 'Plan' })).toBeVisible();
+    await expect(last.locator('sup[data-citation] a').nth(1)).toHaveAttribute('href', /#sources-/);
+    await expect(last.getByTestId('sources')).toContainText('Pasted notes');
+    await expect(last.getByText('Settings', { exact: true })).toHaveJSProperty('tagName', 'STRONG');
+
+    const scroller = thread(page).locator('.overflow-y-auto').first();
+
+    // Opening lands at the bottom; scrolling up shows the pill; the pill leaves as soon as it is used.
+    expect(await scroller.evaluate((node) => node.scrollHeight - node.scrollTop - node.clientHeight)).toBeLessThan(48);
+    await scroller.evaluate((node) => node.scrollTo({ top: 0 }));
+    await expect(page.getByRole('button', { name: 'Jump to latest' })).toBeVisible();
+    await page.getByRole('button', { name: 'Jump to latest' }).click();
+    await expect(page.getByRole('button', { name: 'Jump to latest' })).toHaveCount(0, { timeout: 150 });
+    await expect
+      .poll(() => scroller.evaluate((node) => node.scrollHeight - node.scrollTop - node.clientHeight), { timeout: 2000 })
+      .toBeLessThan(48);
+    await expect(page.getByRole('button', { name: 'Jump to latest' })).toHaveCount(0);
+
+    const shots = process.env.CHAT_SHOTS_DIR;
+
+    if (shots) {
+      await page.screenshot({ path: `${shots}/desktop-dark.png`, fullPage: false });
+      await page.getByRole('button', { name: 'Toggle colour scheme' }).click();
+      await page.waitForTimeout(300);
+      await page.screenshot({ path: `${shots}/desktop-light.png`, fullPage: false });
+      await page.getByRole('button', { name: 'Toggle colour scheme' }).click();
+
+      const phone = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+      const mobile = await phone.newPage();
+
+      await signIn(mobile, `/a/${assistantId}/chat/${conversationId}`);
+      await expect(mobile.locator('[data-role="assistant"]').last()).toBeVisible();
+      await mobile.screenshot({ path: `${shots}/phone-dark.png` });
+      await mobile.getByRole('button', { name: 'Conversations' }).click();
+      await expect(mobile.getByRole('dialog')).toBeVisible();
+      await mobile.screenshot({ path: `${shots}/phone-sheet.png` });
+      await phone.close();
+    }
+  });
+
+  test('the frame streams before the conversation list: the list pane is a suspense boundary', async () => {
+    const response = await page.request.get(`/a/${assistantId}/chat`);
+    const html = await response.text();
+
+    expect(response.status()).toBe(200);
+    // React marks a pending Suspense boundary with <!--$?--> and later fills it in from a hidden segment.
+    expect(html).toContain('<!--$?-->');
+    expect(html).toMatch(/<template id="B:\d+">/);
+  });
+
   test('the chat and feedback endpoints refuse bad input and strangers', async ({ request }) => {
     const signedOut = await request.post('/api/chat', {
       data: { assistantId, conversationId: crypto.randomUUID(), message: 'hi' },
