@@ -108,6 +108,27 @@ const createTurndown = (baseUrl?: string) => {
     },
   });
 
+  // Turndown pads list markers to four columns ("-   item"); one space is what people write.
+  service.addRule('listItem', {
+    filter: 'li',
+    replacement: (content, node, options) => {
+      const parent = node.parentNode as HTMLElement | null;
+      let prefix = `${options.bulletListMarker} `;
+
+      if (parent?.nodeName === 'OL') {
+        const start = Number(parent.getAttribute('start') ?? 1);
+        const index = Array.prototype.indexOf.call(parent.children, node);
+
+        prefix = `${start + index}. `;
+      }
+
+      const isParagraph = /\n$/.test(content);
+      const body = content.replace(/^\n+/, '').replace(/\n+$/, '') + (isParagraph ? '\n' : '');
+
+      return prefix + body.replace(/\n/gm, `\n${' '.repeat(prefix.length)}`) + (node.nextSibling ? '\n' : '');
+    },
+  });
+
   service.addRule('tables', {
     filter: 'table',
     replacement: (_content, node) => {
@@ -165,6 +186,13 @@ const tidyMarkdown = (markdown: string) =>
     .trim();
 
 /**
+ * Readability drops the h1 that repeats the page title and demotes the others, which would leave
+ * every chunk without the top of its heading path. The title goes back in as the level one heading.
+ */
+const withTitleHeading = (markdown: string, title: string | null) =>
+  markdown && title && !/^ {0,3}#[ \t]/m.test(markdown) ? `# ${title}\n\n${markdown}` : markdown;
+
+/**
  * HTML to Markdown: links and title are read from the raw document, chrome is dropped, Readability
  * picks the main content (with <main>/<article>/<body> as the fallback), and Turndown writes
  * headings, fenced code, lists, links and tables.
@@ -201,5 +229,5 @@ export const htmlToMarkdown = (html: string, options: HtmlOptions = {}): Extract
 
   const markdown = tidyMarkdown(createTurndown(options.baseUrl).turndown(contentHtml || fallbackHtml));
 
-  return { title, markdown, links };
+  return { title, markdown: withTitleHeading(markdown, title), links };
 };

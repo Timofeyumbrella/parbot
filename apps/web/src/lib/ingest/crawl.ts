@@ -95,6 +95,11 @@ export const crawlableLinks = (hrefs: string[], base: string, scope: CrawlScope)
   const seen = new Set<string>();
 
   for (const href of hrefs) {
+    if (href.trim().startsWith('#')) {
+      // An anchor points into the page it is on; that page is already being read.
+      continue;
+    }
+
     const url = normalizeUrl(href, base);
 
     if (url && isInScope(url, scope)) {

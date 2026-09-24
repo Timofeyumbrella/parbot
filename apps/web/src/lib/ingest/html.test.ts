@@ -51,6 +51,11 @@ describe('htmlToMarkdown', () => {
     expect(result.markdown).not.toContain('display: none');
   });
 
+  it('puts the title back as the level one heading when Readability removed it', () => {
+    expect(result.markdown.startsWith('# Authentication\n\n')).toBe(true);
+    expect(result.markdown.match(/^# /gm)).toHaveLength(1);
+  });
+
   it('writes headings, a fenced code block with its language, lists, links and tables', () => {
     expect(result.markdown).toContain('## Sending the key');
     expect(result.markdown).toContain('## Scopes');

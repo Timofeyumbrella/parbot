@@ -143,7 +143,10 @@ describe('chunkMarkdown', () => {
 
     const codeIndex = chunks.findIndex((chunk) => chunk.content.includes('run();'));
 
-    expect(codeIndex).toBeGreaterThan(0);
+    // The small code block packs into the chunk before it; what matters is that the chunk after
+    // it starts clean instead of repeating the tail of the code.
+    expect(codeIndex).toBeGreaterThanOrEqual(0);
+    expect(chunks[codeIndex]?.content.endsWith('```')).toBe(true);
     expect(chunks[codeIndex + 1]?.content.startsWith('Sentence number 50')).toBe(true);
   });
 
