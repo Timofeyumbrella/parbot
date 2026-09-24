@@ -70,9 +70,17 @@ export const useConversations = (assistantId: string, snapshot?: ConversationSna
   });
 };
 
-/** One row from the list cache, for a header that names the open conversation. Never fetches. */
+/**
+ * One row from the list cache, for a header that names the open conversation. Never fetches on
+ * its own: the list pane owns the query, this observer only reads what it holds. The queryFn is
+ * still named so TanStack does not treat the observer as misconfigured.
+ */
 export const useConversationRow = (assistantId: string, conversationId: string | null) => {
-  const { data } = useQuery<ConversationRow[]>({ queryKey: conversationsKey(assistantId), enabled: false });
+  const { data } = useQuery<ConversationRow[]>({
+    queryKey: conversationsKey(assistantId),
+    queryFn: () => fetchConversations(getSupabaseBrowserClient(), assistantId),
+    enabled: false,
+  });
 
   return conversationId ? (data?.find((row) => row.id === conversationId) ?? null) : null;
 };

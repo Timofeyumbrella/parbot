@@ -144,12 +144,21 @@ test.describe('the in-app chat', () => {
   let page: Page;
   let browser: Browser;
   const conversationIds: string[] = [];
+  const consoleProblems: string[] = [];
 
   test.beforeAll(async ({ browser: launched }) => {
     browser = launched;
     service = admin();
     assistantId = await seedAssistant(service);
     page = await browser.newPage();
+    // Every flow below runs on this page; a warning or error it logs fails the last test. The
+    // browser's own network log is left out: one test answers /api/chat with a 500 on purpose.
+    page.on('console', (message) => {
+      if ((message.type() === 'error' || message.type() === 'warning') && !message.text().startsWith('Failed to load resource')) {
+        consoleProblems.push(`[${message.type()}] ${message.text()}`);
+      }
+    });
+    page.on('pageerror', (error) => consoleProblems.push(`[pageerror] ${error.message}`));
     // Visit both chat routes once so a dev server's first compile does not count against the timings below.
     await signIn(page, `/a/${assistantId}/chat/${crypto.randomUUID()}`);
     await page.goto(`/a/${assistantId}/chat`);
@@ -541,6 +550,10 @@ test.describe('the in-app chat', () => {
     // React marks a pending Suspense boundary with <!--$?--> and later fills it in from a hidden segment.
     expect(html).toContain('<!--$?-->');
     expect(html).toMatch(/<template id="B:\d+">/);
+  });
+
+  test('none of the flows above logged a console error or warning', () => {
+    expect(consoleProblems).toEqual([]);
   });
 
   test('the chat and feedback endpoints refuse bad input and strangers', async ({ request }) => {
