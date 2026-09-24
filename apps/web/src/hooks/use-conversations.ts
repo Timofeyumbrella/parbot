@@ -28,9 +28,10 @@ export const useConversations = (assistantId: string, initial?: ConversationRow[
   useEffect(() => {
     // A later visit brings newer rows from the server than the cache holds; fold them in.
     if (initial) {
-      queryClient.setQueryData<ConversationRow[]>(key, (rows) => (rows ? mergeConversationLists(rows, initial) : rows));
+      queryClient.setQueryData<ConversationRow[]>(conversationsKey(assistantId), (rows) =>
+        rows ? mergeConversationLists(rows, initial) : rows,
+      );
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- key is derived from assistantId
   }, [initial, assistantId, queryClient]);
 
   return useQuery({
