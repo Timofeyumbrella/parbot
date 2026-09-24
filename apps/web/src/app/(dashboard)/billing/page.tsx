@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 
 import { CurrentPlanCard } from '@/components/billing/current-plan-card';
@@ -12,6 +13,8 @@ import { getAccountPlan, getAccountUsage } from '@/lib/account';
 import { billingProviderName, isBillingInterval, isPaidPlanId } from '@/lib/billing';
 import { isPlanId } from '@/lib/plans';
 import { requireUser } from '@/lib/session';
+
+export const metadata: Metadata = { title: 'Billing' };
 
 const first = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value);
 

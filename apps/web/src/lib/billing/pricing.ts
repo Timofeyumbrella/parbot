@@ -18,9 +18,11 @@ export const priceLabel = (plan: Plan, interval: BillingInterval) => {
 /** What a year on the plan costs less than twelve months would. Zero for free plans. */
 export const yearlySavingCents = (plan: Plan) => Math.max(plan.monthlyCents * 12 - plan.yearlyCents, 0);
 
-/** "$290 a year, two months free". */
+/** "Two months free, $58 less than paying monthly". Null for free plans. */
 export const yearlyNote = (plan: Plan) =>
-  plan.monthlyCents === 0 ? null : `Two months free against ${formatPrice(plan.monthlyCents)} a month`;
+  plan.monthlyCents === 0
+    ? null
+    : `Two months free, ${formatPrice(yearlySavingCents(plan))} less than paying monthly`;
 
 const dateFormatter = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
 

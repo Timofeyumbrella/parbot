@@ -12,15 +12,20 @@ export type SubscriptionSnapshot = {
   status: Stripe.Subscription.Status;
   priceId: string | null;
   cancelAtPeriodEnd: boolean;
-  /** Unix seconds. On this API version it lives on the subscription item. */
+  /** Unix seconds. Current API versions put it on the subscription item, older ones on the subscription. */
   currentPeriodEnd: number | null;
   /** The account id Checkout attached as subscription metadata. */
   accountId: string | null;
 };
 
+const unixSeconds = (value: unknown) => (typeof value === 'number' && Number.isFinite(value) ? value : null);
+
 export const snapshotSubscription = (subscription: Stripe.Subscription): SubscriptionSnapshot => {
   const item = subscription.items?.data?.[0];
   const customer = subscription.customer;
+  // A webhook endpoint pinned to an API version before 2025-03-31 still sends the period on the
+  // subscription itself, which the current SDK types no longer declare.
+  const legacyPeriodEnd = (subscription as { current_period_end?: unknown }).current_period_end;
 
   return {
     id: subscription.id,
@@ -28,7 +33,7 @@ export const snapshotSubscription = (subscription: Stripe.Subscription): Subscri
     status: subscription.status,
     priceId: item?.price?.id ?? null,
     cancelAtPeriodEnd: Boolean(subscription.cancel_at_period_end),
-    currentPeriodEnd: typeof item?.current_period_end === 'number' ? item.current_period_end : null,
+    currentPeriodEnd: unixSeconds(item?.current_period_end) ?? unixSeconds(legacyPeriodEnd),
     accountId: subscription.metadata?.account_id?.trim() || null,
   };
 };

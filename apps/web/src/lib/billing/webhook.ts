@@ -99,6 +99,19 @@ const resolveRow = async (
   return customerId ? store.findByStripeCustomer(customerId) : null;
 };
 
+/**
+ * Whether the event is about the subscription the row follows. A completed Checkout always wins,
+ * a row without a subscription adopts the first one it hears about, and a row whose subscription
+ * has ended adopts the next one (a customer who resubscribes through the portal). What is left is
+ * a lifecycle event for an old subscription, such as it ending after the account moved to a new
+ * one, which must not clobber the current row.
+ */
+const concernsCurrentSubscription = (row: Subscription, snapshot: SubscriptionSnapshot, hints: Hints) =>
+  Boolean(hints.accountId) ||
+  !row.stripe_subscription_id ||
+  row.stripe_subscription_id === snapshot.id ||
+  row.status === 'canceled';
+
 const applySnapshot = async (snapshot: SubscriptionSnapshot, hints: Hints, deps: WebhookDeps): Promise<WebhookOutcome> => {
   const log = deps.log ?? console.warn;
   const row = await resolveRow(snapshot, hints, deps.store, log);
@@ -109,9 +122,7 @@ const applySnapshot = async (snapshot: SubscriptionSnapshot, hints: Hints, deps:
     return ignored('No account for this subscription.');
   }
 
-  if (row.stripe_subscription_id && row.stripe_subscription_id !== snapshot.id && !hints.accountId) {
-    // A lifecycle event for a subscription that is no longer the account's current one, for
-    // example the old subscription ending after the account moved to a new one.
+  if (!concernsCurrentSubscription(row, snapshot, hints)) {
     return ignored(`Subscription ${snapshot.id} is not the account's current subscription.`);
   }
 

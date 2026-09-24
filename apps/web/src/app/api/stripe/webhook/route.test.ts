@@ -81,6 +81,16 @@ describe('POST /api/stripe/webhook', () => {
     expect(memory.saves).toHaveLength(0);
   });
 
+  it('rejects every event while no webhook secret is configured', async () => {
+    vi.stubEnv('STRIPE_WEBHOOK_SECRET', '');
+
+    const response = await post(eventFixture('checkout.session.completed', checkoutSession()));
+
+    expect(response.status).toBe(400);
+    expect(memory.saves).toHaveLength(0);
+    vi.stubEnv('STRIPE_WEBHOOK_SECRET', SECRET);
+  });
+
   it('rejects a signature made with another secret', async () => {
     const response = await post(eventFixture('checkout.session.completed', checkoutSession()), { secret: 'whsec_wrong' });
 
@@ -228,6 +238,35 @@ describe('POST /api/stripe/webhook', () => {
     await post(eventFixture('customer.subscription.deleted', subscriptionFixture({ id: 'sub_old', status: 'canceled' }), 'evt_7'));
 
     expect(memory.rows.get(ACCOUNT)).toMatchObject({ plan_id: 'starter', status: 'active', stripe_subscription_id: 'sub_new' });
+  });
+
+  it('adopts a new subscription once the previous one has ended', async () => {
+    retrieveSubscription.mockResolvedValue(subscriptionFixture({ id: 'sub_old' }));
+    await post(eventFixture('checkout.session.completed', checkoutSession({ subscription: 'sub_old' })));
+    await post(eventFixture('customer.subscription.deleted', subscriptionFixture({ id: 'sub_old', status: 'canceled' }), 'evt_8'));
+
+    expect(memory.rows.get(ACCOUNT)).toMatchObject({ plan_id: 'hobby', status: 'canceled', stripe_subscription_id: 'sub_old' });
+
+    // Resubscribing through the portal creates a subscription without our metadata; the customer id ties it back.
+    await post(
+      eventFixture(
+        'customer.subscription.updated',
+        subscriptionFixture({
+          id: 'sub_again',
+          metadata: {},
+          items: { object: 'list', data: [{ id: 'si_2', price: { id: 'price_gm' }, current_period_end: PERIOD_END }] },
+        }),
+        'evt_9',
+      ),
+    );
+
+    expect(memory.rows.get(ACCOUNT)).toMatchObject({
+      plan_id: 'growth',
+      billing_interval: 'monthly',
+      status: 'active',
+      stripe_subscription_id: 'sub_again',
+      stripe_customer_id: 'cus_1',
+    });
   });
 
   it('falls back to Hobby and logs when the price is unknown', async () => {

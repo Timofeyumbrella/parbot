@@ -18,6 +18,18 @@ describe('snapshotSubscription', () => {
     });
   });
 
+  it('reads the period end from the subscription itself on an older API version', () => {
+    const legacy = subscriptionFixture({
+      current_period_end: PERIOD_END + 60,
+      items: { object: 'list', data: [{ id: 'si_1', object: 'subscription_item', price: { id: 'price_sm' } }] },
+    });
+
+    expect(snapshotSubscription(legacy).currentPeriodEnd).toBe(PERIOD_END + 60);
+    expect(snapshotSubscription(subscriptionFixture({ current_period_end: PERIOD_END + 60 })).currentPeriodEnd).toBe(
+      PERIOD_END,
+    );
+  });
+
   it('accepts an expanded customer and a missing item', () => {
     const snapshot = snapshotSubscription(
       subscriptionFixture({ customer: { id: 'cus_2', object: 'customer' }, items: { object: 'list', data: [] }, metadata: {} }),

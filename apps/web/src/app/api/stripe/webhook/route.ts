@@ -14,7 +14,10 @@ export async function POST(request: Request) {
   const signature = request.headers.get('stripe-signature');
 
   if (!secret || !signature) {
-    return NextResponse.json({ error: 'Missing Stripe signature.' }, { status: 400 });
+    return NextResponse.json(
+      { error: secret ? 'Missing Stripe signature.' : 'STRIPE_WEBHOOK_SECRET is not configured.' },
+      { status: 400 },
+    );
   }
 
   let stripe: Stripe;
