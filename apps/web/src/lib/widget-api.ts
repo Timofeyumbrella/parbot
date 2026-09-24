@@ -18,6 +18,7 @@ import {
   WIDGET_POSITIONS,
   WIDGET_RADII,
   WIDGET_SCHEMES,
+  type WidgetApiError,
   type WidgetConfig,
   type WidgetTheme,
 } from '@parbot/shared';
@@ -194,12 +195,24 @@ export const corsHeaders = (origin?: string | null): Record<string, string> => (
 export const preflight = (request: Request) =>
   new Response(null, { status: 204, headers: corsHeaders(requestOrigin(request)) });
 
+/**
+ * A refused widget request. The body carries the message twice, as `error.message` and as a top
+ * level `message`, so both the widget and the landing's live demo read it without special cases.
+ */
 export const jsonError = (
   status: number,
   code: ChatErrorCode,
   message: string,
   headers?: Record<string, string>,
-) => Response.json({ error: { code, message } }, { status, headers: { ...corsHeaders(), ...headers } });
+) => {
+  const body: WidgetApiError = { error: { code, message }, message };
+
+  return Response.json(body, { status, headers: { ...corsHeaders(), ...headers } });
+};
+
+/** Cache-control for a config response: a versioned request is a preview and must not be served stale. */
+export const configCacheControl = (request: Request) =>
+  new URL(request.url).searchParams.has('v') ? 'no-store' : 'public, max-age=60';
 
 /** The first address in x-forwarded-for is the client; the rest are proxies. */
 export const clientIp = (request: Request) => {

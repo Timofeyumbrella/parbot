@@ -231,7 +231,11 @@ export const WIDGET_ACCENT_PRESETS = [
   '#0f172a',
 ] as const;
 
-/** The JSON body of a failed widget API call. Streaming errors use ChatStreamEvent instead. */
+/**
+ * The JSON body of a failed widget API call. Streaming errors use ChatStreamEvent instead. The
+ * message is repeated at the top level so a client that only reads `{ message }` still gets it.
+ */
 export type WidgetApiError = {
   error: { code: ChatErrorCode; message: string };
+  message: string;
 };

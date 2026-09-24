@@ -9,7 +9,7 @@ import {
 } from '@parbot/shared';
 
 import { accentText, onAccent } from './config';
-import { renderMarkdown } from './markdown';
+import { renderMarkdown, safeUrl } from './markdown';
 import {
   getConversationId,
   getVisitorId,
@@ -31,10 +31,13 @@ export type WidgetOptions = {
 type Message = StoredMessage & {
   id: string;
   streaming?: boolean;
-  error?: { code: ChatErrorCode; message: string } | null;
+  /** `network` is the widget's own code for a request that never reached the server. */
+  error?: { code: ChatErrorCode | 'network' } | null;
   lead?: 'form' | 'sent' | null;
   leadEmail?: string;
 };
+
+const errorCopy = (code: ChatErrorCode | 'network') => (code === 'network' ? NETWORK_ERROR : ERROR_COPY[code]);
 
 const ICONS = {
   chat: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-8 8H7l-4 3V12a8 8 0 0 1 8-8h2a8 8 0 0 1 8 8z"/></svg>',
@@ -45,12 +48,25 @@ const ICONS = {
   spark: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M5.6 18.4l2.8-2.8M15.6 8.4l2.8-2.8"/></svg>',
 };
 
-const ERROR_COPY: Partial<Record<ChatErrorCode, string>> = {
+/**
+ * What a visitor reads for each failure. Server text never shows unchanged: it can name the
+ * owner's plan or a library, neither of which is the visitor's business.
+ */
+const ERROR_COPY: Record<ChatErrorCode, string> = {
   rate_limited: 'Too many messages in a short time. Wait a moment and retry.',
   origin_not_allowed: 'This site is not allowed to use the assistant.',
   not_found: 'The assistant could not be found.',
-  bad_request: 'That message could not be sent.',
+  bad_request: 'That message could not be sent. Shorten it and retry.',
+  unauthorized: 'This assistant is not available here.',
+  quota_exceeded: 'This assistant has reached its monthly limit. Try again later.',
+  model_busy: 'The assistant is busy right now. Wait a moment and retry.',
+  internal: 'The answer could not be loaded. Retry in a moment.',
 };
+
+const NETWORK_ERROR = 'Could not reach the assistant. Check your connection and retry.';
+
+const FOCUSABLE =
+  'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 const isMac = () => /Mac|iPhone|iPad/.test(typeof navigator === 'undefined' ? '' : navigator.platform || navigator.userAgent);
 
@@ -164,7 +180,8 @@ export class ParbotWidget {
     this.host.remove();
   }
 
-  open() {
+  /** Opens the panel. Focus moves to the composer unless the caller asks it not to. */
+  open(options: { focus?: boolean } = {}) {
     if (this.isOpen) {
       return;
     }
@@ -180,7 +197,10 @@ export class ParbotWidget {
       this.launcher.innerHTML = ICONS.close;
     }
 
-    this.input.focus();
+    if (options.focus !== false) {
+      this.input.focus();
+    }
+
     this.scrollToBottom(true);
   }
 
@@ -269,6 +289,7 @@ export class ParbotWidget {
     });
 
     this.menu.setAttribute('role', 'menu');
+    this.menu.setAttribute('aria-label', 'Conversation');
     const fresh = el('button', undefined, 'New conversation');
     fresh.type = 'button';
     fresh.setAttribute('role', 'menuitem');
@@ -281,6 +302,7 @@ export class ParbotWidget {
     closeItem.setAttribute('role', 'menuitem');
     closeItem.addEventListener('click', () => this.close());
     this.menu.append(fresh, closeItem);
+    this.menu.addEventListener('keydown', (event) => this.onMenuKeydown(event));
 
     const closeButton = el('button', 'pb-icon-btn', ICONS.close);
     closeButton.type = 'button';
@@ -331,6 +353,7 @@ export class ParbotWidget {
     this.panel.setAttribute('aria-modal', this.mode === 'palette' ? 'true' : 'false');
     this.panel.append(header, this.list, this.composer, footer);
     this.panel.addEventListener('click', () => this.closeMenu());
+    this.panel.addEventListener('keydown', (event) => this.onPanelKeydown(event));
 
     this.overlay.addEventListener('click', () => this.close());
 
@@ -398,13 +421,73 @@ export class ParbotWidget {
     }
   };
 
+  /**
+   * The palette is modal (it sits on an overlay), so Tab must not leave it for the page behind.
+   * The bubble panel is not modal and keeps the page's natural tab order.
+   */
+  private readonly onPanelKeydown = (event: KeyboardEvent) => {
+    if (event.key !== 'Tab' || this.mode !== 'palette' || !this.isOpen) {
+      return;
+    }
+
+    const focusable = [...this.panel.querySelectorAll<HTMLElement>(FOCUSABLE)].filter(
+      (node) => node.offsetParent !== null || node === this.input,
+    );
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+
+    if (!first || !last) {
+      return;
+    }
+
+    const active = this.shadow.activeElement;
+
+    if (event.shiftKey && (active === first || !this.panel.contains(active))) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && (active === last || !this.panel.contains(active))) {
+      event.preventDefault();
+      first.focus();
+    }
+  };
+
+  private menuItems() {
+    return [...this.menu.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')];
+  }
+
+  /** Arrow keys walk the menu, Home and End jump, Tab leaves it and closes it. */
+  private readonly onMenuKeydown = (event: KeyboardEvent) => {
+    const items = this.menuItems();
+    const index = items.findIndex((item) => item === this.shadow.activeElement);
+    let next: number | null = null;
+
+    if (event.key === 'ArrowDown') {
+      next = (index + 1) % items.length;
+    } else if (event.key === 'ArrowUp') {
+      next = (index - 1 + items.length) % items.length;
+    } else if (event.key === 'Home') {
+      next = 0;
+    } else if (event.key === 'End') {
+      next = items.length - 1;
+    } else if (event.key === 'Tab') {
+      this.closeMenu();
+
+      return;
+    }
+
+    if (next !== null) {
+      event.preventDefault();
+      items[next]?.focus();
+    }
+  };
+
   private toggleMenu() {
     const open = !this.menu.classList.contains('pb-open');
     this.menu.classList.toggle('pb-open', open);
     this.menuButton.setAttribute('aria-expanded', String(open));
 
     if (open) {
-      (this.menu.querySelector('button') as HTMLButtonElement | null)?.focus();
+      this.menuItems()[0]?.focus();
     }
   }
 

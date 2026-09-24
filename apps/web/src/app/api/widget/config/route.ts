@@ -1,5 +1,6 @@
 import { createSupabaseServiceClient } from '@/lib/supabase/service';
 import {
+  configCacheControl,
   corsHeaders,
   findAssistantByKey,
   jsonError,
@@ -16,7 +17,8 @@ export const OPTIONS = (request: Request) => preflight(request);
 
 /**
  * What an installed widget needs to draw itself. Public by design: nothing here is secret, and
- * gated settings are folded back to their free-plan values before they leave the server.
+ * gated settings are folded back to their free-plan values before they leave the server. A
+ * request that carries `?v=` comes from the settings preview and is never served from a cache.
  */
 export async function GET(request: Request) {
   const origin = requestOrigin(request);
@@ -41,6 +43,6 @@ export async function GET(request: Request) {
   const plan = await loadOwnerPlan(service, assistant.owner_id);
 
   return Response.json(widgetConfigFor(assistant, plan), {
-    headers: { ...cors, 'cache-control': 'public, max-age=60' },
+    headers: { ...cors, 'cache-control': configCacheControl(request) },
   });
 }

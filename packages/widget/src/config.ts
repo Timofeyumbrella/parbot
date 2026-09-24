@@ -12,7 +12,13 @@ export type ScriptOptions = {
   api: string;
   mode: WidgetMode | null;
   launcher: boolean;
+  /** A settings version from the preview page; it makes the config request skip every cache. */
+  version: string | null;
+  /** Open the panel as soon as the widget mounts, without taking focus. The preview uses it. */
+  open: boolean;
 };
+
+const VERSION_PATTERN = /^[A-Za-z0-9_-]{1,32}$/;
 
 /** Reads the embedding <script> tag. Returns null when there is no key to work with. */
 export const readScriptOptions = (script: HTMLScriptElement | null): ScriptOptions | null => {
@@ -24,12 +30,15 @@ export const readScriptOptions = (script: HTMLScriptElement | null): ScriptOptio
 
   const mode = script?.getAttribute('data-mode')?.trim().toLowerCase();
   const api = script?.getAttribute('data-api')?.trim().replace(/\/+$/, '');
+  const version = script?.getAttribute('data-version')?.trim() ?? '';
 
   return {
     key,
     api: api || originOf(script?.src) || window.location.origin,
     mode: isWidgetMode(mode) ? mode : null,
     launcher: script?.getAttribute('data-launcher')?.trim().toLowerCase() !== 'false',
+    version: VERSION_PATTERN.test(version) ? version : null,
+    open: script?.getAttribute('data-open')?.trim().toLowerCase() === 'true',
   };
 };
 
@@ -85,10 +94,16 @@ export const normalizeConfig = (value: unknown): WidgetConfig | null => {
   };
 };
 
-export const fetchConfig = async (api: string, key: string): Promise<WidgetConfig | null> => {
-  const response = await fetch(`${api}/api/widget/config?key=${encodeURIComponent(key)}`, {
+/**
+ * Loads the config fresh on every page load: the browser never caches it, and a version from
+ * the preview page also defeats any shared cache in front of the API, so a save shows at once.
+ */
+export const fetchConfig = async (api: string, key: string, version?: string | null): Promise<WidgetConfig | null> => {
+  const query = `key=${encodeURIComponent(key)}${version ? `&v=${encodeURIComponent(version)}` : ''}`;
+  const response = await fetch(`${api}/api/widget/config?${query}`, {
     method: 'GET',
     credentials: 'omit',
+    cache: 'no-store',
   });
 
   if (!response.ok) {

@@ -46,7 +46,7 @@ export const boot = async (script = findScript()): Promise<ParbotWidget | null> 
   }
 
   try {
-    const config = await fetchConfig(options.api, options.key);
+    const config = await fetchConfig(options.api, options.key, options.version);
 
     if (!config) {
       console.warn('[Parbot] The widget config was not understood.');
@@ -67,6 +67,12 @@ export const boot = async (script = findScript()): Promise<ParbotWidget | null> 
       mode: options.mode,
       launcher: options.launcher,
     }).mount();
+
+    if (options.open) {
+      // The preview frame wants the panel visible at once, but must not pull focus away from
+      // the settings form the owner is editing next to it.
+      widget.open({ focus: false });
+    }
 
     for (const command of queue.splice(0)) {
       command(widget);
