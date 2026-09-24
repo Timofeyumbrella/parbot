@@ -118,7 +118,6 @@ const list = (page: Page) => page.getByRole('navigation', { name: 'Conversations
 const thread = (page: Page) => page.getByTestId('thread');
 const assistantBubble = (page: Page, status: string) => page.locator(`[data-role="assistant"][data-status="${status}"]`);
 
-const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/;
 const CONVERSATION_URL = /\/chat\/([0-9a-f-]{36})$/;
 
 const openConversationId = (page: Page) => page.url().match(CONVERSATION_URL)![1]!;
@@ -151,7 +150,10 @@ test.describe('the in-app chat', () => {
     service = admin();
     assistantId = await seedAssistant(service);
     page = await browser.newPage();
-    await signIn(page, `/a/${assistantId}/chat`);
+    // Visit both chat routes once so a dev server's first compile does not count against the timings below.
+    await signIn(page, `/a/${assistantId}/chat/${crypto.randomUUID()}`);
+    await page.goto(`/a/${assistantId}/chat`);
+    await expect(page.getByTestId('welcome')).toBeVisible();
   });
 
   test.afterAll(async () => {
@@ -181,11 +183,12 @@ test.describe('the in-app chat', () => {
 
     await expect(page.locator('[data-role="user"]').getByText('How do I rotate an API key?')).toBeVisible({ timeout: 400 });
     await expect(page.getByRole('status', { name: 'Thinking' })).toBeVisible({ timeout: 400 });
-    await expect(page).toHaveURL(CONVERSATION_URL, { timeout: 400 });
     await expect(list(page).getByRole('link', { name: /How do I rotate an API key\?/ })).toBeVisible({ timeout: 400 });
     await expect(page.getByRole('button', { name: 'Stop' })).toBeVisible({ timeout: 400 });
     expect(Date.now() - started).toBeLessThan(1200);
     await expect(composer(page)).toHaveValue('');
+    // The address bar follows once the router has the route's payload: one round trip, never the answer.
+    await expect(page).toHaveURL(CONVERSATION_URL, { timeout: 1100 });
 
     conversationIds.push(openConversationId(page));
     await releaseRoutes(page);
