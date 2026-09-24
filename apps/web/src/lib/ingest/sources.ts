@@ -63,7 +63,8 @@ const assertOwnsAssistant = async (supabase: UserClient, id: string) => {
   const { data, error } = await supabase.from('assistants').select('id').eq('id', id).maybeSingle();
 
   if (error) {
-    throw new SourceError(500, `The assistant could not be checked (${error.message}).`);
+    console.error('[sources] assistant lookup failed', error);
+    throw new SourceError(500, 'The assistant could not be checked. Try again in a moment.');
   }
 
   if (!data) {
@@ -90,7 +91,8 @@ const insertSource = async (
   }
 
   if (error || !data) {
-    throw new SourceError(500, `The source could not be saved (${error?.message ?? 'no row returned'}).`);
+    console.error('[sources] insert failed', error);
+    throw new SourceError(500, 'The source could not be saved. Try again in a moment.');
   }
 
   return data;
@@ -195,7 +197,8 @@ export const deleteSource = async ({ supabase, sourceId }: { supabase: UserClien
   const { data, error } = await supabase.from('sources').delete().eq('id', sourceId).select('id, storage_path').maybeSingle();
 
   if (error) {
-    throw new SourceError(500, `The source could not be deleted (${error.message}).`);
+    console.error('[sources] delete failed', error);
+    throw new SourceError(500, 'The source could not be deleted. Try again in a moment.');
   }
 
   if (!data) {
@@ -223,7 +226,8 @@ export const requestReindex = async ({ supabase, sourceId }: { supabase: UserCli
     .maybeSingle();
 
   if (error) {
-    throw new SourceError(500, `The source could not be queued (${error.message}).`);
+    console.error('[sources] re-index request failed', error);
+    throw new SourceError(500, 'The source could not be queued. Try again in a moment.');
   }
 
   if (data) {
