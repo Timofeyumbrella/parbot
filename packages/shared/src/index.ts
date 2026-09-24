@@ -59,6 +59,8 @@ export type WidgetConfig = {
   theme: WidgetTheme;
   hideBranding: boolean;
   leadCapture: boolean;
+  /** The modes the owner's plan allows; a data-mode override outside this list is ignored. */
+  modes?: WidgetMode[];
 };
 
 export type WidgetChatRequest = {
@@ -194,4 +196,46 @@ export const citedIndexes = (answer: string, available: number) => {
   );
 
   return [...new Set(found)];
+};
+
+// ---------------------------------------------------------------------------
+// Widget settings: the value sets and limits the settings form, the widget API
+// and the widget script agree on.
+// ---------------------------------------------------------------------------
+
+export const WIDGET_MODES = ['bubble', 'palette'] as const;
+export const WIDGET_SCHEMES = ['auto', 'light', 'dark'] as const;
+export const WIDGET_POSITIONS = ['left', 'right'] as const;
+export const WIDGET_RADII = ['sm', 'md', 'lg'] as const;
+
+export const MAX_SUGGESTED_QUESTIONS = 4;
+export const MAX_SUGGESTED_QUESTION_LENGTH = 120;
+export const MAX_WELCOME_MESSAGE_LENGTH = 300;
+export const MAX_ALLOWED_ORIGINS = 20;
+export const MAX_LEAD_NOTE_LENGTH = 1000;
+export const MAX_PAGE_URL_LENGTH = 2048;
+
+/** Keys default to `pb_<32 hex>` in the database; the pattern is deliberately looser. */
+export const PUBLIC_KEY_PATTERN = /^[A-Za-z0-9_-]{8,80}$/;
+
+export const isWidgetMode = (value: unknown): value is WidgetMode =>
+  value === 'bubble' || value === 'palette';
+
+/** Accent swatches offered in the widget settings; the first is the default. */
+export const WIDGET_ACCENT_PRESETS = [
+  '#f59e0b',
+  '#2563eb',
+  '#16a34a',
+  '#db2777',
+  '#7c3aed',
+  '#0f172a',
+] as const;
+
+/**
+ * The JSON body of a failed widget API call. Streaming errors use ChatStreamEvent instead. The
+ * message is repeated at the top level so a client that only reads `{ message }` still gets it.
+ */
+export type WidgetApiError = {
+  error: { code: ChatErrorCode; message: string };
+  message: string;
 };
