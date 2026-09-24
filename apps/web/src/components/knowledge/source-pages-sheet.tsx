@@ -13,7 +13,7 @@ import { plural } from './format';
 
 export type SourcePage = { id: string; title: string; url: string | null; chunkCount: number };
 
-export const sourcePagesQueryKey = (sourceId: string) => ['source-pages', sourceId] as const;
+export const sourcePagesQueryKey = (sourceId: string) => ['knowledge', 'pages', sourceId] as const;
 
 export const loadSourcePages = async (sourceId: string): Promise<SourcePage[]> => {
   const { data, error } = await getSupabaseBrowserClient()

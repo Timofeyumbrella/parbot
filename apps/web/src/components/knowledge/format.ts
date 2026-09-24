@@ -1,6 +1,7 @@
 import { FileText, Globe, type LucideIcon, Map, TextAlignStart } from 'lucide-react';
 
 import type { Enums, Source } from '@/lib/db';
+import { formatCount } from '@/lib/format';
 import { formatBytes, UPLOAD_TYPES, uploadTypeFor } from '@/lib/uploads';
 
 export type SourceKind = Enums<'source_kind'>;
@@ -29,37 +30,4 @@ export const describeSource = (source: Pick<Source, 'kind' | 'uri' | 'storage_pa
   return source.byte_size ? `${label} · ${formatBytes(source.byte_size)}` : label;
 };
 
-const UNITS: [Intl.RelativeTimeFormatUnit, number][] = [
-  ['year', 365 * 24 * 3600],
-  ['month', 30 * 24 * 3600],
-  ['week', 7 * 24 * 3600],
-  ['day', 24 * 3600],
-  ['hour', 3600],
-  ['minute', 60],
-];
-
-/** "just now", "4 minutes ago", "3 days ago". Past only; the future reads as "just now". */
-export const relativeTime = (iso: string | null, now = Date.now()) => {
-  if (!iso) {
-    return null;
-  }
-
-  const seconds = Math.round((now - new Date(iso).getTime()) / 1000);
-
-  if (!Number.isFinite(seconds) || seconds < 45) {
-    return 'just now';
-  }
-
-  const formatter = new Intl.RelativeTimeFormat('en', { numeric: 'always' });
-
-  for (const [unit, size] of UNITS) {
-    if (seconds >= size) {
-      return formatter.format(-Math.round(seconds / size), unit);
-    }
-  }
-
-  return 'just now';
-};
-
-export const plural = (count: number, noun: string) =>
-  `${count.toLocaleString('en-US')} ${count === 1 ? noun : `${noun}s`}`;
+export const plural = (count: number, noun: string) => `${formatCount(count)} ${count === 1 ? noun : `${noun}s`}`;

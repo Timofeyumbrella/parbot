@@ -22,14 +22,16 @@ const ASSISTANT = '11111111-1111-4111-8111-111111111111';
 type FakeClient = {
   client: unknown;
   inserted: Record<string, unknown>[];
-  uploads: { path: string; contentType?: string }[];
+  uploads: { path: string; contentType?: string; blobType: string }[];
   removed: string[];
 };
 
+type FakeOptions = { ownsAssistant?: boolean; insertError?: { code: string; message: string } };
+
 /** Just enough of the user client for the route: an ownership lookup, an insert and the bucket. */
-const fakeClient = ({ ownsAssistant = true }: { ownsAssistant?: boolean } = {}): FakeClient => {
+const fakeClient = ({ ownsAssistant = true, insertError }: FakeOptions = {}): FakeClient => {
   const inserted: Record<string, unknown>[] = [];
-  const uploads: { path: string; contentType?: string }[] = [];
+  const uploads: { path: string; contentType?: string; blobType: string }[] = [];
   const removed: string[] = [];
 
   const client = {
@@ -49,7 +51,10 @@ const fakeClient = ({ ownsAssistant = true }: { ownsAssistant?: boolean } = {}):
 
             return {
               select: () => ({
-                single: async () => ({ data: { id: 'src-1', created_at: '2026-09-23T00:00:00Z', ...row }, error: null }),
+                single: async () =>
+                  insertError
+                    ? { data: null, error: insertError }
+                    : { data: { id: 'src-1', created_at: '2026-09-23T00:00:00Z', ...row }, error: null },
               }),
             };
           },
@@ -60,8 +65,8 @@ const fakeClient = ({ ownsAssistant = true }: { ownsAssistant?: boolean } = {}):
     },
     storage: {
       from: () => ({
-        upload: async (path: string, _body: unknown, options?: { contentType?: string }) => {
-          uploads.push({ path, contentType: options?.contentType });
+        upload: async (path: string, body: Blob, options?: { contentType?: string }) => {
+          uploads.push({ path, contentType: options?.contentType, blobType: body.type });
 
           return { error: null };
         },
@@ -203,6 +208,62 @@ describe('POST /api/sources', () => {
     expect(response.status).toBe(201);
     expect(fake.uploads[0]?.path).toMatch(new RegExp(`^${USER.id}/${ASSISTANT}/[0-9a-f-]{36}\\.md$`));
     expect(fake.inserted[0]).toMatchObject({ kind: 'upload', title: 'manual.md', byte_size: file.size, mime_type: 'text/markdown' });
+  });
+
+  it('stores a file under the type it resolved, whatever the browser said', async () => {
+    // Windows and Linux browsers send Markdown and Word files as application/octet-stream or with
+    // no type at all; the bucket's allow-list would refuse the Blob as it came in.
+    const fake = fakeClient();
+
+    signIn(fake);
+
+    const markdown = await POST(
+      multipart({ assistantId: ASSISTANT, file: new File(['# Notes'], 'notes.mdx', { type: 'application/octet-stream' }) }),
+    );
+
+    expect(markdown.status).toBe(201);
+    expect(fake.uploads[0]).toMatchObject({ contentType: 'text/markdown', blobType: 'text/markdown' });
+    expect(fake.uploads[0]?.path).toMatch(/\.md$/);
+    expect(fake.inserted[0]).toMatchObject({ kind: 'upload', title: 'notes.mdx', mime_type: 'text/markdown' });
+
+    const word = await POST(multipart({ assistantId: ASSISTANT, file: new File(['PK'], 'handbook.docx', { type: '' }) }));
+
+    expect(word.status).toBe(201);
+    expect(fake.uploads[1]).toMatchObject({
+      contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      blobType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    });
+  });
+
+  it('uses the id the screen chose for the row, and refuses one that is taken', async () => {
+    const id = '22222222-2222-4222-8222-222222222222';
+    const fake = fakeClient();
+
+    signIn(fake);
+
+    const created = await POST(json({ kind: 'url', id, assistantId: ASSISTANT, url: 'https://docs.example.com/guide/' }));
+
+    expect(created.status).toBe(201);
+    expect(fake.inserted[0]).toMatchObject({ id });
+
+    const upload = await POST(multipart({ assistantId: ASSISTANT, id, file: new File(['x'], 'a.txt', { type: 'text/plain' }) }));
+
+    expect(upload.status).toBe(201);
+    expect(fake.inserted[1]).toMatchObject({ id, kind: 'upload' });
+
+    const malformed = await POST(json({ kind: 'url', id: 'nope', assistantId: ASSISTANT, url: 'https://docs.example.com/guide/' }));
+
+    expect(malformed.status).toBe(400);
+    await expect(malformed.json()).resolves.toEqual({ error: 'The source id is not valid.' });
+
+    const taken = fakeClient({ insertError: { code: '23505', message: 'duplicate key value violates unique constraint "sources_pkey"' } });
+
+    signIn(taken);
+
+    const duplicate = await POST(json({ kind: 'url', id, assistantId: ASSISTANT, url: 'https://docs.example.com/guide/' }));
+
+    expect(duplicate.status).toBe(409);
+    await expect(duplicate.json()).resolves.toEqual({ error: 'That source was already added. Refresh the page to see it.' });
   });
 
   it('rejects uploads of other file types and empty files', async () => {

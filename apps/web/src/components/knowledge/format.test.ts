@@ -1,24 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { describeSource, isActiveStatus, plural, relativeTime } from './format';
-
-const NOW = Date.UTC(2026, 8, 23, 12);
-const ago = (seconds: number) => new Date(NOW - seconds * 1000).toISOString();
-
-describe('relativeTime', () => {
-  it('reads as "just now" under a minute and then in the coarsest unit that fits', () => {
-    expect(relativeTime(null)).toBeNull();
-    expect(relativeTime(ago(10), NOW)).toBe('just now');
-    expect(relativeTime(ago(90), NOW)).toBe('2 minutes ago');
-    expect(relativeTime(ago(3 * 3600), NOW)).toBe('3 hours ago');
-    expect(relativeTime(ago(2 * 86_400), NOW)).toBe('2 days ago');
-    expect(relativeTime(ago(400 * 86_400), NOW)).toBe('1 year ago');
-  });
-
-  it('never talks about the future', () => {
-    expect(relativeTime(ago(-600), NOW)).toBe('just now');
-  });
-});
+import { describeSource, isActiveStatus, plural } from './format';
 
 describe('describeSource', () => {
   it('shows the address for web sources and the file type and size otherwise', () => {
