@@ -60,8 +60,13 @@ export const stubAnswer = (prompt: string) => {
   }
 
   const [, index, , body] = sources[0]!;
+  // The rendered source starts with a URL line; the answer should read like prose.
+  const prose = (body ?? '')
+    .split('\n')
+    .filter((line) => !line.startsWith('URL:'))
+    .join('\n');
 
-  return `${firstSentence(body ?? '')} [${index}]`;
+  return `${firstSentence(prose)} [${index}]`;
 };
 
 export const createStubProvider = (): AiProvider => {
