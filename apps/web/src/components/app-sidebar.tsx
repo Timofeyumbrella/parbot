@@ -209,7 +209,6 @@ export const AppSidebar = (props: AppSidebarProps) => {
           </SheetContent>
         </Sheet>
       </div>
-      <div className="h-12 md:hidden" aria-hidden="true" />
     </>
   );
 };

@@ -17,7 +17,7 @@ export default async function DashboardLayout({ children }: LayoutProps<'/'>) {
         email={user.email ?? ''}
         planName={planFor(subscription?.plan_id).name}
       />
-      <main className="flex min-w-0 flex-1 flex-col">{children}</main>
+      <main className="flex min-w-0 flex-1 flex-col pt-12 md:pt-0">{children}</main>
     </div>
   );
 }
