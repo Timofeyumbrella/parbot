@@ -333,22 +333,48 @@ export const widgetSettingsSchema = z.object({
   leadCapture: checkbox.default(false),
 });
 
+export const WIDGET_FIELDS = [
+  'mode',
+  'scheme',
+  'accent',
+  'position',
+  'radius',
+  'welcomeMessage',
+  'suggestedQuestions',
+  'allowedOrigins',
+  'hideBranding',
+  'leadCapture',
+] as const;
+
+export type WidgetField = (typeof WIDGET_FIELDS)[number];
+
+/** The submitted strings, field by field. A checkbox that was off is simply absent. */
+export type WidgetFormValues = Partial<Record<WidgetField, string>>;
+
+/**
+ * What the visitor typed, kept as strings. React resets a form once its action returns, so a
+ * failed save hands these back and the form refills itself from them.
+ */
+export const widgetFormValues = (formData: FormData): WidgetFormValues => {
+  const values: WidgetFormValues = {};
+
+  for (const field of WIDGET_FIELDS) {
+    const value = formData.get(field);
+
+    if (typeof value === 'string') {
+      values[field] = value;
+    }
+  }
+
+  return values;
+};
+
 export type ParsedWidgetSettings =
   | { success: true; data: WidgetSettings }
   | { success: false; error: string };
 
 export const parseWidgetSettings = (formData: FormData): ParsedWidgetSettings => {
-  const raw: Record<string, unknown> = {};
-
-  for (const name of ['mode', 'scheme', 'accent', 'position', 'radius', 'welcomeMessage', 'suggestedQuestions', 'allowedOrigins', 'hideBranding', 'leadCapture']) {
-    const value = formData.get(name);
-
-    if (value !== null) {
-      raw[name] = value;
-    }
-  }
-
-  const result = widgetSettingsSchema.safeParse(raw);
+  const result = widgetSettingsSchema.safeParse(widgetFormValues(formData));
 
   if (!result.success) {
     const issue = result.error.issues[0];

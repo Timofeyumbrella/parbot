@@ -5,23 +5,31 @@ import { revalidatePath } from 'next/cache';
 
 import { getAccountPlan } from '@/lib/account';
 import { requireUser } from '@/lib/session';
-import { gateWidgetSettings, parseWidgetSettings, type WidgetSettings } from '@/lib/widget-api';
+import {
+  gateWidgetSettings,
+  parseWidgetSettings,
+  widgetFormValues,
+  type WidgetFormValues,
+  type WidgetSettings,
+} from '@/lib/widget-api';
 
 export type WidgetFormState =
   | { status: 'idle' }
   | { status: 'saved'; at: number; settings: WidgetSettings }
-  | { status: 'error'; at: number; error: string };
-
-const failure = (error: string): WidgetFormState => ({ status: 'error', at: Date.now(), error });
+  | { status: 'error'; at: number; error: string; values: WidgetFormValues };
 
 /**
  * Saves the widget settings of an assistant the visitor owns. The plan gates are checked here
- * as well as in the form, so a disabled control cannot be re-enabled from the browser.
+ * as well as in the form, so a disabled control cannot be re-enabled from the browser. A failed
+ * save hands the typed values back, because React resets the form once the action returns.
  */
 export const saveWidgetSettings = async (
   _previous: WidgetFormState,
   formData: FormData,
 ): Promise<WidgetFormState> => {
+  const values = widgetFormValues(formData);
+  const failure = (error: string): WidgetFormState => ({ status: 'error', at: Date.now(), error, values });
+
   const { supabase, user } = await requireUser();
   const assistantId = formData.get('assistantId');
 
@@ -43,6 +51,8 @@ export const saveWidgetSettings = async (
   }
 
   const settings = parsed.data;
+  // Row level security limits the update to the visitor's own rows; the owner filter makes
+  // that explicit so a foreign id updates nothing and reads as not found.
   const { data, error } = await supabase
     .from('assistants')
     .update({

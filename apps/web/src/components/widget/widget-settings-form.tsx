@@ -42,8 +42,18 @@ const initialState: WidgetFormState = { status: 'idle' };
 
 export const WidgetSettingsForm = ({ assistantId, settings, gates, onSaved }: WidgetSettingsFormProps) => {
   const [state, formAction, pending] = useActionState(saveWidgetSettings, initialState);
+
+  // React resets the form after every action. The uncontrolled fields therefore take their
+  // defaults from the last outcome: what the visitor typed after a failed save, what the server
+  // stored after a good one, and the row itself before either.
+  const draft = state.status === 'error' ? state.values : null;
+  const saved = state.status === 'saved' ? state.settings : settings;
   // A gated control shows the free value, so what the reader sees matches what the widget does.
-  const theme = gates.customTheme ? settings.theme : DEFAULT_WIDGET_THEME;
+  const theme = gates.customTheme ? saved.theme : DEFAULT_WIDGET_THEME;
+  const mode = gates.palette ? (draft?.mode ?? saved.mode) : 'bubble';
+  const checked = (field: 'hideBranding' | 'leadCapture', allowed: boolean) =>
+    allowed && (draft ? draft[field] === 'on' : saved[field]);
+
   const [accent, setAccent] = useState(theme.accent.toLowerCase());
   const [welcome, setWelcome] = useState(settings.welcomeMessage);
   // Each action result is announced once, however often the parent re-renders around it.
@@ -77,7 +87,7 @@ export const WidgetSettingsForm = ({ assistantId, settings, gates, onSaved }: Wi
           <Segmented
             name="mode"
             label="Mode"
-            defaultValue={gates.palette ? settings.mode : 'bubble'}
+            defaultValue={mode}
             options={[
               { value: 'bubble', label: 'Bubble' },
               { value: 'palette', label: 'Palette (⌘K)', disabled: !gates.palette },
@@ -139,7 +149,7 @@ export const WidgetSettingsForm = ({ assistantId, settings, gates, onSaved }: Wi
             <Segmented
               name="scheme"
               label="Colour scheme"
-              defaultValue={theme.scheme}
+              defaultValue={draft?.scheme ?? theme.scheme}
               options={[
                 { value: 'auto', label: 'Auto' },
                 { value: 'light', label: 'Light' },
@@ -150,7 +160,7 @@ export const WidgetSettingsForm = ({ assistantId, settings, gates, onSaved }: Wi
             <Segmented
               name="position"
               label="Position"
-              defaultValue={theme.position}
+              defaultValue={draft?.position ?? theme.position}
               options={[
                 { value: 'right', label: 'Bottom right' },
                 { value: 'left', label: 'Bottom left' },
@@ -159,7 +169,7 @@ export const WidgetSettingsForm = ({ assistantId, settings, gates, onSaved }: Wi
             <Segmented
               name="radius"
               label="Corner radius"
-              defaultValue={theme.radius}
+              defaultValue={draft?.radius ?? theme.radius}
               options={[
                 { value: 'sm', label: 'Small' },
                 { value: 'md', label: 'Medium' },
@@ -199,7 +209,7 @@ export const WidgetSettingsForm = ({ assistantId, settings, gates, onSaved }: Wi
             <Textarea
               id="suggestedQuestions"
               name="suggestedQuestions"
-              defaultValue={settings.suggestedQuestions.join('\n')}
+              defaultValue={draft?.suggestedQuestions ?? saved.suggestedQuestions.join('\n')}
               rows={4}
               placeholder={'How do I create an API key?\nWhat does the free plan include?'}
             />
@@ -222,7 +232,7 @@ export const WidgetSettingsForm = ({ assistantId, settings, gates, onSaved }: Wi
           <Textarea
             id="allowedOrigins"
             name="allowedOrigins"
-            defaultValue={settings.allowedOrigins.join('\n')}
+            defaultValue={draft?.allowedOrigins ?? saved.allowedOrigins.join('\n')}
             rows={3}
             placeholder={'docs.example.com\n*.example.com'}
             className="font-mono text-xs"
@@ -251,7 +261,7 @@ export const WidgetSettingsForm = ({ assistantId, settings, gates, onSaved }: Wi
             <Switch
               id="hideBranding"
               name="hideBranding"
-              defaultChecked={gates.hideBranding && settings.hideBranding}
+              defaultChecked={checked('hideBranding', gates.hideBranding)}
               disabled={!gates.hideBranding}
             />
           </div>
@@ -268,7 +278,7 @@ export const WidgetSettingsForm = ({ assistantId, settings, gates, onSaved }: Wi
             <Switch
               id="leadCapture"
               name="leadCapture"
-              defaultChecked={gates.leadCapture && settings.leadCapture}
+              defaultChecked={checked('leadCapture', gates.leadCapture)}
               disabled={!gates.leadCapture}
             />
           </div>

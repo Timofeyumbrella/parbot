@@ -1,15 +1,18 @@
-import { isWidgetMode, type WidgetMode } from '@parbot/shared';
 import { cn } from 'cn';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import Script from 'next/script';
+import { cache } from 'react';
 
 import { createSupabaseServiceClient } from '@/lib/supabase/service';
 import { findAssistantByKey, loadOwnerPlan, widgetConfigFor } from '@/lib/widget-api';
 
+import { resolveDemoMode } from './demo-mode';
+
 export const dynamic = 'force-dynamic';
 
-const load = async (key: string) => {
+/** Looked up once per request, however many of the metadata and page functions ask. */
+const load = cache(async (key: string) => {
   const service = createSupabaseServiceClient();
   const assistant = await findAssistantByKey(service, key);
 
@@ -20,7 +23,7 @@ const load = async (key: string) => {
   const plan = await loadOwnerPlan(service, assistant.owner_id);
 
   return { name: assistant.name, config: widgetConfigFor(assistant, plan) };
-};
+});
 
 export async function generateMetadata({ params }: PageProps<'/demo/[key]'>): Promise<Metadata> {
   const { key } = await params;
@@ -71,10 +74,7 @@ export default async function DemoPage({ params, searchParams }: PageProps<'/dem
   }
 
   const { name, config } = found;
-  const allowed = config.modes ?? ['bubble', 'palette'];
-  const requested: WidgetMode | null = isWidgetMode(query.mode) ? query.mode : null;
-  const override = requested && allowed.includes(requested) ? requested : null;
-  const active = override ?? config.mode;
+  const { allowed, override, active } = resolveDemoMode(query.mode, config);
 
   return (
     <div className="bg-background text-foreground flex min-h-svh flex-col">
