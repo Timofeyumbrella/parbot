@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { checksumOf, extractText, extractUpload, markdownTitle } from './extract';
 
@@ -90,3 +90,22 @@ const MINIMAL_PDF = (() => {
 
   return body;
 })();
+
+describe('extractUpload with damaged files', () => {
+  it('explains a Word file that is not really a docx', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    await expect(extractUpload(bytes('this is not a zip archive'), 'docx')).rejects.toThrow(
+      'This Word file could not be read. Open it in Word, save it as .docx and upload it once more.',
+    );
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it('explains a PDF that cannot be parsed', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    await expect(extractUpload(bytes('%PDF-1.4 garbage'), 'pdf')).rejects.toThrow('This PDF could not be read.');
+    warn.mockRestore();
+  });
+});

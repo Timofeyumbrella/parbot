@@ -154,15 +154,56 @@ const createTurndown = (baseUrl?: string) => {
   return service;
 };
 
+/** " | Site", " — Site", " · Site" and the like; a plain hyphen is too common inside real titles. */
+const SITE_SUFFIX = /\s+(?:\||—|–|·|::|»)\s+[^|—–·»]{1,80}$/;
+
+const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
+ * The page's own name: the h1 when the document title merely wraps it ("Setup | AuditDocs"),
+ * otherwise the title with the site name stripped from either end.
+ */
+export const cleanTitle = (title: string, heading: string | null, siteName: string | null) => {
+  const trimmed = collapse(title);
+  const h1 = collapse(heading ?? '');
+
+  if (h1.length >= 2 && h1.length < trimmed.length && trimmed.toLowerCase().includes(h1.toLowerCase())) {
+    return h1;
+  }
+
+  const site = collapse(siteName ?? '');
+
+  if (site && trimmed.toLowerCase() !== site.toLowerCase()) {
+    const separator = '\\s+(?:\\||—|–|·|::|»|-)\\s+';
+    const withoutSite = trimmed
+      .replace(new RegExp(`${separator}${escapeRegExp(site)}$`, 'i'), '')
+      .replace(new RegExp(`^${escapeRegExp(site)}${separator}`, 'i'), '');
+
+    if (withoutSite.length >= 2) {
+      return withoutSite;
+    }
+  }
+
+  const withoutSuffix = trimmed.replace(SITE_SUFFIX, '');
+
+  if (withoutSuffix.length >= 3 && withoutSuffix !== trimmed) {
+    return withoutSuffix;
+  }
+
+  return trimmed;
+};
+
 const pageTitle = (document: Document) => {
+  const heading = document.querySelector('h1')?.textContent ?? null;
+  const siteName = document.querySelector('meta[property="og:site_name"]')?.getAttribute('content') ?? null;
   const candidates = [
     document.querySelector('meta[property="og:title"]')?.getAttribute('content'),
     document.querySelector('title')?.textContent,
-    document.querySelector('h1')?.textContent,
+    heading,
   ];
 
   for (const candidate of candidates) {
-    const title = collapse(candidate ?? '');
+    const title = cleanTitle(candidate ?? '', heading, siteName);
 
     if (title) {
       return title.slice(0, 200);

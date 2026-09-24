@@ -1,5 +1,7 @@
 'use server';
 
+import { z } from 'zod';
+
 import type { Source } from '@/lib/db';
 import {
   createSource,
@@ -26,6 +28,15 @@ const field = (form: FormData, name: string) => {
   return typeof value === 'string' ? value : undefined;
 };
 
+const sourceIdSchema = z.uuid();
+
+/** A malformed id never reaches the database; it reads as a source that is not there. */
+const parseSourceId = (sourceId: string) => {
+  const parsed = sourceIdSchema.safeParse(sourceId);
+
+  return parsed.success ? parsed.data : null;
+};
+
 /**
  * The Add source dialog's website, sitemap and pasted-text forms. Uploads post to the API route
  * instead: server actions cap their body at a size a document easily exceeds.
@@ -40,6 +51,7 @@ export const addSource = async (_previous: AddSourceState, form: FormData): Prom
   const parsed = sourceInputSchema.safeParse({
     kind: field(form, 'kind'),
     assistantId: field(form, 'assistantId'),
+    id: field(form, 'id'),
     url: field(form, 'url'),
     title: field(form, 'title'),
     text: field(form, 'text'),
@@ -67,8 +79,14 @@ export const reindexSource = async (sourceId: string): Promise<SourceActionResul
     return { error: 'Sign in to re-index a source.' };
   }
 
+  const id = parseSourceId(sourceId);
+
+  if (!id) {
+    return { error: 'That source does not exist.' };
+  }
+
   try {
-    const source = await requestReindex({ supabase, sourceId });
+    const source = await requestReindex({ supabase, sourceId: id });
 
     scheduleIngestion(source.id);
 
@@ -85,8 +103,14 @@ export const deleteSource = async (sourceId: string): Promise<SourceActionResult
     return { error: 'Sign in to remove a source.' };
   }
 
+  const id = parseSourceId(sourceId);
+
+  if (!id) {
+    return { error: 'That source does not exist.' };
+  }
+
   try {
-    await removeSource({ supabase, sourceId });
+    await removeSource({ supabase, sourceId: id });
 
     return {};
   } catch (cause) {

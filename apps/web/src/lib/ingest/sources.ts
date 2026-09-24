@@ -9,14 +9,15 @@ import { checkCapacity } from '@/lib/plans';
 import { createSupabaseServiceClient } from '@/lib/supabase/service';
 import { MAX_UPLOAD_BYTES, storagePathFor, UPLOAD_TYPES, UPLOAD_TYPES_LABEL, uploadTypeFor } from '@/lib/uploads';
 
-import { ingestSource, PAGE_LIMIT_MESSAGE, STORAGE_BUCKET } from './index';
+import { ingestSource, PAGE_LIMIT_MESSAGE, STALE_RUN_MS, STORAGE_BUCKET } from './index';
+import { labelForUrl } from './label';
 
 export type UserClient = SupabaseClient<Database>;
 
+export { labelForUrl } from './label';
+
 /** Pasted text larger than this is really a file; the upload path handles those. */
 export const MAX_TEXT_CHARS = 500_000;
-/** A run that has not touched its row for this long is treated as dead and may be restarted. */
-export const STALE_RUN_MS = 10 * 60_000;
 
 /** An error the caller can show as it is, with the HTTP status that fits it. */
 export class SourceError extends Error {
@@ -50,15 +51,18 @@ const httpUrl = z
     }
   }, 'Enter a full address that starts with http:// or https://.');
 const assistantId = z.uuid({ error: 'Pick an assistant.' });
+/** The screen may choose the row's id so the row it draws before the answer is the real one. */
+const clientId = z.uuid({ error: 'The source id is not valid.' }).optional();
 
 export const sourceInputSchema = z.discriminatedUnion(
   'kind',
   [
-    z.object({ kind: z.literal('url'), assistantId, url: httpUrl, title: optionalTitle }),
-    z.object({ kind: z.literal('sitemap'), assistantId, url: httpUrl, title: optionalTitle }),
+    z.object({ kind: z.literal('url'), assistantId, id: clientId, url: httpUrl, title: optionalTitle }),
+    z.object({ kind: z.literal('sitemap'), assistantId, id: clientId, url: httpUrl, title: optionalTitle }),
     z.object({
       kind: z.literal('text'),
       assistantId,
+      id: clientId,
       title,
       text: z
         .string({ error: 'Paste some text.' })
@@ -72,7 +76,7 @@ export const sourceInputSchema = z.discriminatedUnion(
 
 export type SourceInput = z.infer<typeof sourceInputSchema>;
 
-export type UploadInput = { kind: 'upload'; assistantId: string; title?: string; file: File };
+export type UploadInput = { kind: 'upload'; assistantId: string; id?: string; title?: string; file: File };
 
 export type CreateSourceInput = SourceInput | UploadInput;
 
@@ -82,8 +86,8 @@ export const firstIssue = (error: z.ZodError) => error.issues[0]?.message ?? 'Ch
 /** Reads the multipart body of an upload. Throws a SourceError the route can return directly. */
 export const parseUploadForm = (form: FormData): UploadInput => {
   const fields = z
-    .object({ assistantId, title: optionalTitle })
-    .safeParse({ assistantId: form.get('assistantId'), title: form.get('title') ?? undefined });
+    .object({ assistantId, id: clientId, title: optionalTitle })
+    .safeParse({ assistantId: form.get('assistantId'), id: form.get('id') ?? undefined, title: form.get('title') ?? undefined });
 
   if (!fields.success) {
     throw new SourceError(400, firstIssue(fields.error));
@@ -103,19 +107,7 @@ export const parseUploadForm = (form: FormData): UploadInput => {
     throw new SourceError(400, `That file type is not supported. Upload ${UPLOAD_TYPES_LABEL}.`);
   }
 
-  return { kind: 'upload', assistantId: fields.data.assistantId, title: fields.data.title, file };
-};
-
-/** "docs.example.com/guide" for a URL: what people recognise a website source by. */
-export const labelForUrl = (value: string) => {
-  try {
-    const url = new URL(value);
-    const path = url.pathname.replace(/\/+$/, '');
-
-    return `${url.host}${path}`.slice(0, 200);
-  } catch {
-    return value.slice(0, 200);
-  }
+  return { kind: 'upload', assistantId: fields.data.assistantId, id: fields.data.id, title: fields.data.title, file };
 };
 
 const assertOwnsAssistant = async (supabase: UserClient, id: string) => {
@@ -144,6 +136,10 @@ const insertSource = async (
 ): Promise<Source> => {
   const { data, error } = await supabase.from('sources').insert(row).select('*').single();
 
+  if (error?.code === '23505') {
+    throw new SourceError(409, 'That source was already added. Refresh the page to see it.');
+  }
+
   if (error || !data) {
     throw new SourceError(500, `The source could not be saved (${error?.message ?? 'no row returned'}).`);
   }
@@ -151,11 +147,16 @@ const insertSource = async (
   return data;
 };
 
+/**
+ * Storage trusts the Blob's own type over the contentType option, and browsers report an empty or
+ * generic type for Markdown and Word files, so the bytes are re-wrapped with the type we resolved.
+ */
 const storeObject = async (supabase: UserClient, path: string, body: Blob, contentType: string) => {
-  const { error } = await supabase.storage.from(STORAGE_BUCKET).upload(path, body, { contentType, upsert: false });
+  const typed = body.type === contentType ? body : new Blob([await body.arrayBuffer()], { type: contentType });
+  const { error } = await supabase.storage.from(STORAGE_BUCKET).upload(path, typed, { contentType, upsert: false });
 
   if (error) {
-    throw new SourceError(500, `The file could not be stored (${error.message}).`);
+    throw new SourceError(500, 'The file could not be stored. Try the upload again.');
   }
 };
 
@@ -175,12 +176,22 @@ export const createSource = async ({
   await assertOwnsAssistant(supabase, input.assistantId);
   await assertPagesRemain();
 
-  const base = { assistant_id: input.assistantId, owner_id: user.id, status: 'queued' as const };
+  const base = {
+    assistant_id: input.assistantId,
+    owner_id: user.id,
+    status: 'queued' as const,
+    ...(input.id ? { id: input.id } : {}),
+  };
 
   switch (input.kind) {
     case 'url':
     case 'sitemap':
-      return insertSource(supabase, { ...base, kind: input.kind, uri: input.url, title: input.title ?? labelForUrl(input.url) });
+      return insertSource(supabase, {
+        ...base,
+        kind: input.kind,
+        uri: input.url,
+        title: input.title ?? labelForUrl(input.url, input.kind),
+      });
     case 'text': {
       const path = storagePathFor(user.id, input.assistantId, 'md');
       const body = new Blob([input.text], { type: UPLOAD_TYPES.md.mime });
@@ -247,40 +258,36 @@ export const deleteSource = async ({ supabase, sourceId }: { supabase: UserClien
   }
 };
 
-/** Puts a source back in the queue. A run that is still moving is left alone. */
+/**
+ * Puts a source back in the queue. The update is conditional, so two requests that arrive together
+ * (two tabs, a double click, the API) queue it once: the second finds it taken and gets a 409. A
+ * run that has not moved for a while is treated as dead and may be started over.
+ */
 export const requestReindex = async ({ supabase, sourceId }: { supabase: UserClient; sourceId: string }): Promise<Source> => {
-  const { data: current, error } = await supabase
+  const staleBefore = new Date(Date.now() - STALE_RUN_MS).toISOString();
+  const { data, error } = await supabase
     .from('sources')
-    .select('status, updated_at')
+    .update({ status: 'queued', error: null, pages_found: 0, pages_done: 0 })
     .eq('id', sourceId)
+    .or(`status.in.(ready,failed),updated_at.lt.${staleBefore}`)
+    .select('*')
     .maybeSingle();
 
   if (error) {
-    throw new SourceError(500, `The source could not be loaded (${error.message}).`);
+    throw new SourceError(500, `The source could not be queued (${error.message}).`);
   }
+
+  if (data) {
+    return data;
+  }
+
+  const { data: current } = await supabase.from('sources').select('id').eq('id', sourceId).maybeSingle();
 
   if (!current) {
     throw new SourceError(404, 'That source does not exist.');
   }
 
-  const active = current.status === 'crawling' || current.status === 'indexing';
-
-  if (active && Date.now() - new Date(current.updated_at).getTime() < STALE_RUN_MS) {
-    throw new SourceError(409, 'This source is being indexed right now. Wait for it to finish.');
-  }
-
-  const { data, error: updateError } = await supabase
-    .from('sources')
-    .update({ status: 'queued', error: null, pages_found: 0, pages_done: 0 })
-    .eq('id', sourceId)
-    .select('*')
-    .single();
-
-  if (updateError || !data) {
-    throw new SourceError(500, `The source could not be queued (${updateError?.message ?? 'no row returned'}).`);
-  }
-
-  return data;
+  throw new SourceError(409, 'This source is being indexed right now. Wait for it to finish.');
 };
 
 /** Runs ingestion once the response has gone out, with the service role and the configured model. */

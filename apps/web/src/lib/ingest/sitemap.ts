@@ -1,5 +1,6 @@
 import { gunzipSync } from 'node:zlib';
 
+import { defaultLookup, type HostLookup, memoizeLookup } from './guard';
 import { type FetchImpl, FetchPageError, fetchResource } from './http';
 
 export type ParsedSitemap = { kind: 'index' | 'urlset'; locs: string[] };
@@ -39,8 +40,8 @@ export const parseSitemap = (xml: string): ParsedSitemap => {
 const isGzip = (bytes: Uint8Array, url: string) =>
   (bytes[0] === 0x1f && bytes[1] === 0x8b) || /\.gz(\?|$)/i.test(url);
 
-const fetchSitemapXml = async (url: string, fetchImpl: FetchImpl) => {
-  const resource = await fetchResource(url, fetchImpl, 'application/xml,text/xml;q=0.9,*/*;q=0.5');
+const fetchSitemapXml = async (url: string, fetchImpl: FetchImpl, lookup: HostLookup) => {
+  const resource = await fetchResource(url, { fetchImpl, lookup, accept: 'application/xml,text/xml;q=0.9,*/*;q=0.5' });
   const bytes = isGzip(resource.bytes, url) ? gunzipSync(resource.bytes) : resource.bytes;
 
   return new TextDecoder().decode(bytes);
@@ -53,13 +54,16 @@ const fetchSitemapXml = async (url: string, fetchImpl: FetchImpl) => {
 export const discoverSitemapUrls = async ({
   url,
   fetchImpl = fetch,
+  lookup: lookupImpl = defaultLookup,
   limit,
 }: {
   url: string;
   fetchImpl?: FetchImpl;
+  lookup?: HostLookup;
   limit: number;
 }): Promise<string[]> => {
-  const root = parseSitemap(await fetchSitemapXml(url, fetchImpl));
+  const lookup = memoizeLookup(lookupImpl);
+  const root = parseSitemap(await fetchSitemapXml(url, fetchImpl, lookup));
 
   if (root.kind === 'urlset') {
     return root.locs.slice(0, limit);
@@ -73,7 +77,7 @@ export const discoverSitemapUrls = async ({
     }
 
     try {
-      const parsed = parseSitemap(await fetchSitemapXml(child, fetchImpl));
+      const parsed = parseSitemap(await fetchSitemapXml(child, fetchImpl, lookup));
 
       if (parsed.kind === 'urlset') {
         for (const loc of parsed.locs) {

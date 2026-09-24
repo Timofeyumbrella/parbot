@@ -1,9 +1,22 @@
+import { assertPublicUrl, BlockedHostError, defaultLookup, type HostLookup } from './guard';
+
 export const USER_AGENT = 'ParbotBot/0.1 (+https://parbot.dev)';
 export const FETCH_TIMEOUT_MS = 10_000;
 /** Larger responses are almost never documentation pages; reading them would only cost memory. */
 export const MAX_RESPONSE_BYTES = 5 * 1024 * 1024;
+/** Redirect chains longer than this are loops or link shorteners gone wrong. */
+export const MAX_REDIRECTS = 5;
+const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 
 export type FetchImpl = typeof fetch;
+
+export type FetchOptions = {
+  fetchImpl?: FetchImpl;
+  /** The Accept header; pages want HTML, sitemaps want XML. */
+  accept?: string;
+  /** Resolves hostnames for the private-network check. */
+  lookup?: HostLookup;
+};
 
 export class FetchPageError extends Error {
   readonly url: string;
@@ -28,6 +41,7 @@ export type FetchedResource = {
 export type FetchedPage = { url: string; finalUrl: string; html: string };
 
 const HTML_TYPES = ['text/html', 'application/xhtml+xml'];
+const HTML_ACCEPT = 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.1';
 
 export const isHtmlContentType = (contentType: string) => {
   const type = contentType.split(';')[0]!.trim().toLowerCase();
@@ -49,21 +63,60 @@ const describeFailure = (cause: unknown) => {
   return 'network error';
 };
 
-export const fetchResource = async (
-  url: string,
-  fetchImpl: FetchImpl = fetch,
-  accept = 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.1',
-): Promise<FetchedResource> => {
+const assertAllowed = async (url: string, requested: string, lookup: HostLookup) => {
+  try {
+    await assertPublicUrl(requested, lookup);
+  } catch (cause) {
+    const reason = cause instanceof BlockedHostError ? cause.message : 'the address is not valid';
+
+    throw new FetchPageError(url, requested === url ? reason : `it redirects to ${requested}, and ${reason}`);
+  }
+};
+
+/**
+ * Fetches one URL with the crawler's identity and limits. Redirects are followed by hand so each
+ * hop goes through the same private-network check as the address the user typed.
+ */
+export const fetchResource = async (url: string, options: FetchOptions = {}): Promise<FetchedResource> => {
+  const { fetchImpl = fetch, accept = HTML_ACCEPT, lookup = defaultLookup } = options;
+  let current = url;
   let response: Response;
 
-  try {
-    response = await fetchImpl(url, {
-      headers: { 'user-agent': USER_AGENT, accept },
-      redirect: 'follow',
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-    });
-  } catch (cause) {
-    throw new FetchPageError(url, describeFailure(cause));
+  for (let hop = 0; ; hop += 1) {
+    await assertAllowed(url, current, lookup);
+
+    try {
+      response = await fetchImpl(current, {
+        headers: { 'user-agent': USER_AGENT, accept },
+        redirect: 'manual',
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      });
+    } catch (cause) {
+      throw new FetchPageError(url, describeFailure(cause));
+    }
+
+    if (!REDIRECT_STATUSES.has(response.status)) {
+      break;
+    }
+
+    const location = response.headers.get('location');
+    let next: string | null = null;
+
+    try {
+      next = location ? new URL(location, current).href : null;
+    } catch {
+      next = null;
+    }
+
+    if (!next) {
+      throw new FetchPageError(url, `HTTP ${response.status} without a usable location`);
+    }
+
+    if (hop >= MAX_REDIRECTS) {
+      throw new FetchPageError(url, `more than ${MAX_REDIRECTS} redirects`);
+    }
+
+    current = next;
   }
 
   if (!response.ok) {
@@ -90,15 +143,15 @@ export const fetchResource = async (
 
   return {
     url,
-    finalUrl: response.url || url,
+    finalUrl: current,
     contentType: response.headers.get('content-type') ?? '',
     bytes,
   };
 };
 
 /** Fetches one page and insists on HTML; anything else is reported, never parsed. */
-export const fetchHtml = async (url: string, fetchImpl: FetchImpl = fetch): Promise<FetchedPage> => {
-  const resource = await fetchResource(url, fetchImpl);
+export const fetchHtml = async (url: string, options: FetchOptions = {}): Promise<FetchedPage> => {
+  const resource = await fetchResource(url, { ...options, accept: HTML_ACCEPT });
 
   if (!isHtmlContentType(resource.contentType)) {
     const type = resource.contentType.split(';')[0]!.trim() || 'unknown type';

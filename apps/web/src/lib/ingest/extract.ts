@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 
 import type { UploadType } from '@/lib/uploads';
 
+import { IngestError } from './errors';
 import { htmlToMarkdown } from './html';
 
 export type ExtractedDocument = {
@@ -30,10 +31,23 @@ export const markdownTitle = (markdown: string) => {
   return match?.[1]?.trim() || null;
 };
 
+const PDF_UNREADABLE = 'This PDF could not be read. It may be damaged or password protected; export it again and upload it once more.';
+const DOCX_UNREADABLE = 'This Word file could not be read. Open it in Word, save it as .docx and upload it once more.';
+
 const extractPdf = async (bytes: Uint8Array): Promise<ExtractedDocument> => {
   const { extractText, getDocumentProxy, getMeta } = await import('unpdf');
-  const pdf = await getDocumentProxy(new Uint8Array(bytes));
-  const { text } = await extractText(pdf, { mergePages: true });
+  let pdf: Awaited<ReturnType<typeof getDocumentProxy>>;
+  let text: string;
+
+  try {
+    pdf = await getDocumentProxy(new Uint8Array(bytes));
+    ({ text } = await extractText(pdf, { mergePages: true }));
+  } catch (cause) {
+    // pdf.js reports damage with its own vocabulary; the person needs to know what to do instead.
+    console.warn('[ingest] pdf extraction failed', cause);
+    throw new IngestError(PDF_UNREADABLE);
+  }
+
   let title: string | null = null;
 
   try {
@@ -50,8 +64,17 @@ const extractPdf = async (bytes: Uint8Array): Promise<ExtractedDocument> => {
 
 const extractDocx = async (bytes: Uint8Array): Promise<ExtractedDocument> => {
   const mammoth = await import('mammoth');
-  // Word styles become headings in the HTML, so the Markdown keeps the document's structure.
-  const { value } = await mammoth.convertToHtml({ buffer: Buffer.from(bytes) });
+  let value: string;
+
+  try {
+    // Word styles become headings in the HTML, so the Markdown keeps the document's structure.
+    ({ value } = await mammoth.convertToHtml({ buffer: Buffer.from(bytes) }));
+  } catch (cause) {
+    // A damaged or renamed file fails inside the zip reader with a message about central directories.
+    console.warn('[ingest] docx extraction failed', cause);
+    throw new IngestError(DOCX_UNREADABLE);
+  }
+
   const extracted = htmlToMarkdown(value, { readability: false });
 
   return { title: extracted.title, markdown: extracted.markdown };

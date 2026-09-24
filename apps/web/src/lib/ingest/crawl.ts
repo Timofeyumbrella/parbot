@@ -1,3 +1,4 @@
+import { defaultLookup, type HostLookup, memoizeLookup } from './guard';
 import { type FetchImpl, FetchPageError, fetchHtml } from './http';
 import { htmlToMarkdown } from './html';
 
@@ -12,6 +13,8 @@ export type CrawlOptions = {
   scope: CrawlScope | null;
   pageLimit: number;
   fetchImpl?: FetchImpl;
+  /** Resolves hostnames for the private-network check; tests pass one for their fake hosts. */
+  lookup?: HostLookup;
   concurrency?: number;
   maxDepth?: number;
   onPage?: (page: CrawledPage) => void | Promise<void>;
@@ -124,6 +127,7 @@ export const crawlPages = async (options: CrawlOptions): Promise<CrawlResult> =>
     maxDepth = CRAWL_MAX_DEPTH,
     onPage,
   } = options;
+  const lookup = memoizeLookup(options.lookup ?? defaultLookup);
   const pages: CrawledPage[] = [];
   const errors: FetchPageError[] = [];
   const seen = new Set<string>();
@@ -146,7 +150,7 @@ export const crawlPages = async (options: CrawlOptions): Promise<CrawlResult> =>
     let fetched;
 
     try {
-      fetched = await fetchHtml(url, fetchImpl);
+      fetched = await fetchHtml(url, { fetchImpl, lookup });
     } catch (cause) {
       if (cause instanceof FetchPageError) {
         errors.push(cause);

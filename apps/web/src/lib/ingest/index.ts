@@ -6,9 +6,12 @@ import { checkCapacity } from '@/lib/plans';
 import { uploadTypeFor } from '@/lib/uploads';
 
 import { type Chunk, chunkMarkdown, estimateTokens } from './chunk';
-import { crawlPages, crawlScope } from './crawl';
+import { crawlPages, crawlScope, normalizeUrl } from './crawl';
+import { humanizeIngestError, IngestError } from './errors';
 import { checksumOf, extractText, extractUpload } from './extract';
+import type { HostLookup } from './guard';
 import type { FetchImpl } from './http';
+import { isAutoLabel } from './label';
 import { discoverSitemapUrls } from './sitemap';
 
 export type ServiceClient = SupabaseClient<Database>;
@@ -18,23 +21,48 @@ export type IngestParams = {
   provider: AiProvider;
   sourceId: string;
   fetchImpl?: FetchImpl;
+  /** Resolves hostnames for the private-network check; tests pass one for their fake hosts. */
+  lookup?: HostLookup;
   /** Upper bound on pages per run. The plan's remaining pages can lower it, never raise it. */
   pageLimit?: number;
 };
 
 export type IngestResult =
-  | { status: 'ready'; pages: number; documents: number; chunks: number; unchanged: number }
-  | { status: 'failed'; error: string };
+  | { status: 'ready'; pages: number; documents: number; chunks: number; unchanged: number; note: string | null }
+  | { status: 'failed'; error: string }
+  | { status: 'skipped'; reason: string };
 
 export const MAX_PAGES_PER_RUN = 300;
 export const EMBED_BATCH_SIZE = 32;
+/** Ids per request: the local gateway answers 414 once a filter carries a few hundred. */
+export const ID_BATCH_SIZE = 100;
 export const STORAGE_BUCKET = 'sources';
 export const PAGE_LIMIT_MESSAGE =
   "Your plan's page limit is reached. Upgrade on the Billing page or remove a source.";
+/** A run that has not touched its row for this long is treated as dead and may be started over. */
+export const STALE_RUN_MS = 10 * 60_000;
 
 type SourceUpdate = Database['public']['Tables']['sources']['Update'];
 
 type Page = { url: string | null; title: string | null; markdown: string };
+
+type Discovery = {
+  pages: Page[];
+  /** One sentence per page that could not be read. */
+  problems: string[];
+  /** True when more pages were found than the run was allowed to index. */
+  truncated: boolean;
+};
+
+export const inBatches = <T>(items: T[], size = ID_BATCH_SIZE): T[][] => {
+  const batches: T[][] = [];
+
+  for (let start = 0; start < items.length; start += size) {
+    batches.push(items.slice(start, start + size));
+  }
+
+  return batches;
+};
 
 /** Counters are written in the background and coalesced, so crawling never waits on the database. */
 const createProgress = (service: ServiceClient, sourceId: string) => {
@@ -65,17 +93,11 @@ const createProgress = (service: ServiceClient, sourceId: string) => {
   };
 };
 
-const humanize = (cause: unknown) => {
-  const message = cause instanceof Error ? cause.message.trim() : '';
-
-  return (message || 'Something went wrong while indexing. Try again.').slice(0, 500);
-};
-
 const readStorageObject = async (service: ServiceClient, path: string) => {
   const { data, error } = await service.storage.from(STORAGE_BUCKET).download(path);
 
   if (error || !data) {
-    throw new Error(`The uploaded file could not be read from storage${error ? ` (${error.message})` : ''}.`);
+    throw new IngestError('The uploaded file could not be read from storage. Delete this source and upload it again.');
   }
 
   return new Uint8Array(await data.arrayBuffer());
@@ -99,16 +121,26 @@ const discoverPages = async (
   source: Source,
   pageLimit: number,
   fetchImpl: FetchImpl,
+  lookup: HostLookup | undefined,
   onFound: (count: number) => void,
-): Promise<{ pages: Page[]; problems: string[] }> => {
+): Promise<Discovery> => {
   switch (source.kind) {
     case 'url':
     case 'sitemap': {
       const uri = source.uri ?? '';
-      const seeds = source.kind === 'url' ? [uri] : await discoverSitemapUrls({ url: uri, fetchImpl, limit: pageLimit });
+      let seeds = [uri];
+      let truncated = false;
 
-      if (seeds.length === 0) {
-        throw new Error('The sitemap lists no pages.');
+      if (source.kind === 'sitemap') {
+        // One more than the limit tells whether the sitemap goes on beyond what this run indexes.
+        const listed = await discoverSitemapUrls({ url: uri, fetchImpl, lookup, limit: pageLimit + 1 });
+
+        if (listed.length === 0) {
+          throw new IngestError('The sitemap lists no pages. Check the address or add the site as a website instead.');
+        }
+
+        truncated = listed.length > pageLimit;
+        seeds = listed.slice(0, pageLimit);
       }
 
       let found = 0;
@@ -117,6 +149,7 @@ const discoverPages = async (
         scope: source.kind === 'url' ? crawlScope(uri) : null,
         pageLimit,
         fetchImpl,
+        lookup,
         onPage: () => {
           found += 1;
           onFound(found);
@@ -126,6 +159,7 @@ const discoverPages = async (
       return {
         pages: result.pages.map((page) => ({ url: page.url, title: page.title, markdown: page.markdown })),
         problems: result.errors.map((error) => error.message),
+        truncated: truncated || result.truncated,
       };
     }
     case 'upload': {
@@ -133,23 +167,68 @@ const discoverPages = async (
       const type = uploadTypeFor(path, source.mime_type);
 
       if (!type) {
-        throw new Error('This file type is not supported. Upload a PDF, Word, HTML, Markdown or text file.');
+        throw new IngestError('This file type is not supported. Upload a PDF, Word, HTML, Markdown or text file.');
       }
 
       const extracted = await extractUpload(await readStorageObject(service, path), type);
 
       onFound(1);
 
-      return { pages: [{ url: null, ...extracted }], problems: [] };
+      return { pages: [{ url: null, ...extracted }], problems: [], truncated: false };
     }
     case 'text': {
       const extracted = extractText(await readStorageObject(service, source.storage_path ?? ''));
 
       onFound(1);
 
-      return { pages: [{ url: null, ...extracted }], problems: [] };
+      return { pages: [{ url: null, ...extracted }], problems: [], truncated: false };
     }
   }
+};
+
+const noContentMessage = (source: Source, problems: string[]) => {
+  if (source.kind === 'upload') {
+    return 'The file has no readable text. A scanned PDF needs OCR before it can be indexed.';
+  }
+
+  if (source.kind === 'text') {
+    return 'The pasted text is empty.';
+  }
+
+  return problems[0] ? `No pages could be read. ${problems[0]}` : 'No readable content was found on the pages.';
+};
+
+/** What a person should know about a run that finished: pages left out and why. */
+export const describeRun = ({
+  pages,
+  truncated,
+  problems,
+  atPlanLimit,
+}: {
+  pages: number;
+  truncated: boolean;
+  problems: string[];
+  atPlanLimit: boolean;
+}) => {
+  const notes: string[] = [];
+  const count = `${pages} ${pages === 1 ? 'page' : 'pages'}`;
+
+  if (truncated) {
+    notes.push(
+      atPlanLimit
+        ? `Stopped at your plan's page limit after ${count}. Upgrade on the Billing page or remove a source to index the rest.`
+        : `Stopped after ${count}, the most one run indexes. Re-index to continue with the rest.`,
+    );
+  }
+
+  if (problems.length > 0) {
+    const shown = problems.slice(0, 3).join(' ');
+    const more = problems.length > 3 ? ` And ${problems.length - 3} more.` : '';
+
+    notes.push(`${problems.length} ${problems.length === 1 ? 'page' : 'pages'} could not be read. ${shown}${more}`);
+  }
+
+  return notes.length > 0 ? notes.join(' ').slice(0, 1000) : null;
 };
 
 const embedChunks = async (provider: AiProvider, chunks: Chunk[], title: string) => {
@@ -163,7 +242,7 @@ const embedChunks = async (provider: AiProvider, chunks: Chunk[], title: string)
     const embedded = await provider.embed(batch, 'document');
 
     if (embedded.length !== batch.length) {
-      throw new Error('The embedding provider returned the wrong number of vectors.');
+      throw new IngestError('The embedding provider returned the wrong number of vectors. Re-index to try again.');
     }
 
     vectors.push(...embedded);
@@ -172,13 +251,33 @@ const embedChunks = async (provider: AiProvider, chunks: Chunk[], title: string)
   return vectors;
 };
 
+/** The title a page is stored under: the person's own title for pasted text, the page's otherwise. */
+const documentTitle = (source: Source, page: Page) => {
+  const title = source.kind === 'text' ? source.title : (page.title ?? source.title);
+
+  return title.trim().slice(0, 200) || source.title;
+};
+
+/** A website named after its address takes the start page's title once that page has been read. */
+const sourceTitleAfterCrawl = (source: Source, pages: Page[]) => {
+  if (source.kind !== 'url' || !isAutoLabel(source.title, source.uri, 'url')) {
+    return null;
+  }
+
+  const start = normalizeUrl(source.uri ?? '');
+  const startPage = pages.find((page) => page.url === start) ?? pages[0];
+  const title = startPage?.title?.trim().slice(0, 200);
+
+  return title ? title : null;
+};
+
 /**
  * Indexes one source end to end: discovers its pages, turns them into Markdown, chunks and embeds
  * them and writes documents and chunks. Progress and the outcome land on the source row, so the
  * Knowledge screen can follow along. Never throws; failures are reported on the row and returned.
  */
 export const ingestSource = async (params: IngestParams): Promise<IngestResult> => {
-  const { service, provider, sourceId, fetchImpl = fetch } = params;
+  const { service, provider, sourceId, fetchImpl = fetch, lookup } = params;
   const progress = createProgress(service, sourceId);
 
   const update = async (fields: SourceUpdate) => {
@@ -187,36 +286,55 @@ export const ingestSource = async (params: IngestParams): Promise<IngestResult> 
     const { error } = await service.from('sources').update(fields).eq('id', sourceId);
 
     if (error) {
-      throw new Error(`The source could not be updated (${error.message}).`);
+      throw new IngestError('The source row could not be updated. Re-index to try again.');
     }
   };
 
   const { data: source, error: loadError } = await service.from('sources').select('*').eq('id', sourceId).maybeSingle();
 
-  if (loadError || !source) {
-    return { status: 'failed', error: loadError ? humanize(new Error(loadError.message)) : 'That source does not exist.' };
+  if (loadError) {
+    return { status: 'failed', error: 'The source could not be loaded. Re-index to try again.' };
+  }
+
+  if (!source) {
+    return { status: 'failed', error: 'That source does not exist.' };
+  }
+
+  // Only one run per source: the row is claimed with a conditional update, so a second run that
+  // was scheduled by mistake (two tabs, a retried request) finds it taken and steps aside.
+  const staleBefore = new Date(Date.now() - STALE_RUN_MS).toISOString();
+  const { data: claimed } = await service
+    .from('sources')
+    .update({ status: 'crawling', error: null, pages_found: 0, pages_done: 0 })
+    .eq('id', sourceId)
+    .or(`status.in.(queued,ready,failed),updated_at.lt.${staleBefore}`)
+    .select('id');
+
+  if (!claimed || claimed.length === 0) {
+    return { status: 'skipped', reason: 'This source is being indexed by another run.' };
   }
 
   try {
     const capacity = await remainingPages(service, source);
 
     if (capacity.remaining <= 0) {
-      throw new Error(PAGE_LIMIT_MESSAGE);
+      throw new IngestError(PAGE_LIMIT_MESSAGE);
     }
 
     const pageLimit = Math.max(1, Math.min(capacity.remaining, params.pageLimit ?? MAX_PAGES_PER_RUN, MAX_PAGES_PER_RUN));
+    const atPlanLimit = pageLimit === capacity.remaining && capacity.remaining < MAX_PAGES_PER_RUN;
 
-    await update({ status: 'crawling', error: null, pages_found: 0, pages_done: 0 });
-
-    const { pages, problems } = await discoverPages(service, source, pageLimit, fetchImpl, (count) =>
+    const { pages, problems, truncated } = await discoverPages(service, source, pageLimit, fetchImpl, lookup, (count) =>
       progress.set({ pages_found: count }),
     );
 
-    if (pages.length === 0) {
-      throw new Error(problems[0] ? `No pages could be read. ${problems[0]}` : 'No readable content was found.');
+    const readable = pages.filter((page) => page.markdown.trim().length > 0);
+
+    if (readable.length === 0) {
+      throw new IngestError(noContentMessage(source, problems));
     }
 
-    await update({ status: 'indexing', pages_found: pages.length, pages_done: 0 });
+    await update({ status: 'indexing', pages_found: readable.length, pages_done: 0 });
 
     const { data: existing, error: existingError } = await service
       .from('documents')
@@ -224,7 +342,7 @@ export const ingestSource = async (params: IngestParams): Promise<IngestResult> 
       .eq('source_id', sourceId);
 
     if (existingError) {
-      throw new Error(`Existing pages could not be loaded (${existingError.message}).`);
+      throw new IngestError('The pages indexed earlier could not be loaded. Re-index to try again.');
     }
 
     const keyOf = (url: string | null) => url ?? '';
@@ -233,7 +351,7 @@ export const ingestSource = async (params: IngestParams): Promise<IngestResult> 
     let done = 0;
     let unchanged = 0;
 
-    for (const page of pages) {
+    for (const page of readable) {
       const key = keyOf(page.url);
 
       if (seen.has(key)) {
@@ -252,7 +370,7 @@ export const ingestSource = async (params: IngestParams): Promise<IngestResult> 
         continue;
       }
 
-      const title = (page.title ?? source.title).slice(0, 200);
+      const title = documentTitle(source, page);
       const chunks = chunkMarkdown(page.markdown);
 
       if (chunks.length === 0) {
@@ -266,7 +384,7 @@ export const ingestSource = async (params: IngestParams): Promise<IngestResult> 
         const { error } = await service.from('documents').delete().eq('id', previous.id);
 
         if (error) {
-          throw new Error(`An old page could not be replaced (${error.message}).`);
+          throw new IngestError('An earlier copy of a page could not be replaced. Re-index to try again.');
         }
       }
 
@@ -286,7 +404,7 @@ export const ingestSource = async (params: IngestParams): Promise<IngestResult> 
         .single();
 
       if (documentError || !document) {
-        throw new Error(`A page could not be saved (${documentError?.message ?? 'no row returned'}).`);
+        throw new IngestError('A page could not be saved. Re-index to try again.');
       }
 
       const rows = chunks.map((chunk, position) => ({
@@ -300,13 +418,13 @@ export const ingestSource = async (params: IngestParams): Promise<IngestResult> 
         embedding: JSON.stringify(vectors[position]),
       }));
 
-      for (let start = 0; start < rows.length; start += EMBED_BATCH_SIZE) {
-        const { error } = await service.from('chunks').insert(rows.slice(start, start + EMBED_BATCH_SIZE));
+      for (const batch of inBatches(rows, EMBED_BATCH_SIZE)) {
+        const { error } = await service.from('chunks').insert(batch);
 
         if (error) {
           // A document without its chunks would be invisible to retrieval; leave nothing behind.
           await service.from('documents').delete().eq('id', document.id);
-          throw new Error(`Passages could not be saved (${error.message}).`);
+          throw new IngestError('The passages of a page could not be saved. Re-index to try again.');
         }
       }
 
@@ -316,40 +434,42 @@ export const ingestSource = async (params: IngestParams): Promise<IngestResult> 
 
     const stale = (existing ?? []).filter((document) => !seen.has(keyOf(document.url)));
 
-    if (stale.length > 0) {
-      const { error } = await service
-        .from('documents')
-        .delete()
-        .in(
-          'id',
-          stale.map((document) => document.id),
-        );
+    for (const batch of inBatches(stale.map((document) => document.id))) {
+      const { error } = await service.from('documents').delete().in('id', batch);
 
       if (error) {
-        throw new Error(`Removed pages could not be cleaned up (${error.message}).`);
+        throw new IngestError('Pages that no longer exist could not be removed. Re-index to try again.');
       }
     }
 
-    const { data: documents } = await service.from('documents').select('id').eq('source_id', sourceId);
-    const documentIds = (documents ?? []).map((document) => document.id);
-    const { count } =
-      documentIds.length > 0
-        ? await service.from('chunks').select('id', { count: 'exact', head: true }).in('document_id', documentIds)
-        : { count: 0 };
-    const chunkCount = count ?? 0;
+    // One request for the whole source, however many pages it has: no id list in the URL.
+    const { data: counted, error: countError } = await service
+      .from('documents')
+      .select('id, chunks(count)')
+      .eq('source_id', sourceId);
+
+    if (countError) {
+      throw new IngestError('The passages could not be counted. Re-index to try again.');
+    }
+
+    const documents = counted ?? [];
+    const chunkCount = documents.reduce((sum, document) => sum + (document.chunks[0]?.count ?? 0), 0);
+    const note = describeRun({ pages: readable.length, truncated, problems, atPlanLimit });
+    const title = sourceTitleAfterCrawl(source, readable);
 
     await update({
       status: 'ready',
-      error: null,
-      pages_found: pages.length,
+      error: note,
+      pages_found: readable.length,
       pages_done: done,
       chunk_count: chunkCount,
       last_indexed_at: new Date().toISOString(),
+      ...(title ? { title } : {}),
     });
 
-    return { status: 'ready', pages: pages.length, documents: documentIds.length, chunks: chunkCount, unchanged };
+    return { status: 'ready', pages: readable.length, documents: documents.length, chunks: chunkCount, unchanged, note };
   } catch (cause) {
-    const error = humanize(cause);
+    const error = humanizeIngestError(cause);
 
     try {
       await update({ status: 'failed', error });
@@ -363,7 +483,10 @@ export const ingestSource = async (params: IngestParams): Promise<IngestResult> 
 
 export { type Chunk, chunkMarkdown, estimateTokens } from './chunk';
 export { crawlableLinks, crawlPages, crawlScope, isInScope, normalizeUrl } from './crawl';
+export { humanizeIngestError, IngestError } from './errors';
 export { checksumOf, extractText, extractUpload } from './extract';
+export { assertPublicUrl, type HostLookup, isBlockedAddress, isBlockedHostname, publicLookup } from './guard';
 export { htmlToMarkdown } from './html';
 export { type FetchImpl, FetchPageError } from './http';
+export { isAutoLabel, labelForUrl } from './label';
 export { discoverSitemapUrls, parseSitemap } from './sitemap';

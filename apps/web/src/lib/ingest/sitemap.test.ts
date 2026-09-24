@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
 
+import { publicLookup } from './guard';
 import type { FetchImpl } from './http';
 import { discoverSitemapUrls, parseSitemap } from './sitemap';
 
@@ -72,14 +73,14 @@ describe('parseSitemap', () => {
 
 describe('discoverSitemapUrls', () => {
   it('returns the pages of a flat sitemap up to the limit', async () => {
-    await expect(discoverSitemapUrls({ url: 'https://docs.example.com/flat.xml', fetchImpl, limit: 2 })).resolves.toEqual([
+    await expect(discoverSitemapUrls({ url: 'https://docs.example.com/flat.xml', fetchImpl, lookup: publicLookup, limit: 2 })).resolves.toEqual([
       'https://docs.example.com/guide/intro',
       'https://docs.example.com/guide/setup?ref=x&y=1',
     ]);
   });
 
   it('follows a sitemap index one level and skips children that fail', async () => {
-    await expect(discoverSitemapUrls({ url: 'https://docs.example.com/sitemap.xml', fetchImpl, limit: 10 })).resolves.toEqual([
+    await expect(discoverSitemapUrls({ url: 'https://docs.example.com/sitemap.xml', fetchImpl, lookup: publicLookup, limit: 10 })).resolves.toEqual([
       'https://docs.example.com/guide/intro',
       'https://docs.example.com/guide/setup?ref=x&y=1',
       'https://docs.example.com/guide/faq',
@@ -96,11 +97,11 @@ describe('discoverSitemapUrls', () => {
       return fetchImpl(input, init);
     };
 
-    await expect(discoverSitemapUrls({ url: 'https://docs.example.com/sitemap.xml', fetchImpl: counting, limit: 3 })).resolves.toHaveLength(3);
+    await expect(discoverSitemapUrls({ url: 'https://docs.example.com/sitemap.xml', fetchImpl: counting, lookup: publicLookup, limit: 3 })).resolves.toHaveLength(3);
     expect(seen).toEqual(['https://docs.example.com/sitemap.xml', 'https://docs.example.com/sitemap-guide.xml']);
   });
 
   it('reports a sitemap that cannot be fetched', async () => {
-    await expect(discoverSitemapUrls({ url: 'https://docs.example.com/nope.xml', fetchImpl, limit: 5 })).rejects.toThrow('HTTP 404');
+    await expect(discoverSitemapUrls({ url: 'https://docs.example.com/nope.xml', fetchImpl, lookup: publicLookup, limit: 5 })).rejects.toThrow('HTTP 404');
   });
 });

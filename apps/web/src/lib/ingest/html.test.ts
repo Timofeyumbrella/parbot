@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
 
-import { htmlToMarkdown } from './html';
+import { cleanTitle, htmlToMarkdown } from './html';
 
 const FIXTURE = `<!doctype html>
 <html>
@@ -86,5 +86,38 @@ describe('htmlToMarkdown', () => {
 
   it('returns empty Markdown for a page without text', () => {
     expect(htmlToMarkdown('<html><body><script>1</script></body></html>').markdown).toBe('');
+  });
+});
+
+describe('cleanTitle', () => {
+  it('prefers the h1 when the document title merely wraps it', () => {
+    expect(cleanTitle('Setup | AuditDocs', 'Setup', null)).toBe('Setup');
+    expect(cleanTitle('AuditDocs - Setup', 'Setup', null)).toBe('Setup');
+    expect(cleanTitle('Setup', 'Setup', null)).toBe('Setup');
+  });
+
+  it('strips a known site name from either end', () => {
+    expect(cleanTitle('Webhooks - Example Docs', null, 'Example Docs')).toBe('Webhooks');
+    expect(cleanTitle('Example Docs | Webhooks', null, 'Example Docs')).toBe('Webhooks');
+    expect(cleanTitle('Example Docs', null, 'Example Docs')).toBe('Example Docs');
+  });
+
+  it('drops a trailing site segment after a pipe, dash or dot, but leaves plain hyphens alone', () => {
+    expect(cleanTitle('Webhooks | Example', null, null)).toBe('Webhooks');
+    expect(cleanTitle('Webhooks — Example', null, null)).toBe('Webhooks');
+    expect(cleanTitle('Webhooks · Example', null, null)).toBe('Webhooks');
+    expect(cleanTitle('Part 1 - Getting started', null, null)).toBe('Part 1 - Getting started');
+    expect(cleanTitle('A | B', null, null)).toBe('A | B');
+  });
+
+  it('shapes the heading path and document title of a real page', () => {
+    const html = `<html><head><title>Setup | AuditDocs</title><meta property="og:site_name" content="AuditDocs"></head>
+      <body><main><article><h1>Setup</h1><p>Install the package with your package manager of choice and run it.</p>
+      <h2>Configuration</h2><p>Set the options in the config file before the first run of the tool.</p></article></main></body></html>`;
+    const result = htmlToMarkdown(html);
+
+    expect(result.title).toBe('Setup');
+    expect(result.markdown.startsWith('# Setup\n\n')).toBe(true);
+    expect(result.markdown).toContain('## Configuration');
   });
 });

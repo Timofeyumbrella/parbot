@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { crawlableLinks, crawlPages, crawlScope, isInScope, normalizeUrl } from './crawl';
+import { publicLookup } from './guard';
 import type { FetchImpl } from './http';
 
 const scope = crawlScope('https://docs.example.com/guide/intro');
@@ -101,6 +102,7 @@ describe('crawlPages', () => {
       scope,
       pageLimit: 50,
       fetchImpl: makeFetch(log),
+      lookup: publicLookup,
       concurrency: 1,
     });
 
@@ -124,6 +126,7 @@ describe('crawlPages', () => {
       scope,
       pageLimit: 2,
       fetchImpl: makeFetch(),
+      lookup: publicLookup,
     });
 
     expect(result.pages).toHaveLength(2);
@@ -136,6 +139,7 @@ describe('crawlPages', () => {
       scope: null,
       pageLimit: 10,
       fetchImpl: makeFetch(),
+      lookup: publicLookup,
     });
 
     expect(result.pages.map((entry) => entry.url)).toEqual(['https://docs.example.com/guide/faq']);
@@ -149,6 +153,7 @@ describe('crawlPages', () => {
       scope: null,
       pageLimit: 10,
       fetchImpl: makeFetch(log),
+      lookup: publicLookup,
     });
 
     expect(result.pages).toHaveLength(1);
@@ -163,6 +168,7 @@ describe('crawlPages', () => {
       scope,
       pageLimit: 10,
       fetchImpl: makeFetch(),
+      lookup: publicLookup,
       onPage: (entry) => {
         seen.push(entry.title ?? '');
       },
