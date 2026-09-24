@@ -20,7 +20,7 @@ export type Plan = PlanLimits & {
   featured?: boolean;
 };
 
-/** Yearly is ten months for the price of twelve. */
+/** Yearly is twelve months for the price of ten. */
 export const yearlyCents = (monthlyCents: number) => monthlyCents * 10;
 
 export const PLANS: Record<PlanId, Plan> = {
@@ -80,7 +80,7 @@ export const PLANS: Record<PlanId, Plan> = {
       '20,000 indexed pages',
       '20,000 answers a month',
       'Everything in Starter',
-      'Priority answers during peaks',
+      'Room for several products and their docs',
     ],
   },
 };
@@ -88,7 +88,7 @@ export const PLANS: Record<PlanId, Plan> = {
 export const PLAN_ORDER: PlanId[] = ['hobby', 'starter', 'growth'];
 
 export const isPlanId = (value: unknown): value is PlanId =>
-  typeof value === 'string' && value in PLANS;
+  typeof value === 'string' && Object.hasOwn(PLANS, value);
 
 export const planFor = (value: unknown): Plan => (isPlanId(value) ? PLANS[value] : PLANS.hobby);
 

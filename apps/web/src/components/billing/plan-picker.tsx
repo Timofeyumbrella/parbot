@@ -91,7 +91,7 @@ export const PlanPicker = ({
             Plans
           </h2>
           <p className="text-muted-foreground text-sm">
-            Yearly billing is ten months for the price of twelve.
+            Yearly billing is twelve months for the price of ten.
           </p>
         </div>
         <Tabs

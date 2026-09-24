@@ -68,3 +68,22 @@ and see your bubble in the same frame with the answer streaming into a placehold
 - Tests: Vitest, colocated `*.test.ts(x)`, jsdom. Test behaviour through the public surface. Keep
   the stub AI provider working; it is what tests and keyless dev run on.
 - Comments explain why, not what. No TODOs left behind; either do it or write it in the report.
+
+## Rules learned from the first audit
+
+- Realtime: `await realtimeReadyClient()` from `lib/supabase/client.ts` before `.channel(...).subscribe(...)`.
+  A channel that joins before the session is loaded runs as anon and the server rejects filtered
+  subscriptions silently. Always pass a status callback to `subscribe` and log a failed join.
+- TanStack keys are namespaced by screen: `['chat', ...]`, `['inbox', ...]`, `['knowledge', ...]`.
+  Never share a key between screens that store different shapes. A mutation that changes
+  conversations invalidates the other screens' namespaces (`queryClient.invalidateQueries({ queryKey: ['inbox'] })`).
+- Links: leave `prefetch` at its default. `prefetch={true}` on a dynamic route caches its full payload
+  for minutes in Next 16, so Inbox and Overview showed stale data after a chat. The `loading.tsx`
+  skeleton keeps navigation instant without it.
+- Dates and counts: `relativeTime`, `formatDate`, `formatDateTime`, `formatCount`, `formatPercent`
+  from `lib/format.ts`. No screen defines its own.
+- Row level security now also checks `owns_assistant(assistant_id)` on inserts and updates, and
+  `increment_usage` is service-role only. `proxy.ts` no longer runs for `/api/sources`, `/api/health`
+  and `/demo/`; those handle their own auth, and uploads up to 25 MB reach the route.
+- Library and provider error text never reaches a visitor unchanged: map it to a sentence that says
+  what happened and what to try.

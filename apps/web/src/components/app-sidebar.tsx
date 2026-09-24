@@ -114,7 +114,6 @@ const SidebarBody = ({ assistants, email, planName, onNavigate }: AppSidebarProp
         <Link
           href="/dashboard"
           onClick={onNavigate}
-          prefetch
           className={cn(
             'mb-1 flex h-8 items-center gap-2.5 rounded-md px-2.5 text-sm transition-colors',
             isActive('/dashboard', true)
@@ -131,7 +130,6 @@ const SidebarBody = ({ assistants, email, planName, onNavigate }: AppSidebarProp
                 key={item.href}
                 href={item.href}
                 onClick={onNavigate}
-                prefetch
                 className={cn(
                   'flex h-8 items-center gap-2.5 rounded-md px-2.5 text-sm transition-colors',
                   isActive(item.href, item.exact)

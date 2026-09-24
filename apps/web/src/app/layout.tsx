@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
 
 import { Providers } from '@/components/providers';
+import { publicEnv } from '@/lib/env';
 
 import './globals.css';
 
@@ -16,6 +17,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(publicEnv.appUrl),
   title: {
     default: 'Parbot',
     template: '%s · Parbot',

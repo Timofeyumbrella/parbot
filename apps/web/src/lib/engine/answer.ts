@@ -112,7 +112,7 @@ export async function* streamAnswer(params: AnswerParams): AsyncGenerator<ChatSt
     yield {
       type: 'error',
       code: 'quota_exceeded',
-      message: `This assistant has used its ${quota.limit.toLocaleString('en-US')} answers for the month.`,
+      message: `This account has used its ${quota.limit.toLocaleString('en-US')} answers for the month.`,
     };
 
     return;

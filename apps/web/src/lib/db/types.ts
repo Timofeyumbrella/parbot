@@ -635,6 +635,7 @@ export type Database = {
           similarity: number
         }[]
       }
+      owns_assistant: { Args: { assistant: string }; Returns: boolean }
       top_questions: {
         Args: { assistant: string; max_rows?: number; since: string }
         Returns: {
