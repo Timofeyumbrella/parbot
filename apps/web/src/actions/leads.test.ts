@@ -64,12 +64,14 @@ describe('updateLeadStatus', () => {
     });
   });
 
-  it('surfaces database errors in plain words', async () => {
+  it('maps database errors to a plain sentence instead of passing them through', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
     session.update.mockResolvedValue({ data: null, error: { message: 'connection reset' } });
 
-    expect(await updateLeadStatus({ leadId: LEAD, status: 'closed' })).toMatchObject({
-      ok: false,
-      error: expect.stringContaining('connection reset'),
-    });
+    const result = await updateLeadStatus({ leadId: LEAD, status: 'closed' });
+
+    expect(result).toMatchObject({ ok: false, error: expect.stringContaining('could not be saved') });
+    expect(result).not.toMatchObject({ error: expect.stringContaining('connection reset') });
+    expect(consoleError).toHaveBeenCalled();
   });
 });

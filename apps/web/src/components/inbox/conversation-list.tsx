@@ -1,52 +1,45 @@
 'use client';
 
-import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
+import type { RealtimeChannel, RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 import { type InfiniteData, useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { cn } from 'cn';
 import { MessageSquare } from 'lucide-react';
 import Link from 'next/link';
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useEffect, useState } from 'react';
 
 import { ChannelBadge, UnansweredBadge } from '@/components/inbox/channel-badge';
 import {
   activityStamp,
   conversationListKey,
   conversationPage,
+  type ConversationPage,
   type ConversationRow,
+  inboxCountsKey,
+  type InboxCounts,
   matchesFilter,
-  nextCursor,
+  type PageCursor,
+  pageOf,
 } from '@/components/inbox/conversation-query';
+import { LocalTime } from '@/components/inbox/local-time';
 import { Button } from '@/components/ui/button';
-import { absoluteTime, type ConversationFilter, formatCount, hostnameOf, relativeTime } from '@/lib/analytics';
-import { getSupabaseBrowserClient } from '@/lib/supabase/client';
+import { type ConversationFilter, hostnameOf } from '@/lib/analytics';
+import { formatCount } from '@/lib/format';
+import { getSupabaseBrowserClient, realtimeReadyClient } from '@/lib/supabase/client';
 
-type Page = { rows: ConversationRow[]; cursor: string | null };
-type ListData = InfiniteData<Page, string | null>;
+export type ListData = InfiniteData<ConversationPage, PageCursor | null>;
 
-const CLOCK_MS = 30_000;
-
-const subscribeClock = (notify: () => void) => {
-  const timer = setInterval(notify, CLOCK_MS);
-
-  return () => clearInterval(timer);
-};
-
-const clockSnapshot = () => Math.floor(Date.now() / CLOCK_MS) * CLOCK_MS;
-
-/**
- * The reference time for "5m ago". Hydration uses the server's value so both renders agree,
- * then the client ticks forward in half-minute steps.
- */
-const useNow = (initial: number) => useSyncExternalStore(subscribeClock, clockSnapshot, () => initial);
-
-const fetchPage = async (assistantId: string, filter: ConversationFilter, cursor: string | null): Promise<Page> => {
+const fetchPage = async (
+  assistantId: string,
+  filter: ConversationFilter,
+  cursor: PageCursor | null,
+): Promise<ConversationPage> => {
   const { data, error } = await conversationPage(getSupabaseBrowserClient(), assistantId, filter, cursor);
 
   if (error) {
     throw new Error(error.message);
   }
 
-  return { rows: data ?? [], cursor: nextCursor(data ?? []) };
+  return pageOf(data ?? []);
 };
 
 /** Applies one Realtime change to the cached pages. Returns the same object when nothing applies. */
@@ -58,7 +51,7 @@ export const applyChange = (
   if (payload.eventType === 'DELETE') {
     const id = payload.old.id;
 
-    if (!id) {
+    if (!id || !data.pages.some((page) => page.rows.some((row) => row.id === id))) {
       return { data, added: null };
     }
 
@@ -102,7 +95,9 @@ export const applyChange = (
 export type ConversationListProps = {
   assistantId: string;
   filter: ConversationFilter;
+  /** The first page as the server read it, one row over the page size when more exist. */
   initialRows: ConversationRow[];
+  /** The request's clock, shared by every relative time on the page. */
   now: number;
 };
 
@@ -129,52 +124,93 @@ const EMPTY_COPY: Record<ConversationFilter, { title: string; body: string }> = 
  * The conversation rows for one filter. The first page comes from the server; more pages load
  * through the browser client by keyset, and Realtime keeps the list current while it is open.
  */
-export const ConversationList = ({ assistantId, filter, initialRows, now: initialNow }: ConversationListProps) => {
+export const ConversationList = ({ assistantId, filter, initialRows, now }: ConversationListProps) => {
   const queryClient = useQueryClient();
   const key = conversationListKey(assistantId, filter);
-  const now = useNow(initialNow);
   const [fresh, setFresh] = useState<ReadonlySet<string>>(() => new Set());
 
   const query = useInfiniteQuery({
     queryKey: key,
     queryFn: ({ pageParam }) => fetchPage(assistantId, filter, pageParam),
-    initialPageParam: null as string | null,
+    initialPageParam: null as PageCursor | null,
     getNextPageParam: (lastPage) => lastPage.cursor,
-    initialData: { pages: [{ rows: initialRows, cursor: nextCursor(initialRows) }], pageParams: [null] },
-    initialDataUpdatedAt: initialNow,
+    initialData: { pages: [pageOf(initialRows)], pageParams: [null] },
+    initialDataUpdatedAt: now,
   });
+
+  // A cached list from an earlier visit must not outrank the page the server just rendered:
+  // whatever is in the cache from before this request is replaced by the fresh first page.
+  useEffect(() => {
+    const state = queryClient.getQueryState<ListData>(key);
+
+    if (state && state.dataUpdatedAt < now) {
+      queryClient.setQueryData<ListData>(key, { pages: [pageOf(initialRows)], pageParams: [null] }, { updatedAt: now });
+    }
+    // The key is derived from these two; the rows belong to the same server render as `now`.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [assistantId, filter, now, queryClient]);
 
   // The page mounts one list per filter, so the subscription simply closes over this filter.
   useEffect(() => {
-    const supabase = getSupabaseBrowserClient();
     const currentKey = conversationListKey(assistantId, filter);
-    const channel = supabase
-      .channel(`inbox:${assistantId}:${filter}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'conversations', filter: `assistant_id=eq.${assistantId}` },
-        (payload: RealtimePostgresChangesPayload<ConversationRow>) => {
-          const current = queryClient.getQueryData<ListData>(currentKey);
+    const countsKey = inboxCountsKey(assistantId);
+    let channel: RealtimeChannel | null = null;
+    let cancelled = false;
 
-          if (!current) {
-            return;
+    const subscribe = async () => {
+      const supabase = await realtimeReadyClient();
+
+      if (cancelled) {
+        return;
+      }
+
+      channel = supabase
+        .channel(`inbox:${assistantId}:${filter}`)
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'conversations', filter: `assistant_id=eq.${assistantId}` },
+          (payload: RealtimePostgresChangesPayload<ConversationRow>) => {
+            const current = queryClient.getQueryData<ListData>(currentKey);
+
+            if (!current) {
+              return;
+            }
+
+            const { data, added } = applyChange(current, payload, filter);
+
+            if (data !== current) {
+              queryClient.setQueryData<ListData>(currentKey, data);
+            }
+
+            if (added) {
+              setFresh((marked) => new Set(marked).add(added));
+            }
+
+            // The tab label counts every conversation, whichever filter is open.
+            if (payload.eventType === 'INSERT' || payload.eventType === 'DELETE') {
+              const delta = payload.eventType === 'INSERT' ? 1 : -1;
+
+              queryClient.setQueryData<InboxCounts>(countsKey, (counts) =>
+                counts ? { ...counts, conversations: Math.max(counts.conversations + delta, 0) } : counts,
+              );
+            }
+          },
+        )
+        .subscribe((status, error) => {
+          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+            console.error(`Inbox realtime channel ${status}`, error);
           }
+        });
+    };
 
-          const { data, added } = applyChange(current, payload, filter);
-
-          if (data !== current) {
-            queryClient.setQueryData<ListData>(currentKey, data);
-          }
-
-          if (added) {
-            setFresh((marked) => new Set(marked).add(added));
-          }
-        },
-      )
-      .subscribe();
+    void subscribe();
 
     return () => {
-      void supabase.removeChannel(channel);
+      cancelled = true;
+
+      if (channel) {
+        void getSupabaseBrowserClient().removeChannel(channel);
+      }
     };
   }, [assistantId, filter, queryClient]);
 
@@ -204,23 +240,17 @@ export const ConversationList = ({ assistantId, filter, initialRows, now: initia
         {filter === 'all' || filter === 'app' ? (
           <div className="mt-2 flex gap-2">
             <Button asChild size="sm">
-              <Link href={`/a/${assistantId}/chat`} prefetch>
-                Open Chat
-              </Link>
+              <Link href={`/a/${assistantId}/chat`}>Open Chat</Link>
             </Button>
             {filter === 'all' ? (
               <Button asChild size="sm" variant="outline">
-                <Link href={`/a/${assistantId}/widget`} prefetch>
-                  Install the widget
-                </Link>
+                <Link href={`/a/${assistantId}/widget`}>Install the widget</Link>
               </Button>
             ) : null}
           </div>
         ) : filter === 'widget' ? (
           <Button asChild size="sm" variant="outline" className="mt-2">
-            <Link href={`/a/${assistantId}/widget`} prefetch>
-              Install the widget
-            </Link>
+            <Link href={`/a/${assistantId}/widget`}>Install the widget</Link>
           </Button>
         ) : null}
       </div>
@@ -231,7 +261,6 @@ export const ConversationList = ({ assistantId, filter, initialRows, now: initia
     <div className="flex flex-col gap-3">
       <ul className="divide-y overflow-hidden rounded-lg border" data-testid="conversation-list">
         {rows.map((row) => {
-          const stamp = activityStamp(row);
           const host = row.channel === 'widget' ? hostnameOf(row.page_url) : null;
           const isNew = fresh.has(row.id);
 
@@ -239,7 +268,6 @@ export const ConversationList = ({ assistantId, filter, initialRows, now: initia
             <li key={row.id} data-conversation-id={row.id} data-new={isNew ? 'true' : undefined}>
               <Link
                 href={`/a/${assistantId}/inbox/${row.id}`}
-                prefetch
                 className={cn(
                   'hover:bg-muted/60 flex items-center gap-3 px-3 py-2.5 text-sm transition-colors',
                   isNew && 'bg-primary/5',
@@ -270,13 +298,11 @@ export const ConversationList = ({ assistantId, filter, initialRows, now: initia
                     {row.unanswered_count > 0 ? <UnansweredBadge count={row.unanswered_count} /> : null}
                   </div>
                 </div>
-                <time
-                  dateTime={stamp}
-                  title={absoluteTime(stamp)}
+                <LocalTime
+                  value={activityStamp(row)}
+                  now={now}
                   className="text-muted-foreground w-16 shrink-0 text-right text-xs"
-                >
-                  {relativeTime(stamp, now)}
-                </time>
+                />
               </Link>
             </li>
           );
@@ -285,7 +311,7 @@ export const ConversationList = ({ assistantId, filter, initialRows, now: initia
 
       {query.isError ? (
         <p role="alert" className="text-destructive text-sm">
-          More conversations could not be loaded: {query.error.message}. Try again.
+          More conversations could not be loaded. Check your connection and try again.
         </p>
       ) : null}
 

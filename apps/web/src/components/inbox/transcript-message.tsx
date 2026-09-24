@@ -5,7 +5,7 @@ import remarkGfm from 'remark-gfm';
 import { z } from 'zod';
 
 import { UnansweredBadge } from '@/components/inbox/channel-badge';
-import { absoluteTime, relativeTime } from '@/lib/analytics';
+import { LocalTime } from '@/components/inbox/local-time';
 import type { Message } from '@/lib/db';
 
 const citationSchema = z.object({
@@ -25,17 +25,47 @@ export const parseCitations = (value: unknown): TranscriptCitation[] => {
   return parsed.success ? parsed.data : [];
 };
 
+const CITE_PREFIX = 'cite';
+
+/**
+ * Turns the answer's `[n]` markers into links to the entries of its Sources list. Markers that
+ * point at nothing stay as they were, so a stray bracket is never turned into a broken link.
+ */
+export const linkCitations = (content: string, messageId: string, citations: TranscriptCitation[]) => {
+  if (citations.length === 0) {
+    return content;
+  }
+
+  const known = new Set(citations.map((citation) => citation.index));
+
+  // A marker already followed by "(" is a Markdown link of its own and is left alone.
+  return content.replace(/\[(\d{1,2})\](?!\()/g, (marker, digits: string) => {
+    const index = Number(digits);
+
+    return known.has(index) ? `[${index}](#${CITE_PREFIX}-${messageId}-${index})` : marker;
+  });
+};
+
 export type TranscriptMessageProps = {
   message: Pick<Message, 'id' | 'role' | 'content' | 'citations' | 'answered' | 'feedback' | 'created_at'>;
   now: number;
 };
 
 const components = {
-  a: ({ href, children }: { href?: string; children?: React.ReactNode }) => (
-    <a href={href} target="_blank" rel="noreferrer" className="underline underline-offset-4">
-      {children}
-    </a>
-  ),
+  a: ({ href, children }: { href?: string; children?: React.ReactNode }) =>
+    href?.startsWith(`#${CITE_PREFIX}-`) ? (
+      <a
+        href={href}
+        className="bg-primary/15 text-foreground hover:bg-primary/30 mx-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded px-1 align-text-top text-[10px] font-medium tabular-nums no-underline transition-colors"
+        aria-label={`Source ${String(children)}`}
+      >
+        {children}
+      </a>
+    ) : (
+      <a href={href} target="_blank" rel="noreferrer" className="underline underline-offset-4">
+        {children}
+      </a>
+    ),
   p: ({ children }: { children?: React.ReactNode }) => <p className="my-2 first:mt-0 last:mb-0">{children}</p>,
   ul: ({ children }: { children?: React.ReactNode }) => <ul className="my-2 list-disc pl-5">{children}</ul>,
   ol: ({ children }: { children?: React.ReactNode }) => <ol className="my-2 list-decimal pl-5">{children}</ol>,
@@ -98,7 +128,7 @@ export const TranscriptMessage = ({ message, now }: TranscriptMessageProps) => {
             <p className="whitespace-pre-wrap">{message.content}</p>
           ) : (
             <Markdown remarkPlugins={[remarkGfm]} components={components}>
-              {message.content}
+              {linkCitations(message.content, message.id, citations)}
             </Markdown>
           )}
 
@@ -107,7 +137,11 @@ export const TranscriptMessage = ({ message, now }: TranscriptMessageProps) => {
               <p className="text-muted-foreground mb-1 text-xs font-medium">Sources</p>
               <ol className="flex flex-col gap-0.5 text-xs">
                 {citations.map((citation) => (
-                  <li key={`${citation.index}-${citation.documentId}`} className="flex gap-1.5">
+                  <li
+                    key={`${citation.index}-${citation.documentId}`}
+                    id={`${CITE_PREFIX}-${message.id}-${citation.index}`}
+                    className="flex gap-1.5 scroll-mt-16"
+                  >
                     <span className="text-muted-foreground shrink-0 tabular-nums">[{citation.index}]</span>
                     {citation.url ? (
                       <a
@@ -132,9 +166,7 @@ export const TranscriptMessage = ({ message, now }: TranscriptMessageProps) => {
         </div>
 
         <div className="text-muted-foreground flex flex-wrap items-center gap-2 px-1 text-xs">
-          <time dateTime={message.created_at} title={absoluteTime(message.created_at)}>
-            {relativeTime(message.created_at, now)}
-          </time>
+          <LocalTime value={message.created_at} now={now} />
           {unanswered ? <UnansweredBadge /> : null}
           {message.feedback === 1 ? (
             <span className="inline-flex items-center gap-1" title="The reader marked this answer as helpful">

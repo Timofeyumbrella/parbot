@@ -52,7 +52,7 @@ export default async function ConversationPage({ params }: PageProps<'/a/[assist
   ]);
 
   if (conversation.error) {
-    throw new Error(`The conversation could not be loaded: ${conversation.error.message}`);
+    throw new Error('The conversation could not be loaded because the database did not answer as expected.');
   }
 
   if (!conversation.data) {
@@ -68,7 +68,6 @@ export default async function ConversationPage({ params }: PageProps<'/a/[assist
       <div className="flex flex-col gap-3">
         <Link
           href={`/a/${assistantId}/inbox`}
-          prefetch
           className="text-muted-foreground hover:text-foreground inline-flex w-fit items-center gap-1 text-sm transition-colors"
         >
           <ArrowLeft aria-hidden="true" className="size-4" />
@@ -87,7 +86,7 @@ export default async function ConversationPage({ params }: PageProps<'/a/[assist
             <div role="alert" className="border-destructive/40 bg-destructive/10 rounded-lg border p-4 text-sm">
               <p className="font-medium">The transcript could not be loaded.</p>
               <p className="text-muted-foreground mt-1">
-                The database answered with an error: {failure.message}. Reload the page to try again.
+                The database did not answer as expected. Reload the page to try again.
               </p>
             </div>
           ) : (messages.data ?? []).length === 0 ? (
@@ -97,7 +96,7 @@ export default async function ConversationPage({ params }: PageProps<'/a/[assist
                 It was started but nothing was asked. Delete it from the panel if it is just noise.
               </p>
               <Button asChild size="sm" variant="outline" className="mt-2">
-                <Link href={`/a/${assistantId}/inbox`} prefetch>
+                <Link href={`/a/${assistantId}/inbox`}>
                   Back to the inbox
                 </Link>
               </Button>

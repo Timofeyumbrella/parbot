@@ -1,8 +1,9 @@
 import { ArrowUpRight, BookOpen } from 'lucide-react';
 import Link from 'next/link';
 
+import { LocalTime } from '@/components/inbox/local-time';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { absoluteTime, formatCount, relativeTime } from '@/lib/analytics';
+import { formatCount } from '@/lib/format';
 
 export type TopQuestion = {
   question: string;
@@ -36,17 +37,14 @@ const Row = ({
       <span className="min-w-0 flex-1 truncate" title={question}>
         {question}
       </span>
-      <span className="text-muted-foreground w-12 shrink-0 text-right text-xs tabular-nums" title={`Asked ${formatCount(asks)} ${asks === 1 ? 'time' : 'times'}`}>
+      <span
+        className="text-muted-foreground w-14 shrink-0 text-right text-xs tabular-nums"
+        title={`Asked ${formatCount(asks)} ${asks === 1 ? 'time' : 'times'}`}
+      >
         {formatCount(asks)}
         {asks === 1 ? ' time' : ' times'}
       </span>
-      <time
-        dateTime={lastAskedAt}
-        title={absoluteTime(lastAskedAt)}
-        className="text-muted-foreground w-16 shrink-0 text-right text-xs"
-      >
-        {relativeTime(lastAskedAt, now)}
-      </time>
+      <LocalTime value={lastAskedAt} now={now} className="text-muted-foreground w-16 shrink-0 text-right text-xs" />
     </>
   );
 
@@ -55,7 +53,6 @@ const Row = ({
       {href ? (
         <Link
           href={href}
-          prefetch
           className="hover:bg-muted/60 flex items-center gap-3 px-(--card-spacing) py-2 text-sm transition-colors"
         >
           {body}
@@ -122,7 +119,6 @@ export const UnansweredQuestions = ({
           <div className="bg-muted/50 border-t px-(--card-spacing) py-2.5">
             <Link
               href={`/a/${assistantId}/knowledge`}
-              prefetch
               className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-xs transition-colors"
             >
               <BookOpen aria-hidden="true" className="size-3.5" />

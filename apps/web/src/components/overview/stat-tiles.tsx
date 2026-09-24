@@ -1,5 +1,5 @@
 import { Card } from '@/components/ui/card';
-import { formatCount, formatPercent, percentage } from '@/lib/analytics';
+import { formatCount, formatPercent } from '@/lib/format';
 
 export type StatTileProps = {
   label: string;
@@ -10,7 +10,7 @@ export type StatTileProps = {
 export const StatTile = ({ label, value, caption }: StatTileProps) => (
   <Card size="sm" className="gap-1" data-testid="stat-tile">
     <div className="text-muted-foreground px-(--card-spacing) text-xs font-medium">{label}</div>
-    <div className="px-(--card-spacing) text-2xl font-semibold tracking-tight">{value}</div>
+    <div className="px-(--card-spacing) text-2xl font-semibold tracking-tight tabular-nums">{value}</div>
     <div className="text-muted-foreground px-(--card-spacing) text-xs">{caption}</div>
   </Card>
 );
@@ -27,7 +27,6 @@ export type StatTilesProps = {
 /** The four headline numbers of the Overview for the selected period. */
 export const StatTiles = ({ days, conversations, questions, answered, unanswered, leads }: StatTilesProps) => {
   const answers = answered + unanswered;
-  const rate = percentage(answered, answers);
   const period = `in the last ${days} days`;
 
   return (
@@ -36,7 +35,7 @@ export const StatTiles = ({ days, conversations, questions, answered, unanswered
       <StatTile label="Questions" value={formatCount(questions)} caption={`Asked ${period}`} />
       <StatTile
         label="Answer rate"
-        value={formatPercent(rate)}
+        value={formatPercent(answered, answers)}
         caption={
           answers === 0
             ? 'No answers yet'

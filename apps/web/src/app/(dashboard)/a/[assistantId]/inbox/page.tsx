@@ -5,6 +5,7 @@ import { ConversationList } from '@/components/inbox/conversation-list';
 import { conversationPage } from '@/components/inbox/conversation-query';
 import { ConversationFilters, InboxTabs } from '@/components/inbox/inbox-nav';
 import { LeadsTable } from '@/components/inbox/leads-table';
+import { PendingNav, PendingRegion } from '@/components/inbox/pending-nav';
 import { PageContainer, PageHeader } from '@/components/page-header';
 import { parseConversationFilter, parseInboxTab } from '@/lib/analytics';
 import { getAssistant } from '@/lib/assistants';
@@ -48,33 +49,39 @@ export default async function InboxPage({ params, searchParams }: PageProps<'/a/
     <PageContainer>
       <PageHeader title="Inbox" description={`Every conversation ${assistant.name} had, and the leads it captured.`} />
 
-      <InboxTabs
-        assistantId={assistantId}
-        tab={tab}
-        counts={{ conversations: conversationCount.count ?? 0, leads: leadCount.count ?? 0 }}
-      />
+      <PendingNav>
+        <InboxTabs
+          assistantId={assistantId}
+          tab={tab}
+          counts={{ conversations: conversationCount.count ?? 0, leads: leadCount.count ?? 0 }}
+          now={now}
+        />
 
-      {failure ? (
-        <div role="alert" className="border-destructive/40 bg-destructive/10 rounded-lg border p-4 text-sm">
-          <p className="font-medium">The inbox could not be loaded.</p>
-          <p className="text-muted-foreground mt-1">
-            The database answered with an error: {failure.message}. Reload the page to try again.
-          </p>
-        </div>
-      ) : tab === 'leads' ? (
-        <LeadsTable rows={leads?.data ?? []} assistantId={assistantId} now={now} />
-      ) : (
-        <>
-          <ConversationFilters assistantId={assistantId} filter={filter} />
-          <ConversationList
-            key={filter}
-            assistantId={assistantId}
-            filter={filter}
-            initialRows={conversations?.data ?? []}
-            now={now}
-          />
-        </>
-      )}
+        {failure ? (
+          <div role="alert" className="border-destructive/40 bg-destructive/10 rounded-lg border p-4 text-sm">
+            <p className="font-medium">The inbox could not be loaded.</p>
+            <p className="text-muted-foreground mt-1">
+              The database did not answer as expected. Reload the page to try again; if it keeps happening, the
+              assistant may have been deleted.
+            </p>
+          </div>
+        ) : tab === 'leads' ? (
+          <PendingRegion>
+            <LeadsTable rows={leads?.data ?? []} assistantId={assistantId} now={now} />
+          </PendingRegion>
+        ) : (
+          <PendingRegion className="gap-4">
+            <ConversationFilters assistantId={assistantId} filter={filter} />
+            <ConversationList
+              key={filter}
+              assistantId={assistantId}
+              filter={filter}
+              initialRows={conversations?.data ?? []}
+              now={now}
+            />
+          </PendingRegion>
+        )}
+      </PendingNav>
     </PageContainer>
   );
 }

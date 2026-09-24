@@ -7,7 +7,7 @@ import { useActionState, useState } from 'react';
 import { toast } from 'sonner';
 
 import { deleteConversation, type DeleteConversationState } from '@/app/(dashboard)/a/[assistantId]/inbox/[conversationId]/actions';
-import { conversationListKey } from '@/components/inbox/conversation-query';
+import { inboxKey } from '@/components/inbox/conversation-query';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -23,8 +23,9 @@ import {
 const initialState: DeleteConversationState = {};
 
 /**
- * A destructive action behind a confirmation dialog. On success the cached inbox lists are
- * dropped before going back, because Realtime cannot deliver a filtered DELETE for the row.
+ * A destructive action behind a confirmation dialog. On success every cached list that could
+ * still hold the row is dropped before going back: the inbox lists, because Realtime cannot
+ * deliver a filtered DELETE, and the chat's list and thread, which live in their own namespace.
  */
 export const DeleteConversation = ({ assistantId, conversationId }: { assistantId: string; conversationId: string }) => {
   const [open, setOpen] = useState(false);
@@ -32,10 +33,18 @@ export const DeleteConversation = ({ assistantId, conversationId }: { assistantI
   const queryClient = useQueryClient();
   const [state, action, pending] = useActionState(
     async (previous: DeleteConversationState, formData: FormData) => {
-      const result = await deleteConversation(previous, formData);
+      let result: DeleteConversationState;
+
+      try {
+        result = await deleteConversation(previous, formData);
+      } catch {
+        return { error: 'The conversation could not be deleted. Check your connection and try again.' };
+      }
 
       if (result.deleted) {
-        queryClient.removeQueries({ queryKey: conversationListKey(assistantId) });
+        queryClient.removeQueries({ queryKey: inboxKey(assistantId) });
+        queryClient.removeQueries({ queryKey: ['thread', conversationId] });
+        void queryClient.invalidateQueries({ queryKey: ['chat'] });
         toast.success('Conversation deleted');
         router.replace(`/a/${assistantId}/inbox`);
       }

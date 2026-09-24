@@ -33,7 +33,8 @@ export const PendingNav = ({ children }: { children: React.ReactNode }) => {
   const navigate = (href: string) => {
     setTarget(href);
     startTransition(() => {
-      router.push(href);
+      // The switch sits at the top of the page; keep the scroll position instead of jumping.
+      router.push(href, { scroll: false });
     });
   };
 
@@ -50,7 +51,11 @@ export const PendingRegion = ({ children, className }: { children: React.ReactNo
     <div
       aria-busy={pending || undefined}
       data-pending={pending ? 'true' : undefined}
-      className={cn('flex flex-col gap-6 transition-opacity duration-150', pending && 'pointer-events-none opacity-50', className)}
+      className={cn(
+        'flex flex-col gap-6 transition-opacity duration-150',
+        pending && 'pointer-events-none opacity-50',
+        className,
+      )}
     >
       {children}
     </div>
@@ -104,8 +109,8 @@ export const SegmentedLink = ({
 };
 
 /** The shared look of a compact pill switch (period, filter). */
-export const pillNavClass = 'bg-muted text-muted-foreground inline-flex h-8 w-fit items-center rounded-lg p-[3px]';
-export const pillLinkClass = 'inline-flex h-full items-center rounded-md px-2.5 text-sm font-medium transition-colors';
+export const pillNavClass = 'bg-muted text-muted-foreground inline-flex h-8 w-fit max-w-full items-center rounded-lg p-[3px]';
+export const pillLinkClass = 'inline-flex h-full items-center rounded-md px-2.5 text-sm font-medium whitespace-nowrap transition-colors';
 export const pillActiveClass =
   'bg-background text-foreground dark:bg-input/30 dark:border-input border border-transparent shadow-sm';
 export const pillInactiveClass = 'hover:text-foreground';

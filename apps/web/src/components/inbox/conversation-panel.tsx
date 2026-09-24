@@ -1,8 +1,10 @@
 import { ChannelBadge } from '@/components/inbox/channel-badge';
 import { DeleteConversation } from '@/components/inbox/delete-conversation';
+import { AbsoluteTime, LocalTime } from '@/components/inbox/local-time';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { absoluteTime, formatCount, hostnameOf, relativeTime } from '@/lib/analytics';
+import { hostnameOf } from '@/lib/analytics';
 import type { Conversation, Lead } from '@/lib/db';
+import { formatCount } from '@/lib/format';
 
 export type PanelLead = Pick<Lead, 'id' | 'email' | 'status'>;
 
@@ -61,10 +63,8 @@ export const ConversationPanel = ({
             )}
           </Row>
           <Row label="Started">
-            <time dateTime={conversation.created_at} title={absoluteTime(conversation.created_at)}>
-              {relativeTime(conversation.created_at, now)}
-            </time>
-            <span className="text-muted-foreground"> · {absoluteTime(conversation.created_at)} UTC</span>
+            <LocalTime value={conversation.created_at} now={now} />
+            <AbsoluteTime value={conversation.created_at} className="text-muted-foreground block text-xs" />
           </Row>
           <Row label="Messages">
             <span className="tabular-nums">{formatCount(conversation.message_count)}</span>

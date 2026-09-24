@@ -37,7 +37,9 @@ export const updateLeadStatus = async (input: unknown): Promise<LeadActionResult
     .maybeSingle();
 
   if (error) {
-    return { ok: false, error: `The lead could not be saved: ${error.message}` };
+    console.error('updateLeadStatus', error);
+
+    return { ok: false, error: 'The lead could not be saved because the database refused the change. Try again.' };
   }
 
   if (!data) {

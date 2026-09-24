@@ -24,7 +24,7 @@ export const FirstUse = ({ assistantId, assistantName }: { assistantId: string; 
           Ask the assistant something your docs cover and see how it answers, with the sources it used.
         </p>
         <Button asChild size="sm" className="mt-auto w-fit">
-          <Link href={`/a/${assistantId}/chat`} prefetch>
+          <Link href={`/a/${assistantId}/chat`}>
             Open Chat
           </Link>
         </Button>
@@ -38,7 +38,7 @@ export const FirstUse = ({ assistantId, assistantName }: { assistantId: string; 
           Drop one script tag on your docs site and visitors can ask there. Their questions land in the Inbox.
         </p>
         <Button asChild size="sm" variant="outline" className="mt-auto w-fit">
-          <Link href={`/a/${assistantId}/widget`} prefetch>
+          <Link href={`/a/${assistantId}/widget`}>
             Get the embed code
           </Link>
         </Button>
