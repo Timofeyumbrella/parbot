@@ -1,0 +1,447 @@
+/**
+ * Seeds the demo: the demo account on Starter, a "Parbot Docs" assistant trained on
+ * apps/web/content/docs, and with --history two weeks of realistic conversations plus a lead.
+ *
+ *   pnpm --filter web seed:demo                 docs only, re-indexes on every run
+ *   pnpm --filter web seed:demo --history       docs plus inbox history (skipped if history exists)
+ *   pnpm --filter web seed:demo --reset         delete the demo assistant first
+ *   pnpm --filter web seed:demo --write-env     also write NEXT_PUBLIC_DEMO_ASSISTANT_KEY into .env
+ *
+ * Runs outside Next, so it builds its own service client and never imports server-only modules.
+ * With GEMINI_API_KEY unset it indexes on the stub provider, which is fine for local demos.
+ */
+import { readdir, readFile, writeFile } from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+import { createClient } from '@supabase/supabase-js';
+
+import { getAiProvider, hasLiveAiProvider } from '../src/lib/ai';
+import type { Database } from '../src/lib/db';
+import { ingestSource } from '../src/lib/ingest';
+
+const here = path.dirname(fileURLToPath(import.meta.url));
+const DOCS_DIR = path.resolve(here, '../content/docs');
+const ENV_FILE = path.resolve(here, '../../../.env');
+
+const DEMO_EMAIL = 'demo@parbot.dev';
+const DEMO_PASSWORD = 'parbot-demo';
+const DEMO_NAME = 'Demo Founder';
+const SLUG = 'parbot-docs';
+
+const args = new Set(process.argv.slice(2));
+const flag = (name: string) => args.has(`--${name}`);
+
+const required = (name: string) => {
+  const value = process.env[name]?.trim();
+
+  if (!value) {
+    throw new Error(`Missing ${name}. Run this from apps/web with the root .env linked in.`);
+  }
+
+  return value;
+};
+
+const service = createClient<Database>(required('NEXT_PUBLIC_SUPABASE_URL'), required('SUPABASE_SERVICE_ROLE_KEY'), {
+  auth: { persistSession: false, autoRefreshToken: false },
+});
+
+const log = (message: string) => console.info(`  ${message}`);
+
+const ensureDemoUser = async () => {
+  const { data: profile } = await service.from('profiles').select('id').eq('email', DEMO_EMAIL).maybeSingle();
+
+  if (profile) {
+    return profile.id;
+  }
+
+  const { data, error } = await service.auth.admin.createUser({
+    email: DEMO_EMAIL,
+    password: DEMO_PASSWORD,
+    email_confirm: true,
+    user_metadata: { full_name: DEMO_NAME },
+  });
+
+  if (error || !data.user) {
+    throw new Error(`Could not create the demo user: ${error?.message ?? 'unknown error'}`);
+  }
+
+  log(`created ${DEMO_EMAIL}`);
+
+  return data.user.id;
+};
+
+/** Starter unlocks the palette, theme, lead capture and branding switch the demo shows off. */
+const putOnStarter = async (ownerId: string) => {
+  const periodEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+  const { error } = await service
+    .from('subscriptions')
+    .upsert(
+      {
+        account_id: ownerId,
+        plan_id: 'starter',
+        status: 'active',
+        billing_interval: 'monthly',
+        current_period_end: periodEnd,
+        cancel_at_period_end: false,
+      },
+      { onConflict: 'account_id' },
+    );
+
+  if (error) {
+    throw new Error(`Could not set the plan: ${error.message}`);
+  }
+};
+
+const ensureAssistant = async (ownerId: string) => {
+  if (flag('reset')) {
+    await service.from('assistants').delete().eq('owner_id', ownerId).eq('slug', SLUG);
+    log('deleted the previous demo assistant');
+  }
+
+  const { data: existing } = await service
+    .from('assistants')
+    .select('id, public_key')
+    .eq('owner_id', ownerId)
+    .eq('slug', SLUG)
+    .maybeSingle();
+
+  if (existing) {
+    return existing;
+  }
+
+  const { data, error } = await service
+    .from('assistants')
+    .insert({
+      owner_id: ownerId,
+      name: 'Parbot Docs',
+      slug: SLUG,
+      description: 'Answers questions about Parbot itself, from the product docs.',
+      instructions: 'The product is Parbot. When a reader asks how to do something, give the steps.',
+      welcome_message: 'Ask me anything about Parbot: sources, the widget, plans or privacy.',
+      suggested_questions: [
+        'How do I install the widget?',
+        'What happens when the docs do not cover a question?',
+        'What is the difference between bubble and palette mode?',
+        'How many pages can I index on Starter?',
+      ],
+      mode: 'palette',
+      theme: { scheme: 'auto', accent: '#f59e0b', position: 'right', radius: 'md' },
+      allowed_origins: [],
+      hide_branding: true,
+      lead_capture: true,
+    })
+    .select('id, public_key')
+    .single();
+
+  if (error || !data) {
+    throw new Error(`Could not create the assistant: ${error?.message ?? 'unknown error'}`);
+  }
+
+  log('created the Parbot Docs assistant');
+
+  return data;
+};
+
+const titleOf = (markdown: string, fallback: string) =>
+  markdown.match(/^#\s+(.+)$/m)?.[1]?.trim() ?? fallback;
+
+const indexDocs = async (ownerId: string, assistantId: string) => {
+  const provider = getAiProvider();
+  const files = (await readdir(DOCS_DIR)).filter((name) => name.endsWith('.md')).sort();
+
+  log(`indexing ${files.length} docs on the ${hasLiveAiProvider() ? 'Gemini' : 'stub'} provider`);
+
+  for (const file of files) {
+    const markdown = await readFile(path.join(DOCS_DIR, file), 'utf8');
+    const title = titleOf(markdown, file.replace(/^\d+-/, '').replace(/\.md$/, ''));
+
+    const { data: known } = await service
+      .from('sources')
+      .select('id, storage_path')
+      .eq('assistant_id', assistantId)
+      .eq('title', title)
+      .maybeSingle();
+
+    const storagePath = known?.storage_path ?? `${ownerId}/${assistantId}/${crypto.randomUUID()}.md`;
+    const { error: uploadError } = await service.storage
+      .from('sources')
+      .upload(storagePath, Buffer.from(markdown, 'utf8'), { contentType: 'text/markdown', upsert: true });
+
+    if (uploadError) {
+      throw new Error(`Could not store ${file}: ${uploadError.message}`);
+    }
+
+    let sourceId = known?.id;
+
+    if (!sourceId) {
+      const { data, error } = await service
+        .from('sources')
+        .insert({
+          assistant_id: assistantId,
+          owner_id: ownerId,
+          kind: 'text',
+          title,
+          storage_path: storagePath,
+          mime_type: 'text/markdown',
+          byte_size: Buffer.byteLength(markdown),
+          status: 'queued',
+        })
+        .select('id')
+        .single();
+
+      if (error || !data) {
+        throw new Error(`Could not create the source for ${file}: ${error?.message ?? 'unknown error'}`);
+      }
+
+      sourceId = data.id;
+    }
+
+    await ingestSource({ service, provider, sourceId });
+
+    const { data: source } = await service
+      .from('sources')
+      .select('status, chunk_count, error')
+      .eq('id', sourceId)
+      .single();
+
+    log(`${title}: ${source?.status ?? 'unknown'}${source?.chunk_count ? `, ${source.chunk_count} passages` : ''}${source?.error ? `, ${source.error}` : ''}`);
+  }
+};
+
+type Exchange = {
+  question: string;
+  answer: string | null;
+  doc?: string;
+  feedback?: 1 | -1;
+  channel?: 'app' | 'widget';
+  page?: string;
+};
+
+/** Questions a reader of Parbot's docs would ask, answered or not, for the inbox and overview. */
+const EXCHANGES: Exchange[] = [
+  {
+    question: 'How do I install the widget on my docs site?',
+    answer:
+      'Add one script tag to any page:\n\n```html\n<script src="https://app.parbot.dev/widget.js" data-parbot="pb_your_public_key" async></script>\n```\n\nThe exact snippet with your key is on the Widget page of your assistant [1].',
+    doc: 'Installing the widget',
+    feedback: 1,
+    page: 'https://docs.example.com/getting-started',
+  },
+  {
+    question: 'What is palette mode?',
+    answer:
+      'Palette mode has no launcher in the way. Readers press ⌘K, or Ctrl+K on Windows and Linux, and a command-palette style dialog opens with the question box on top. It is available on Starter and Growth [1].',
+    doc: 'Installing the widget',
+    page: 'https://docs.example.com/widget',
+  },
+  {
+    question: 'Does it work with Docusaurus?',
+    answer:
+      'Yes. For Docusaurus, Mintlify, Astro, Hugo and plain HTML, paste the script tag into the site head or footer template [1].',
+    doc: 'Installing the widget',
+    feedback: 1,
+    page: 'https://docs.example.com/widget',
+  },
+  {
+    question: 'How many pages can I index on the Starter plan?',
+    answer: 'Starter includes 2,000 indexed pages across all of your assistants, with 3,000 answers a month [1].',
+    doc: 'Plans and billing',
+    page: 'https://docs.example.com/pricing',
+  },
+  {
+    question: 'What happens when the docs do not cover a question?',
+    answer:
+      'The assistant says so instead of guessing. With lead capture on, the widget then offers a small form for an email and a note, and the lead appears in your Inbox. The question is also recorded as unanswered [1].',
+    doc: 'Theming and behaviour',
+    feedback: 1,
+    channel: 'app',
+  },
+  {
+    question: 'Can I restrict which sites can load my widget?',
+    answer:
+      'Yes. Add the origins on the Widget page, one per line. Bare hostnames and wildcards like *.example.com are accepted, and requests from anywhere else are refused [1].',
+    doc: 'Installing the widget',
+    page: 'https://docs.example.com/widget',
+  },
+  {
+    question: 'Do you support JavaScript-rendered docs sites?',
+    answer:
+      'Not for crawling: pages that render everything with JavaScript after load are not rendered. Give Parbot a sitemap or export the pages instead [1].',
+    doc: 'Frequently asked questions',
+    feedback: -1,
+    page: 'https://docs.example.com/sources',
+  },
+  {
+    question: 'Is there a Slack integration?',
+    answer: null,
+    page: 'https://docs.example.com/integrations',
+  },
+  {
+    question: 'Can I export conversations to CSV automatically every week?',
+    answer: null,
+    page: 'https://docs.example.com/inbox',
+  },
+  {
+    question: 'How do I delete my account?',
+    answer: 'Write to privacy@parbot.dev and the account is deleted along with everything it owns [1].',
+    doc: 'Privacy and security',
+    channel: 'app',
+  },
+  {
+    question: 'Does Parbot train models on my documentation?',
+    answer:
+      'No. Only the handful of passages closest to a question are sent to the model, together with the question and the recent turns of that conversation. Parbot does not train models on your content [1].',
+    doc: 'Privacy and security',
+    feedback: 1,
+    page: 'https://docs.example.com/privacy',
+  },
+  {
+    question: 'Is there an API?',
+    answer: null,
+    page: 'https://docs.example.com/api',
+  },
+];
+
+const UNANSWERED_TEXT =
+  "I couldn't find that in the documentation, so I'd rather not guess. Try rephrasing, or ask about something the docs cover.";
+
+const seedHistory = async (ownerId: string, assistantId: string) => {
+  const { count } = await service
+    .from('conversations')
+    .select('id', { count: 'exact', head: true })
+    .eq('assistant_id', assistantId);
+
+  if ((count ?? 0) > 0 && !flag('reset')) {
+    log('history already present, leaving it alone');
+
+    return;
+  }
+
+  const { data: documents } = await service
+    .from('documents')
+    .select('id, title, content')
+    .eq('assistant_id', assistantId);
+  const byTitle = new Map((documents ?? []).map((document) => [document.title, document]));
+
+  const now = Date.now();
+  let leadConversation: string | null = null;
+
+  for (const [index, exchange] of EXCHANGES.entries()) {
+    const daysAgo = 13 - Math.floor((index / EXCHANGES.length) * 13);
+    const askedAt = new Date(now - daysAgo * 24 * 60 * 60 * 1000 - (index * 37 % 11) * 60 * 60 * 1000);
+    const answeredAt = new Date(askedAt.getTime() + 2_200);
+    const channel = exchange.channel ?? 'widget';
+    const conversationId = crypto.randomUUID();
+
+    await service.from('conversations').insert({
+      id: conversationId,
+      assistant_id: assistantId,
+      owner_id: ownerId,
+      channel,
+      visitor_id: channel === 'widget' ? `demo_${index.toString().padStart(2, '0')}_visitor` : null,
+      page_url: channel === 'widget' ? (exchange.page ?? null) : null,
+      title: exchange.question.slice(0, 60),
+      created_at: askedAt.toISOString(),
+    });
+
+    await service.from('messages').insert({
+      conversation_id: conversationId,
+      assistant_id: assistantId,
+      owner_id: ownerId,
+      role: 'user',
+      content: exchange.question,
+      created_at: askedAt.toISOString(),
+    });
+
+    const document = exchange.doc ? byTitle.get(exchange.doc) : undefined;
+    const answered = exchange.answer !== null;
+
+    await service.from('messages').insert({
+      conversation_id: conversationId,
+      assistant_id: assistantId,
+      owner_id: ownerId,
+      role: 'assistant',
+      content: answered ? exchange.answer! : UNANSWERED_TEXT,
+      answered,
+      citations:
+        answered && document
+          ? [
+              {
+                index: 1,
+                documentId: document.id,
+                title: document.title,
+                url: null,
+                snippet: document.content.replace(/\s+/g, ' ').slice(0, 200),
+              },
+            ]
+          : [],
+      feedback: exchange.feedback ?? null,
+      model: hasLiveAiProvider() ? 'gemini-3.8-flash' : 'stub-1',
+      latency_ms: 900 + ((index * 131) % 1400),
+      prompt_tokens: 600 + ((index * 53) % 400),
+      completion_tokens: answered ? 80 + ((index * 17) % 90) : 30,
+      created_at: answeredAt.toISOString(),
+    });
+
+    if (!answered && !leadConversation) {
+      leadConversation = conversationId;
+    }
+  }
+
+  if (leadConversation) {
+    await service.from('leads').insert({
+      assistant_id: assistantId,
+      owner_id: ownerId,
+      conversation_id: leadConversation,
+      email: 'maya@northwind.dev',
+      note: 'We would switch from our current tool if there were a Slack integration.',
+      page_url: 'https://docs.example.com/integrations',
+      status: 'new',
+    });
+  }
+
+  log(`seeded ${EXCHANGES.length} conversations and 1 lead`);
+};
+
+const writeEnv = async (publicKey: string) => {
+  const line = `NEXT_PUBLIC_DEMO_ASSISTANT_KEY=${publicKey}`;
+
+  try {
+    const current = await readFile(ENV_FILE, 'utf8');
+    const next = /^NEXT_PUBLIC_DEMO_ASSISTANT_KEY=.*$/m.test(current)
+      ? current.replace(/^NEXT_PUBLIC_DEMO_ASSISTANT_KEY=.*$/m, line)
+      : `${current.trimEnd()}\n${line}\n`;
+
+    await writeFile(ENV_FILE, next);
+    log(`wrote ${line} to .env (restart the dev server to pick it up)`);
+  } catch (cause) {
+    log(`could not write .env: ${cause instanceof Error ? cause.message : 'unknown error'}`);
+  }
+};
+
+const main = async () => {
+  console.info('Seeding the Parbot demo');
+  const ownerId = await ensureDemoUser();
+  await putOnStarter(ownerId);
+  const assistant = await ensureAssistant(ownerId);
+  await indexDocs(ownerId, assistant.id);
+
+  if (flag('history')) {
+    await seedHistory(ownerId, assistant.id);
+  }
+
+  console.info(`\nDemo assistant public key: ${assistant.public_key}`);
+  console.info(`Sign in as ${DEMO_EMAIL} / ${DEMO_PASSWORD}`);
+
+  if (flag('write-env')) {
+    await writeEnv(assistant.public_key);
+  } else {
+    console.info(`Set NEXT_PUBLIC_DEMO_ASSISTANT_KEY=${assistant.public_key} to power the landing demo.`);
+  }
+};
+
+main().catch((cause) => {
+  console.error(cause instanceof Error ? cause.message : cause);
+  process.exit(1);
+});

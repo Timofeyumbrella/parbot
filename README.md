@@ -67,6 +67,44 @@ user's message to the thread before the request leaves the browser and streams t
 placeholder beneath it; switching conversations reads from a client cache, so nothing waits on the
 server except the answer itself.
 
+## Demo data
+
+```bash
+pnpm --filter web seed:demo --history --write-env
+```
+
+Creates the demo account on the Starter plan, an assistant called Parbot Docs trained on
+`apps/web/content/docs`, two weeks of realistic conversations with one lead, and writes the
+assistant's public key into `.env` so the landing page runs the live demo and ⌘K. Re-running
+re-indexes the docs and leaves the history alone; `--reset` starts over.
+
+## Tests
+
+| Command                                   | What it covers                                                  |
+| ----------------------------------------- | --------------------------------------------------------------- |
+| `pnpm test`                               | Unit tests, plus integration tests when the local stack is up   |
+| `GEMINI_LIVE=1 pnpm --filter web exec vitest run src/lib/ai/gemini.live` | One embedding and one streamed answer against the real Gemini API |
+| `pnpm --filter web test:e2e`              | Playwright: sign up and onboarding, landing, billing in test mode |
+
+## Deploying
+
+The app is one Next.js project; the widget is built into it before `next build`.
+
+1. **Supabase.** Create a project, then from the repo root `pnpm exec supabase link --project-ref <ref>`
+   and `pnpm exec supabase db push`. In Authentication settings set the site URL to your app URL and
+   add it to the redirect URLs. Copy the project URL, anon key and service role key.
+2. **Gemini.** Create a key at https://aistudio.google.com/apikey. The free tier needs no card.
+3. **Vercel.** Import the repo with the root directory set to `apps/web`. Vercel detects pnpm and
+   installs the workspace. Set the environment variables from `.env.example`: the Supabase values,
+   `GEMINI_API_KEY`, `NEXT_PUBLIC_APP_URL` set to the deployment URL, and `BILLING_PROVIDER=mock`
+   until Stripe is configured. Pick the region closest to the Supabase project.
+4. **Stripe, optional.** With a test secret key in `.env`, run `pnpm --filter web stripe:seed` once;
+   it creates the two products and four prices and prints the `STRIPE_PRICE_*` lines. Add a webhook
+   endpoint for `<app url>/api/stripe/webhook` with the subscription events, set
+   `STRIPE_WEBHOOK_SECRET`, then `BILLING_PROVIDER=stripe`. Test cards: `4242 4242 4242 4242`.
+5. **Demo content.** Run the seed against the hosted project by pointing `.env` at it, then set
+   `NEXT_PUBLIC_DEMO_ASSISTANT_KEY` on Vercel and redeploy.
+
 ## Layout
 
 See `CLAUDE.md` for the file map, conventions and the reasoning behind them.
