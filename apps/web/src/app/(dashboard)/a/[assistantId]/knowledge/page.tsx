@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
 import { KnowledgeScreen } from '@/components/knowledge/knowledge-screen';
@@ -6,6 +7,8 @@ import { getAccountPlan, getAccountUsage } from '@/lib/account';
 import { hasLiveAiProvider } from '@/lib/ai';
 import { getAssistant } from '@/lib/assistants';
 import { requireUser } from '@/lib/session';
+
+export const metadata: Metadata = { title: 'Knowledge' };
 
 export default async function KnowledgePage({ params }: PageProps<'/a/[assistantId]/knowledge'>) {
   const { assistantId } = await params;

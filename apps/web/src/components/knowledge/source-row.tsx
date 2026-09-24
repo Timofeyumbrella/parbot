@@ -60,7 +60,8 @@ export const SourceRow = ({ source, onReindex, onDelete }: SourceRowProps) => {
         </p>
         <p className="text-muted-foreground text-xs tabular-nums">
           {plural(source.document_count, 'page')} · {plural(source.chunk_count, 'passage')} ·{' '}
-          {indexed ? `indexed ${indexed}` : 'not indexed yet'}
+          {/* The relative time is computed on both sides of hydration and may cross a minute. */}
+          <span suppressHydrationWarning>{indexed ? `indexed ${indexed}` : 'not indexed yet'}</span>
         </p>
         {source.status === 'failed' && source.error ? (
           <div className="flex flex-col items-start gap-1">
