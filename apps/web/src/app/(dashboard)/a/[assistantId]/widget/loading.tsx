@@ -9,7 +9,7 @@ export default function WidgetLoading() {
         <Skeleton className="h-6 w-24" />
         <Skeleton className="h-4 w-80" />
       </div>
-      <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:items-start">
         <div className="flex flex-col gap-4">
           <Skeleton className="h-36 rounded-xl" />
           <Skeleton className="h-64 rounded-xl" />

@@ -37,8 +37,6 @@ type Message = StoredMessage & {
   leadEmail?: string;
 };
 
-const errorCopy = (code: ChatErrorCode | 'network') => (code === 'network' ? NETWORK_ERROR : ERROR_COPY[code]);
-
 const ICONS = {
   chat: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-8 8H7l-4 3V12a8 8 0 0 1 8-8h2a8 8 0 0 1 8 8z"/></svg>',
   close: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>',
@@ -64,6 +62,19 @@ const ERROR_COPY: Record<ChatErrorCode, string> = {
 };
 
 const NETWORK_ERROR = 'Could not reach the assistant. Check your connection and retry.';
+
+const errorCopy = (code: ChatErrorCode | 'network') => (code === 'network' ? NETWORK_ERROR : ERROR_COPY[code]);
+
+const LEAD_FAILED = 'The message could not be sent. Try again.';
+
+/** Lead form failures that deserve their own sentence; every other code reads as LEAD_FAILED. */
+const LEAD_ERROR_COPY: Partial<Record<ChatErrorCode, string>> = {
+  rate_limited: 'Too many attempts in a short time. Wait a moment and retry.',
+  unauthorized: 'This assistant does not take email addresses.',
+  bad_request: 'Check the email address and retry.',
+};
+
+const isErrorCode = (value: unknown): value is ChatErrorCode => typeof value === 'string' && value in ERROR_COPY;
 
 const FOCUSABLE =
   'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -430,8 +441,9 @@ export class ParbotWidget {
       return;
     }
 
+    // The closed menu and a hidden footer are the only parts of the panel that are not shown.
     const focusable = [...this.panel.querySelectorAll<HTMLElement>(FOCUSABLE)].filter(
-      (node) => node.offsetParent !== null || node === this.input,
+      (node) => !node.closest('.pb-menu:not(.pb-open), .pb-hidden'),
     );
     const first = focusable[0];
     const last = focusable[focusable.length - 1];
@@ -560,7 +572,7 @@ export class ParbotWidget {
       });
 
       if (!response.headers.get('content-type')?.includes('text/event-stream')) {
-        answer.error = await this.readJsonError(response);
+        answer.error = { code: await this.readErrorCode(response) };
       } else {
         for await (const event of readChatStream(response)) {
           if (event.type === 'token') {
@@ -576,20 +588,19 @@ export class ParbotWidget {
               answer.lead = 'form';
             }
           } else if (event.type === 'error') {
-            answer.error = { code: event.code, message: event.message };
+            answer.error = { code: isErrorCode(event.code) ? event.code : 'internal' };
           }
         }
 
         if (!answer.error && answer.answered === undefined && !answer.text) {
-          answer.error = { code: 'internal', message: 'The answer did not arrive.' };
+          answer.error = { code: 'internal' };
         }
       }
-    } catch (cause) {
+    } catch {
+      // A blocked request, a dropped connection or a stream cut short. The browser's own text
+      // ("Failed to fetch") is not copy, so all of them read as one sentence.
       if (!controller.signal.aborted) {
-        answer.error = {
-          code: 'internal',
-          message: cause instanceof Error && cause.message ? cause.message : 'The answer could not be loaded.',
-        };
+        answer.error = { code: 'network' };
       }
     } finally {
       if (this.controller === controller) {
@@ -608,21 +619,19 @@ export class ParbotWidget {
     this.persist();
   }
 
-  private async readJsonError(response: Response): Promise<{ code: ChatErrorCode; message: string }> {
+  /** The code of a refused request. A body that cannot be read counts as internal, or rate limited by status. */
+  private async readErrorCode(response: Response): Promise<ChatErrorCode> {
     try {
-      const data = (await response.json()) as { error?: { code?: ChatErrorCode; message?: string } };
+      const data = (await response.json()) as { error?: { code?: unknown } };
 
-      if (data.error?.code) {
-        return { code: data.error.code, message: data.error.message ?? '' };
+      if (isErrorCode(data.error?.code)) {
+        return data.error.code;
       }
     } catch {
-      // Not JSON; fall through to a status-based message.
+      // Not JSON; fall through to the status.
     }
 
-    return {
-      code: response.status === 429 ? 'rate_limited' : 'internal',
-      message: `The assistant returned an error (${response.status}).`,
-    };
+    return response.status === 429 ? 'rate_limited' : 'internal';
   }
 
   private retry(answerId: string) {
@@ -676,8 +685,7 @@ export class ParbotWidget {
       });
 
       if (!response.ok) {
-        const error = await this.readJsonError(response);
-        status.textContent = error.message || 'The message could not be sent. Try again.';
+        status.textContent = LEAD_ERROR_COPY[await this.readErrorCode(response)] ?? LEAD_FAILED;
         button.disabled = false;
 
         return;
@@ -687,7 +695,7 @@ export class ParbotWidget {
       answer.leadEmail = email;
       this.renderItem(answer);
     } catch {
-      status.textContent = 'The message could not be sent. Check your connection and try again.';
+      status.textContent = 'The message could not be sent. Check your connection and retry.';
       button.disabled = false;
     }
   }
@@ -805,7 +813,7 @@ export class ParbotWidget {
       const line = el('div', 'pb-error');
       line.setAttribute('role', 'alert');
       const text = el('span');
-      text.textContent = ERROR_COPY[message.error.code] ?? message.error.message ?? 'The answer could not be loaded.';
+      text.textContent = errorCopy(message.error.code);
       const retry = el('button', undefined, 'Retry');
       retry.type = 'button';
       retry.addEventListener('click', () => this.retry(message.id));
@@ -829,9 +837,11 @@ export class ParbotWidget {
       const entry = el('li');
       entry.value = citation.index;
 
-      if (citation.url) {
+      const href = citation.url ? safeUrl(citation.url) : null;
+
+      if (href) {
         const link = el('a');
-        link.href = citation.url;
+        link.href = href;
         link.target = '_blank';
         link.rel = 'noopener noreferrer';
         link.textContent = citation.title;

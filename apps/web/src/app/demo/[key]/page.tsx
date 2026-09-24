@@ -7,9 +7,13 @@ import { cache } from 'react';
 import { createSupabaseServiceClient } from '@/lib/supabase/service';
 import { findAssistantByKey, loadOwnerPlan, widgetConfigFor } from '@/lib/widget-api';
 
-import { resolveDemoMode } from './demo-mode';
+import { resolveDemoMode, resolveDemoPreview } from './demo-mode';
 
 export const dynamic = 'force-dynamic';
+
+// No loading.tsx here on purpose: a loading boundary streams a 200 shell before the key is
+// looked up, so an unknown key could never answer with a real 404 status. The lookup is one
+// indexed read and the page is small, so nothing is gained by streaming it.
 
 /** Looked up once per request, however many of the metadata and page functions ask. */
 const load = cache(async (key: string) => {
@@ -75,6 +79,7 @@ export default async function DemoPage({ params, searchParams }: PageProps<'/dem
 
   const { name, config } = found;
   const { allowed, override, active } = resolveDemoMode(query.mode, config);
+  const preview = resolveDemoPreview(query);
 
   return (
     <div className="bg-background text-foreground flex min-h-svh flex-col">
@@ -142,7 +147,14 @@ export default async function DemoPage({ params, searchParams }: PageProps<'/dem
         </main>
       </div>
 
-      <Script src="/widget.js" strategy="afterInteractive" data-parbot={key} data-mode={override ?? undefined} />
+      <Script
+        src="/widget.js"
+        strategy="afterInteractive"
+        data-parbot={key}
+        data-mode={override ?? undefined}
+        data-version={preview.version ?? undefined}
+        data-open={preview.open ? 'true' : undefined}
+      />
     </div>
   );
 }

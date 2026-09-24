@@ -1,7 +1,7 @@
 /**
  * A small Markdown renderer for answers. It understands the handful of constructs the answer
- * engine is told to produce (paragraphs, bold, inline code, fenced code, links, lists and [n]
- * citation markers) and escapes everything else, so model output can never inject markup.
+ * engine is told to produce (paragraphs, bold, italic, inline code, fenced code, links, lists
+ * and [n] citation markers) and escapes everything else, so model output can never inject markup.
  */
 
 const ESCAPES: Record<string, string> = {
@@ -23,20 +23,23 @@ export const safeUrl = (url: string) => {
   return SAFE_URL.test(trimmed) ? trimmed : null;
 };
 
-const CODE_TOKEN = '\u0000';
+const TOKEN = '\u0000';
 
-/** Inline formatting on one already-escaped chunk of text. */
+/** Bold before italic, so the inner asterisks of **bold** are never read as emphasis. */
+const emphasis = (text: string) =>
+  text
+    .replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/(^|[^*\w])\*(\S(?:[^*\n]*?\S)?)\*(?![*\w])/g, '$1<em>$2</em>');
+
+/**
+ * Inline formatting on one line of already-escaped text. Code spans and links are lifted out
+ * first, so a `*` inside code or a `[1]` inside a URL is never rewritten.
+ */
 export const renderInline = (raw: string) => {
-  const codes: string[] = [];
+  const lifted: string[] = [];
+  const lift = (html: string) => `${TOKEN}${lifted.push(html) - 1}${TOKEN}`;
 
-  // Inline code first so its contents are never treated as formatting.
-  let text = escapeHtml(raw).replace(/`([^`\n]+)`/g, (_, code: string) => {
-    codes.push(`<code>${code}</code>`);
-
-    return `${CODE_TOKEN}${codes.length - 1}${CODE_TOKEN}`;
-  });
-
-  text = text.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
+  let text = escapeHtml(raw).replace(/`([^`\n]+)`/g, (_, code: string) => lift(`<code>${code}</code>`));
 
   text = text.replace(/\[([^\]\n]+)\]\(([^)\s]+)\)/g, (match, label: string, url: string) => {
     // The label was escaped along with the rest, so quotes in the URL were too. Undo that
@@ -44,19 +47,26 @@ export const renderInline = (raw: string) => {
     const href = safeUrl(url.replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, "'"));
 
     return href
-      ? `<a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">${label}</a>`
+      ? lift(`<a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">${emphasis(label)}</a>`)
       : match;
   });
 
-  // Citation markers such as [1] or [1, 3], but not the [text](url) form handled above.
+  text = emphasis(text);
+
+  // Citation markers such as [1] or [1, 3], but not the [text](url) form of a link that was
+  // refused above. Several numbers in one bracket keep their comma, so "1, 3" never reads as 13.
   text = text.replace(/\[(\d{1,2}(?:\s*,\s*\d{1,2})*)\](?!\()/g, (_, list: string) =>
     list
       .split(',')
       .map((part) => `<sup class="pb-cite" data-cite="${part.trim()}">${part.trim()}</sup>`)
-      .join(''),
+      .join('<sup class="pb-cite-sep">,</sup>'),
   );
 
-  return text.replace(new RegExp(`${CODE_TOKEN}(\\d+)${CODE_TOKEN}`, 'g'), (_, index: string) => codes[Number(index)] ?? '');
+  // A lifted link may hold a lifted code span, so restoring is recursive.
+  const restore = (html: string): string =>
+    html.replace(new RegExp(`${TOKEN}(\\d+)${TOKEN}`, 'g'), (_, index: string) => restore(lifted[Number(index)] ?? ''));
+
+  return restore(text);
 };
 
 type Block =

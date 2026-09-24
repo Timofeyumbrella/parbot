@@ -35,9 +35,28 @@ describe('renderInline', () => {
     expect(renderInline('`**not bold** [1]`')).toBe('<code>**not bold** [1]</code>');
   });
 
-  it('turns citation markers into superscripts', () => {
+  it('turns citation markers into superscripts, keeping the comma between two', () => {
     expect(renderInline('Keys live in Settings [1]. Rotate them [1, 2].')).toBe(
-      'Keys live in Settings <sup class="pb-cite" data-cite="1">1</sup>. Rotate them <sup class="pb-cite" data-cite="1">1</sup><sup class="pb-cite" data-cite="2">2</sup>.',
+      'Keys live in Settings <sup class="pb-cite" data-cite="1">1</sup>. Rotate them <sup class="pb-cite" data-cite="1">1</sup><sup class="pb-cite-sep">,</sup><sup class="pb-cite" data-cite="2">2</sup>.',
+    );
+  });
+
+  it('renders italic without touching arithmetic or bold', () => {
+    expect(renderInline('Click *New* then **Save**')).toBe('Click <em>New</em> then <strong>Save</strong>');
+    expect(renderInline('2 * 3 * 4 = 24')).toBe('2 * 3 * 4 = 24');
+    expect(renderInline('*a*')).toBe('<em>a</em>');
+    expect(renderInline('snake_case_name stays')).toBe('snake_case_name stays');
+  });
+
+  it('leaves a citation-like bracket inside a link url alone', () => {
+    expect(renderInline('See [the guide](https://x.dev/a[1]) [1]')).toBe(
+      'See <a href="https://x.dev/a[1]" target="_blank" rel="noopener noreferrer">the guide</a> <sup class="pb-cite" data-cite="1">1</sup>',
+    );
+  });
+
+  it('formats the label of a link, code included', () => {
+    expect(renderInline('[`npm i` *now*](https://x.io)')).toBe(
+      '<a href="https://x.io" target="_blank" rel="noopener noreferrer"><code>npm i</code> <em>now</em></a>',
     );
   });
 
@@ -90,7 +109,7 @@ describe('renderMarkdown', () => {
 
     expect(html).toBe(
       '<p>Create keys in <strong>Settings</strong> <sup class="pb-cite" data-cite="1">1</sup>.</p>' +
-        '<ul><li>Open Settings</li><li>Click *New*</li></ul>' +
+        '<ul><li>Open Settings</li><li>Click <em>New</em></li></ul>' +
         '<pre><code class="language-sh">curl -X POST &lt;url&gt;</code></pre>',
     );
   });

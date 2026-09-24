@@ -55,6 +55,22 @@ describe('GET /api/widget/config', () => {
     });
   });
 
+  it('never caches a request that carries the preview version', async () => {
+    const response = await get(`?key=${PUBLIC_KEY}&v=3`);
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+  });
+
+  it('repeats the error message at the top level, so a client reading { message } gets it too', async () => {
+    const response = await get('?key=pb_ffffffffffffffffffffffffffffffff');
+
+    await expect(response.json()).resolves.toEqual({
+      error: { code: 'not_found', message: 'No assistant has that key.' },
+      message: 'No assistant has that key.',
+    });
+  });
+
   it('keeps the paid settings on Starter and echoes the origin', async () => {
     holder.service = createFakeService({
       assistants: [assistantRow()],

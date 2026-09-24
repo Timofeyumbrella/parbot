@@ -43,7 +43,7 @@ export const InstallCard = ({ snippet }: { snippet: string }) => {
         </CardAction>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
-        <pre className="bg-muted overflow-x-auto rounded-lg p-3 font-mono text-xs leading-relaxed" tabIndex={0}>
+        <pre className="bg-muted rounded-lg p-3 font-mono text-xs leading-relaxed break-all whitespace-pre-wrap" tabIndex={0}>
           <code>{snippet}</code>
         </pre>
         <div className="flex flex-col gap-1.5">
@@ -54,7 +54,7 @@ export const InstallCard = ({ snippet }: { snippet: string }) => {
               tool. In Next.js, use next/script with the same attributes.
             </li>
             <li>To limit which sites can use the key, list them under Allowed origins. An empty list allows any site.</li>
-            <li>Deploy. Installed widgets pick up new settings on their next page load.</li>
+            <li>Deploy. Installed widgets pick up a saved change within a minute, on their next page load.</li>
           </ol>
         </div>
       </CardContent>

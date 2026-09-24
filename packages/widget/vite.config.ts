@@ -16,13 +16,6 @@ export default defineConfig({
     emptyOutDir: false,
     sourcemap: true,
     target: 'es2020',
-    rollupOptions: {
-      output: {
-        // The bundle lands in the app's public folder, which the app's linter walks; generated
-        // code is not its business.
-        banner: '/* eslint-disable */',
-      },
-    },
   },
   test: {
     environment: 'jsdom',

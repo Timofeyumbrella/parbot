@@ -150,7 +150,10 @@ button:focus-visible, textarea:focus-visible, input:focus-visible, a:focus-visib
   to { opacity: 1; transform: translateX(-50%); }
 }
 @media (max-width: 639px) {
-  .pb-root[data-mode="bubble"] .pb-panel {
+  /* Written with the position attribute so these beat the left/right rules above. */
+  .pb-root[data-mode="bubble"] .pb-panel,
+  .pb-root[data-mode="bubble"][data-position="right"] .pb-panel,
+  .pb-root[data-mode="bubble"][data-position="left"] .pb-panel {
     inset: 0;
     width: auto;
     height: auto;
@@ -278,6 +281,12 @@ button:focus-visible, textarea:focus-visible, input:focus-visible, a:focus-visib
   margin-left: 1px;
   color: var(--pb-accent-text);
   font-weight: 600;
+}
+.pb-body sup.pb-cite-sep {
+  font-size: 10px;
+  line-height: 0;
+  vertical-align: super;
+  color: var(--pb-muted-fg);
 }
 .pb-caret .pb-body > :last-child::after,
 .pb-caret .pb-body:empty::after {

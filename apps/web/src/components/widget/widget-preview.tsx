@@ -14,7 +14,10 @@ type WidgetPreviewProps = {
   demoPath: string;
   demoUrl: string;
   mode: WidgetMode;
-  /** Bumped after every successful save so the frame reloads with the new settings. */
+  /**
+   * Bumped after every successful save. The frame reloads with it, and the demo page passes it
+   * to the widget, whose config request then skips every cache, so the save shows at once.
+   */
   version: number;
   hasSources: boolean;
   knowledgeHref: string;
@@ -40,7 +43,7 @@ export const WidgetPreview = ({ demoPath, demoUrl, mode, version, hasSources, kn
   <Card size="sm">
     <CardHeader>
       <CardTitle>Live preview</CardTitle>
-      <CardDescription>The public demo page with your saved settings. It reloads after every save.</CardDescription>
+      <CardDescription>The public demo page with your saved settings, opened. It reloads after every save.</CardDescription>
       <CardAction>
         <Button asChild variant="outline" size="sm">
           <a href={demoUrl} target="_blank" rel="noopener noreferrer">
@@ -54,13 +57,13 @@ export const WidgetPreview = ({ demoPath, demoUrl, mode, version, hasSources, kn
       {hasSources ? null : (
         <p className="bg-muted text-muted-foreground rounded-lg p-3 text-sm">
           No sources are indexed yet, so the assistant will say it cannot find an answer.{' '}
-          <Link href={knowledgeHref} prefetch className="text-foreground underline underline-offset-4">
+          <Link href={knowledgeHref} className="text-foreground underline underline-offset-4">
             Add sources under Knowledge
           </Link>
           .
         </p>
       )}
-      <PreviewFrame key={version} src={`${demoPath}?mode=${mode}&v=${version}`} />
+      <PreviewFrame key={version} src={`${demoPath}?mode=${mode}&v=${version}&open=1`} />
     </CardContent>
   </Card>
 );

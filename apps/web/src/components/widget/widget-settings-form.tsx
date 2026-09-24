@@ -75,7 +75,7 @@ export const WidgetSettingsForm = ({ assistantId, settings, gates, onSaved }: Wi
   }, [state, onSaved]);
 
   return (
-    <form action={formAction} className="flex flex-col gap-4" aria-busy={pending}>
+    <form action={formAction} className="flex min-w-0 flex-col gap-4" aria-busy={pending}>
       <input type="hidden" name="assistantId" value={assistantId} />
 
       <Card size="sm">

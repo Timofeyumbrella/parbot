@@ -324,6 +324,129 @@ describe('widget', () => {
     expect(shadow.querySelectorAll('.pb-chip')).toHaveLength(2);
   });
 
+  it('keeps Tab inside the palette and walks the menu with the arrow keys', async () => {
+    installFetch({ mode: 'palette' });
+    const widget = await boot(mountScript());
+    const shadow = shadowOf(widget!);
+    const menuButton = shadow.querySelector<HTMLButtonElement>('[aria-haspopup="menu"]')!;
+    const footerLink = shadow.querySelector<HTMLAnchorElement>('.pb-footer a')!;
+
+    widget!.open();
+
+    footerLink.focus();
+    press(footerLink, 'Tab');
+    expect(shadow.activeElement).toBe(menuButton);
+
+    press(menuButton, 'Tab', { shiftKey: true });
+    expect(shadow.activeElement).toBe(footerLink);
+
+    menuButton.click();
+    const items = [...shadow.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')];
+    expect(items.map((item) => item.textContent)).toEqual(['New conversation', 'Close']);
+    expect(shadow.activeElement).toBe(items[0]);
+
+    press(items[0]!, 'ArrowDown');
+    expect(shadow.activeElement).toBe(items[1]);
+    press(items[1]!, 'ArrowDown');
+    expect(shadow.activeElement).toBe(items[0]);
+    press(items[0]!, 'End');
+    expect(shadow.activeElement).toBe(items[1]);
+    press(items[1]!, 'ArrowUp');
+    expect(shadow.activeElement).toBe(items[0]);
+
+    // Escape closes the menu first and only then the panel.
+    press(items[0]!, 'Escape');
+    expect(shadow.querySelector('.pb-menu')?.classList.contains('pb-open')).toBe(false);
+    expect(shadow.activeElement).toBe(menuButton);
+    expect(widget!.opened).toBe(true);
+
+    press(menuButton, 'Escape');
+    expect(widget!.opened).toBe(false);
+  });
+
+  it('never shows server or browser text for a failure, only its own sentence', async () => {
+    let attempt = 0;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<typeof fetch>(async (input) => {
+        if (String(input).startsWith(`${API}/api/widget/config`)) {
+          return Response.json(config);
+        }
+
+        attempt += 1;
+
+        if (attempt === 1) {
+          return sse([{ type: 'error', code: 'quota_exceeded', message: 'This account has used its 200 answers for the month.' }]);
+        }
+
+        throw new TypeError('Failed to fetch');
+      }),
+    );
+
+    const widget = await boot(mountScript());
+    const shadow = shadowOf(widget!);
+
+    widget!.ask('hello');
+    await vi.waitFor(() => {
+      expect(shadow.querySelector('.pb-error')?.textContent).toContain('reached its monthly limit');
+    });
+    expect(shadow.querySelector('.pb-error')?.textContent).not.toContain('200 answers');
+
+    shadow.querySelector<HTMLButtonElement>('.pb-error button')!.click();
+    await vi.waitFor(() => {
+      expect(shadow.querySelector('.pb-error')?.textContent).toContain('Could not reach the assistant');
+    });
+    expect(shadow.querySelector('.pb-error')?.textContent).not.toContain('Failed to fetch');
+  });
+
+  it('shows a source with an unsafe url as plain text', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<typeof fetch>(async (input, init) => {
+        if (String(input).startsWith(`${API}/api/widget/config`)) {
+          return Response.json(config);
+        }
+
+        const body = JSON.parse(String(init?.body)) as { conversationId: string };
+
+        return sse([
+          { type: 'meta', conversationId: body.conversationId, userMessageId: 'u1', assistantMessageId: 'a1' },
+          { type: 'token', text: 'See the guide [1] and the page [2].' },
+          {
+            type: 'citations',
+            citations: [
+              { index: 1, documentId: 'd1', title: 'Guide', url: 'javascript:alert(1)', snippet: '' },
+              { index: 2, documentId: 'd2', title: 'Page', url: 'https://docs.example.com/page', snippet: '' },
+            ],
+          },
+          { type: 'done', answered: true, latencyMs: 1 },
+        ]);
+      }),
+    );
+
+    const widget = await boot(mountScript());
+    const shadow = shadowOf(widget!);
+    widget!.ask('hello');
+
+    await vi.waitFor(() => {
+      expect(shadow.querySelectorAll('.pb-sources li')).toHaveLength(2);
+    });
+
+    const [first, second] = shadow.querySelectorAll('.pb-sources li');
+    expect(first?.querySelector('a')).toBeNull();
+    expect(first?.textContent).toBe('Guide');
+    expect(second?.querySelector('a')?.href).toBe('https://docs.example.com/page');
+  });
+
+  it('opens at once without taking focus, and sends the preview version with the config request', async () => {
+    const fetchMock = installFetch();
+    const widget = await boot(mountScript({ 'data-version': '4', 'data-open': 'true' }));
+
+    expect(fetchMock).toHaveBeenCalledWith(`${API}/api/widget/config?key=${KEY}&v=4`, expect.objectContaining({ cache: 'no-store' }));
+    expect(widget!.opened).toBe(true);
+    expect(shadowOf(widget!).activeElement).toBeNull();
+  });
+
   it('does nothing without a key and warns when the config cannot load', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.stubGlobal('fetch', vi.fn(async () => new Response('nope', { status: 404 })));

@@ -27,14 +27,14 @@ export const WidgetScreen = ({ assistantId, publicKey, settings, gates, snippet,
   });
 
   return (
-    <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:items-start">
       <WidgetSettingsForm
         assistantId={assistantId}
         settings={settings}
         gates={gates}
         onSaved={(saved) => setPreview((current) => ({ mode: saved.mode, version: current.version + 1 }))}
       />
-      <div className="flex flex-col gap-4">
+      <div className="flex min-w-0 flex-col gap-4">
         <InstallCard snippet={snippet} />
         <WidgetPreview
           demoPath={`/demo/${publicKey}`}

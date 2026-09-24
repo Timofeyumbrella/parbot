@@ -7,12 +7,14 @@ import { PLANS } from '@/lib/plans';
 import {
   appOrigin,
   clientIp,
+  configCacheControl,
   corsHeaders,
   firstIssue,
   gateWidgetSettings,
   installSnippet,
   isOriginAllowed,
   isValidOriginEntry,
+  jsonError,
   originAllowed,
   parseWidgetSettings,
   requestOrigin,
@@ -127,6 +129,26 @@ describe('corsHeaders and clientIp', () => {
     expect(clientIp(forwarded)).toBe('203.0.113.9');
     expect(clientIp(real)).toBe('198.51.100.2');
     expect(clientIp(new Request('http://x'))).toBe('unknown');
+  });
+});
+
+describe('jsonError and configCacheControl', () => {
+  it('writes the message in both shapes with CORS headers', async () => {
+    const response = jsonError(429, 'rate_limited', 'Slow down.', { 'retry-after': '5' });
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get('retry-after')).toBe('5');
+    expect(response.headers.get('access-control-allow-origin')).toBe('*');
+    await expect(response.json()).resolves.toEqual({
+      error: { code: 'rate_limited', message: 'Slow down.' },
+      message: 'Slow down.',
+    });
+  });
+
+  it('caches a plain config request briefly and a versioned one not at all', () => {
+    expect(configCacheControl(new Request('http://x/api/widget/config?key=pb_1'))).toBe('public, max-age=60');
+    expect(configCacheControl(new Request('http://x/api/widget/config?key=pb_1&v=2'))).toBe('no-store');
+    expect(configCacheControl(new Request('http://x/api/widget/config?key=pb_1&v='))).toBe('no-store');
   });
 });
 

@@ -1,7 +1,7 @@
 import { DEFAULT_WIDGET_THEME } from '@parbot/shared';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { accentText, findScript, normalizeConfig, onAccent, readScriptOptions } from './config';
+import { accentText, fetchConfig, findScript, normalizeConfig, onAccent, readScriptOptions } from './config';
 
 const script = (attributes: Record<string, string>) => {
   const node = document.createElement('script');
@@ -26,18 +26,57 @@ describe('readScriptOptions', () => {
       api: 'https://app.parbot.dev',
       mode: null,
       launcher: true,
+      version: null,
+      open: false,
     });
   });
 
   it('falls back to the page origin without a src and honours overrides', () => {
     expect(
       readScriptOptions(script({ 'data-parbot': 'pb_1', 'data-mode': 'Palette', 'data-launcher': 'false', 'data-api': 'http://localhost:3104/' })),
-    ).toEqual({ key: 'pb_1', api: 'http://localhost:3104', mode: 'palette', launcher: false });
+    ).toEqual({ key: 'pb_1', api: 'http://localhost:3104', mode: 'palette', launcher: false, version: null, open: false });
 
     expect(readScriptOptions(script({ 'data-parbot': 'pb_1', 'data-mode': 'weird' }))).toMatchObject({
       api: window.location.origin,
       mode: null,
     });
+  });
+
+  it('reads the preview attributes and ignores a version that is not a plain token', () => {
+    expect(readScriptOptions(script({ 'data-parbot': 'pb_1', 'data-version': '7', 'data-open': 'true' }))).toMatchObject({
+      version: '7',
+      open: true,
+    });
+    expect(readScriptOptions(script({ 'data-parbot': 'pb_1', 'data-version': 'not ok!', 'data-open': 'yes' }))).toMatchObject({
+      version: null,
+      open: false,
+    });
+  });
+});
+
+describe('fetchConfig', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('never reads a cached copy, sends no credentials and passes the preview version along', async () => {
+    const mock = vi.fn<typeof fetch>(async () => Response.json({ assistantId: 'a', name: 'Docs' }));
+    vi.stubGlobal('fetch', mock);
+
+    await expect(fetchConfig('https://app.parbot.dev', 'pb_1', '3')).resolves.toMatchObject({ name: 'Docs' });
+    expect(mock).toHaveBeenCalledWith(
+      'https://app.parbot.dev/api/widget/config?key=pb_1&v=3',
+      expect.objectContaining({ cache: 'no-store', credentials: 'omit' }),
+    );
+
+    await fetchConfig('https://app.parbot.dev', 'pb_1');
+    expect(mock).toHaveBeenLastCalledWith('https://app.parbot.dev/api/widget/config?key=pb_1', expect.anything());
+  });
+
+  it('throws with the status when the server refuses', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('nope', { status: 403 })));
+
+    await expect(fetchConfig('https://app.parbot.dev', 'pb_1')).rejects.toThrow('403');
   });
 });
 
