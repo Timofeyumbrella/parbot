@@ -1,10 +1,29 @@
 import { expect, test } from '@playwright/test';
+import { createClient } from '@supabase/supabase-js';
 
 const unique = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+
+/** Removes an account the test created, and with it everything it owns, through the service role. */
+const removeAccount = async (email: string) => {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!url || !key) {
+    return;
+  }
+
+  const admin = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+  const { data } = await admin.from('profiles').select('id').eq('email', email).maybeSingle();
+
+  if (data?.id) {
+    await admin.auth.admin.deleteUser(data.id);
+  }
+};
 
 test.describe('signing up and creating the first assistant', () => {
   test('a new visitor lands on onboarding, creates an assistant and sees the dashboard', async ({ page }) => {
     const email = `e2e-${unique()}@parbot.test`;
+    test.info().annotations.push({ type: 'account', description: email });
 
     await page.goto('/signup');
     await expect(page.getByText('Create your account')).toBeVisible();
@@ -23,6 +42,8 @@ test.describe('signing up and creating the first assistant', () => {
 
     await page.goto('/dashboard');
     await expect(page.getByText('Acme Docs').first()).toBeVisible();
+
+    await removeAccount(email);
   });
 
   test('guarded routes bounce to login and keep the destination', async ({ page }) => {

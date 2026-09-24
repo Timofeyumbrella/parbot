@@ -1,5 +1,12 @@
 import { defineConfig, devices } from '@playwright/test';
 
+// The specs clean up after themselves with the service role key from apps/web/.env.
+try {
+  process.loadEnvFile(new URL('./.env', import.meta.url));
+} catch {
+  // No env file: the dev server still starts, cleanup is skipped.
+}
+
 const port = Number(process.env.E2E_PORT ?? 3210);
 
 export default defineConfig({
