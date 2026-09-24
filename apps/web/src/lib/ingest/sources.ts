@@ -1,6 +1,5 @@
 import type { SupabaseClient, User } from '@supabase/supabase-js';
 import { after } from 'next/server';
-import { z } from 'zod';
 
 import { getAccountPlan, getAccountUsage } from '@/lib/account';
 import { getAiProvider } from '@/lib/ai';
@@ -11,13 +10,11 @@ import { MAX_UPLOAD_BYTES, storagePathFor, UPLOAD_TYPES, UPLOAD_TYPES_LABEL, upl
 
 import { ingestSource, PAGE_LIMIT_MESSAGE, STALE_RUN_MS, STORAGE_BUCKET } from './index';
 import { labelForUrl } from './label';
+import { firstIssue, formFields, type SourceInput, uploadFieldsSchema } from './schema';
 
 export type UserClient = SupabaseClient<Database>;
 
 export { labelForUrl } from './label';
-
-/** Pasted text larger than this is really a file; the upload path handles those. */
-export const MAX_TEXT_CHARS = 500_000;
 
 /** An error the caller can show as it is, with the HTTP status that fits it. */
 export class SourceError extends Error {
@@ -30,64 +27,16 @@ export class SourceError extends Error {
   }
 }
 
-const title = z.string().trim().min(1, 'Give the source a title.').max(200, 'Keep the title under 200 characters.');
-const optionalTitle = z
-  .string()
-  .trim()
-  .max(200, 'Keep the title under 200 characters.')
-  .optional()
-  .transform((value) => value || undefined);
-const httpUrl = z
-  .string({ error: 'Enter a web address.' })
-  .trim()
-  .min(1, 'Enter a web address.')
-  .refine((value) => {
-    try {
-      const url = new URL(value);
-
-      return (url.protocol === 'http:' || url.protocol === 'https:') && Boolean(url.hostname);
-    } catch {
-      return false;
-    }
-  }, 'Enter a full address that starts with http:// or https://.');
-const assistantId = z.uuid({ error: 'Pick an assistant.' });
-/** The screen may choose the row's id so the row it draws before the answer is the real one. */
-const clientId = z.uuid({ error: 'The source id is not valid.' }).optional();
-
-export const sourceInputSchema = z.discriminatedUnion(
-  'kind',
-  [
-    z.object({ kind: z.literal('url'), assistantId, id: clientId, url: httpUrl, title: optionalTitle }),
-    z.object({ kind: z.literal('sitemap'), assistantId, id: clientId, url: httpUrl, title: optionalTitle }),
-    z.object({
-      kind: z.literal('text'),
-      assistantId,
-      id: clientId,
-      title,
-      text: z
-        .string({ error: 'Paste some text.' })
-        .trim()
-        .min(1, 'Paste some text.')
-        .max(MAX_TEXT_CHARS, 'That is more than 500,000 characters. Upload it as a file instead.'),
-    }),
-  ],
-  { error: 'Choose a website, sitemap, upload or pasted text.' },
-);
-
-export type SourceInput = z.infer<typeof sourceInputSchema>;
+export type { SourceInput } from './schema';
+export { firstIssue, MAX_TEXT_CHARS, sourceInputSchema } from './schema';
 
 export type UploadInput = { kind: 'upload'; assistantId: string; id?: string; title?: string; file: File };
 
 export type CreateSourceInput = SourceInput | UploadInput;
 
-/** The first problem zod found, phrased for people. */
-export const firstIssue = (error: z.ZodError) => error.issues[0]?.message ?? 'Check the form and try again.';
-
 /** Reads the multipart body of an upload. Throws a SourceError the route can return directly. */
 export const parseUploadForm = (form: FormData): UploadInput => {
-  const fields = z
-    .object({ assistantId, id: clientId, title: optionalTitle })
-    .safeParse({ assistantId: form.get('assistantId'), id: form.get('id') ?? undefined, title: form.get('title') ?? undefined });
+  const fields = uploadFieldsSchema.safeParse(formFields(form, ['assistantId', 'id', 'title']));
 
   if (!fields.success) {
     throw new SourceError(400, firstIssue(fields.error));

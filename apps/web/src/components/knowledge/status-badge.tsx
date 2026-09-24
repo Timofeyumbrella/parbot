@@ -6,6 +6,7 @@ import { CircleAlert, CircleCheck, Clock, LoaderCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import type { Source } from '@/lib/db';
+import { formatCount } from '@/lib/format';
 
 import { plural } from './format';
 
@@ -35,7 +36,7 @@ export const StatusBadge = ({ source, className }: StatusBadgeProps) => {
       return (
         <Badge variant="outline" className={className}>
           <LoaderCircle className="animate-spin" aria-hidden="true" />
-          Indexing {source.pages_done.toLocaleString('en-US')} of {plural(source.pages_found, 'page')}
+          Indexing {formatCount(source.pages_done)} of {plural(source.pages_found, 'page')}
         </Badge>
       );
     case 'ready':

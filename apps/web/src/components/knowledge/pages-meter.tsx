@@ -2,6 +2,7 @@ import { cn } from 'cn';
 import Link from 'next/link';
 
 import { Progress } from '@/components/ui/progress';
+import { formatCount } from '@/lib/format';
 
 export type MeterPlan = { name: string; pages: number };
 
@@ -23,8 +24,8 @@ export const PagesMeter = ({ used, plan, className }: PagesMeterProps) => {
     <div className={cn('flex w-48 flex-col gap-1.5 text-xs', className)} data-testid="pages-meter">
       <div className="flex items-baseline justify-between gap-2">
         <span className="tabular-nums">
-          <span className="text-foreground font-medium">{used.toLocaleString('en-US')}</span>
-          <span className="text-muted-foreground"> of {plan.pages.toLocaleString('en-US')} pages</span>
+          <span className="text-foreground font-medium">{formatCount(used)}</span>
+          <span className="text-muted-foreground"> of {formatCount(plan.pages)} pages</span>
         </span>
         <span className="text-muted-foreground">{plan.name}</span>
       </div>

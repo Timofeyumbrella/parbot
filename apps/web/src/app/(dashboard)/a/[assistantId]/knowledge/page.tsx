@@ -12,7 +12,7 @@ export const metadata: Metadata = { title: 'Knowledge' };
 
 export default async function KnowledgePage({ params }: PageProps<'/a/[assistantId]/knowledge'>) {
   const { assistantId } = await params;
-  const { supabase } = await requireUser();
+  const { supabase, user } = await requireUser();
   const [assistant, sources, { plan }, usage] = await Promise.all([
     getAssistant(assistantId),
     supabase.from('sources').select('*').eq('assistant_id', assistantId).order('created_at', { ascending: false }),
@@ -32,6 +32,7 @@ export default async function KnowledgePage({ params }: PageProps<'/a/[assistant
     <PageContainer>
       <KnowledgeScreen
         assistantId={assistant.id}
+        ownerId={user.id}
         initialSources={sources.data}
         initialPagesUsed={usage.pages}
         plan={{ name: plan.name, pages: plan.pages }}

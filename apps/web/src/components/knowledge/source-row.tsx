@@ -1,6 +1,6 @@
 'use client';
 
-import { Ellipsis, FileText, RefreshCw, Trash } from 'lucide-react';
+import { Ellipsis, FileText, RefreshCw, Trash, TriangleAlert } from 'lucide-react';
 import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -21,10 +21,22 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import type { Source } from '@/lib/db';
+import { relativeTime } from '@/lib/format';
 
-import { describeSource, isActiveStatus, plural, relativeTime, SOURCE_KINDS } from './format';
+import { describeSource, isActiveStatus, plural, SOURCE_KINDS } from './format';
 import { SourcePagesSheet } from './source-pages-sheet';
 import { StatusBadge } from './status-badge';
+
+/** What goes with the source: its pages and passages, and the stored file when there is one. */
+export const deleteWarning = (source: Pick<Source, 'document_count' | 'storage_path'>) => {
+  const pages =
+    source.document_count > 0
+      ? `The ${plural(source.document_count, 'page')} it added, and their passages, are removed from the assistant's knowledge.`
+      : 'Nothing has been indexed from it yet.';
+  const file = source.storage_path ? ' The stored file is deleted too.' : '';
+
+  return `${pages}${file} This cannot be undone.`;
+};
 
 type SourceRowProps = {
   source: Source;
@@ -38,7 +50,7 @@ export const SourceRow = ({ source, onReindex, onDelete }: SourceRowProps) => {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const kind = SOURCE_KINDS[source.kind];
   const active = isActiveStatus(source.status);
-  const indexed = relativeTime(source.last_indexed_at);
+  const indexed = source.last_indexed_at ? relativeTime(source.last_indexed_at) : null;
 
   return (
     <li className="flex items-start gap-3 px-4 py-3" data-testid="source-row">
@@ -63,6 +75,13 @@ export const SourceRow = ({ source, onReindex, onDelete }: SourceRowProps) => {
           {/* The relative time is computed on both sides of hydration and may cross a minute. */}
           <span suppressHydrationWarning>{indexed ? `indexed ${indexed}` : 'not indexed yet'}</span>
         </p>
+        {source.status === 'ready' && source.error ? (
+          // A run that finished with pages left out says so here, in the row itself.
+          <p className="text-warning flex items-start gap-1.5 text-xs">
+            <TriangleAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+            <span className="break-words">{source.error}</span>
+          </p>
+        ) : null}
         {source.status === 'failed' && source.error ? (
           <div className="flex flex-col items-start gap-1">
             <button
@@ -107,10 +126,7 @@ export const SourceRow = ({ source, onReindex, onDelete }: SourceRowProps) => {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Delete {source.title}?</DialogTitle>
-            <DialogDescription>
-              Its {plural(source.document_count, 'page')} leave this assistant&apos;s knowledge and the stored
-              file, if any, is removed. This cannot be undone.
-            </DialogDescription>
+            <DialogDescription>{deleteWarning(source)}</DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <DialogClose asChild>

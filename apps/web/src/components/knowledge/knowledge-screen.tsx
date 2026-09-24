@@ -15,6 +15,8 @@ import { useSources } from './use-sources';
 
 export type KnowledgeScreenProps = {
   assistantId: string;
+  /** The signed-in account, stamped on rows the screen draws before the server has answered. */
+  ownerId: string;
   initialSources: Source[];
   initialPagesUsed: number;
   plan: MeterPlan;
@@ -47,9 +49,9 @@ const EmptyState = ({ onPick }: { onPick: (tab: AddSourceTab) => void }) => (
   </section>
 );
 
-export const KnowledgeScreen = ({ assistantId, initialSources, initialPagesUsed, plan, liveAi }: KnowledgeScreenProps) => {
+export const KnowledgeScreen = ({ assistantId, ownerId, initialSources, initialPagesUsed, plan, liveAi }: KnowledgeScreenProps) => {
   const [dialog, setDialog] = useState<{ open: boolean; tab: AddSourceTab }>({ open: false, tab: 'url' });
-  const { sources, pagesUsed, error, refetch, addToCache, reindex, remove } = useSources({
+  const { sources, pagesUsed, error, refetch, addPending, settleAdd, reindex, remove } = useSources({
     assistantId,
     initialSources,
     initialPagesUsed,
@@ -57,13 +59,15 @@ export const KnowledgeScreen = ({ assistantId, initialSources, initialPagesUsed,
 
   const openDialog = (tab: AddSourceTab) => setDialog({ open: true, tab });
 
-  const handleCreated = useCallback(
-    (source: Source) => {
-      addToCache(source);
-      setDialog((current) => ({ ...current, open: false }));
-      toast.success(`Added ${source.title}. Indexing has started.`);
+  const handleSettled = useCallback(
+    (id: string, source: Source | null) => {
+      settleAdd(id, source);
+
+      if (source) {
+        toast.success(`Added ${source.title}. Indexing has started.`);
+      }
     },
-    [addToCache],
+    [settleAdd],
   );
 
   return (
@@ -92,8 +96,11 @@ export const KnowledgeScreen = ({ assistantId, initialSources, initialPagesUsed,
       )}
 
       {error ? (
-        <div role="alert" className="border-destructive/30 bg-destructive/10 flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm">
-          <span>The list could not be refreshed. {error.message}</span>
+        <div
+          role="alert"
+          className="border-destructive/30 bg-destructive/10 flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm"
+        >
+          <span>The list could not be refreshed. Check your connection; the rows shown may be out of date.</span>
           <Button variant="outline" size="sm" onClick={() => void refetch()}>
             Try again
           </Button>
@@ -112,11 +119,13 @@ export const KnowledgeScreen = ({ assistantId, initialSources, initialPagesUsed,
 
       <AddSourceDialog
         assistantId={assistantId}
+        ownerId={ownerId}
         open={dialog.open}
         tab={dialog.tab}
         onOpenChange={(open) => setDialog((current) => ({ ...current, open }))}
         onTabChange={(tab) => setDialog((current) => ({ ...current, tab }))}
-        onCreated={handleCreated}
+        onPending={addPending}
+        onSettled={handleSettled}
       />
     </>
   );
