@@ -6,7 +6,8 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-import { useChatPane } from '@/components/chat/chat-shell';
+import { useChatPane, useChatSelection } from '@/components/chat/chat-shell';
+import { isPlainLeftClick } from '@/components/nav-pending';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -24,6 +25,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { useConversationActions, useConversations } from '@/hooks/use-conversations';
+import { usePrefetchThread } from '@/hooks/use-thread';
 import {
   conversationLabel,
   type ConversationRow,
@@ -103,7 +105,8 @@ type RowProps = {
   href: string;
   active: boolean;
   renaming: boolean;
-  onNavigate?: () => void;
+  onNavigate: (event: React.MouseEvent<HTMLAnchorElement>) => void;
+  onIntent: () => void;
   onRename: () => void;
   onRenameSubmit: (title: string) => void;
   onRenameCancel: () => void;
@@ -116,6 +119,7 @@ const Row = ({
   active,
   renaming,
   onNavigate,
+  onIntent,
   onRename,
   onRenameSubmit,
   onRenameCancel,
@@ -139,7 +143,12 @@ const Row = ({
     >
       <Link
         href={href}
+        // The pane selects on the client, so the route prefetch would buy nothing here; left on, a
+        // long list queues ahead of the sidebar's own prefetches after a page load.
+        prefetch={false}
         onClick={onNavigate}
+        onPointerEnter={onIntent}
+        onFocus={onIntent}
         aria-current={active ? 'page' : undefined}
         className="flex min-w-0 flex-1 items-center gap-2 self-stretch pl-2.5 pr-1 text-sm outline-none focus-visible:underline"
       >
@@ -189,7 +198,10 @@ export const ConversationList = ({ assistantId, snapshot }: ConversationListProp
   const params = useParams<{ conversationId?: string }>();
   const router = useRouter();
   const { onNavigate } = useChatPane();
-  const activeId = params.conversationId ?? null;
+  const selection = useChatSelection();
+  const prefetchThread = usePrefetchThread();
+  // The row lights up on click, before the router has the route; outside a shell, the route alone.
+  const activeId = selection ? selection.selectedId : (params.conversationId ?? null);
   const { data, isError, error, refetch } = useConversations(assistantId, snapshot);
   const { rename, remove } = useConversationActions(assistantId);
   const [query, setQuery] = useState('');
@@ -198,6 +210,14 @@ export const ConversationList = ({ assistantId, snapshot }: ConversationListProp
   const inputRef = useRef<HTMLInputElement | null>(null);
   const rows = useMemo(() => filterConversations(data ?? [], query), [data, query]);
   const base = `/a/${assistantId}/chat`;
+
+  const follow = (conversationId: string | null) => (event: React.MouseEvent<HTMLAnchorElement>) => {
+    if (isPlainLeftClick(event)) {
+      selection?.select(conversationId);
+    }
+
+    onNavigate?.();
+  };
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -231,6 +251,7 @@ export const ConversationList = ({ assistantId, snapshot }: ConversationListProp
     void remove(target.id);
 
     if (target.id === activeId) {
+      selection?.select(null);
       router.push(base);
     }
   };
@@ -239,7 +260,7 @@ export const ConversationList = ({ assistantId, snapshot }: ConversationListProp
     <div className="flex h-full min-h-0 flex-col" data-testid="conversation-list">
       <div className="flex flex-col gap-2 p-2">
         <Button asChild variant="outline" className="justify-start">
-          <Link href={base} onClick={onNavigate}>
+          <Link href={base} onClick={follow(null)}>
             <Plus data-icon="inline-start" />
             New chat
           </Link>
@@ -315,7 +336,8 @@ export const ConversationList = ({ assistantId, snapshot }: ConversationListProp
                   href={`${base}/${row.id}`}
                   active={row.id === activeId}
                   renaming={row.id === renamingId}
-                  onNavigate={onNavigate}
+                  onNavigate={follow(row.id)}
+                  onIntent={() => prefetchThread(row.id)}
                   onRename={() => setRenamingId(row.id)}
                   onRenameSubmit={(title) => {
                     setRenamingId(null);
