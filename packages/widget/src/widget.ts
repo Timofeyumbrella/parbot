@@ -6,9 +6,10 @@ import {
   type WidgetConfig,
   type WidgetLeadRequest,
   type WidgetMode,
+  type WidgetScheme,
 } from '@parbot/shared';
 
-import { accentText, onAccent } from './config';
+import { accentText, isWidgetScheme, onAccent } from './config';
 import { renderMarkdown, safeUrl } from './markdown';
 import {
   getConversationId,
@@ -26,6 +27,8 @@ export type WidgetOptions = {
   config: WidgetConfig;
   mode?: WidgetMode | null;
   launcher?: boolean;
+  /** Overrides the saved theme's scheme; a host page with its own toggle knows better than the OS. */
+  scheme?: WidgetScheme | null;
 };
 
 type Message = StoredMessage & {
@@ -138,6 +141,8 @@ export class ParbotWidget {
   private readonly config: WidgetConfig;
   private readonly showLauncher: boolean;
   private mode: WidgetMode;
+  private scheme: WidgetScheme;
+  private media: MediaQueryList | null = null;
   private isOpen = false;
   private messages: Message[] = [];
   private visitorId: string;
@@ -163,6 +168,7 @@ export class ParbotWidget {
     this.config = options.config;
     this.mode = options.mode && this.allows(options.mode) ? options.mode : options.config.mode;
     this.showLauncher = options.launcher !== false;
+    this.scheme = options.scheme ?? options.config.theme.scheme;
     this.visitorId = getVisitorId(this.key);
     this.conversationId = getConversationId(this.key);
     this.messages = loadMessages(this.key).map((stored) => ({ ...stored, id: nextId() }));
@@ -195,13 +201,30 @@ export class ParbotWidget {
     this.renderAll();
     document.addEventListener('keydown', this.onDocumentKeydown);
 
+    if (typeof window.matchMedia === 'function') {
+      this.media = window.matchMedia('(prefers-color-scheme: dark)');
+      this.media.addEventListener('change', this.onSystemSchemeChange);
+    }
+
     return this;
   }
 
   destroy() {
     this.controller?.abort();
     document.removeEventListener('keydown', this.onDocumentKeydown);
+    this.media?.removeEventListener('change', this.onSystemSchemeChange);
     this.host.remove();
+  }
+
+  /** Switches between light, dark and following the OS, as a host page's own theme toggle does. */
+  setScheme(scheme: WidgetScheme) {
+    // Host pages call this from plain JavaScript, so anything but the three schemes is ignored.
+    if (!isWidgetScheme(scheme)) {
+      return;
+    }
+
+    this.scheme = scheme;
+    this.applyTheme();
   }
 
   /** Opens the panel. Focus moves to the composer unless the caller asks it not to. */
@@ -387,24 +410,18 @@ export class ParbotWidget {
 
   private applyTheme() {
     const { theme } = this.config;
-    const scheme = theme.scheme === 'auto' ? (prefersDark() ? 'dark' : 'light') : theme.scheme;
+    const scheme = this.scheme === 'auto' ? (prefersDark() ? 'dark' : 'light') : this.scheme;
 
-    this.root.dataset.scheme = theme.scheme;
+    this.root.dataset.scheme = this.scheme;
     this.root.dataset.radius = theme.radius;
     this.root.dataset.position = theme.position;
     this.root.style.setProperty('--pb-accent', theme.accent);
     this.root.style.setProperty('--pb-on-accent', onAccent(theme.accent));
     this.root.style.setProperty('--pb-accent-text', accentText(theme.accent, scheme));
-
-    if (theme.scheme === 'auto' && typeof window.matchMedia === 'function') {
-      window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (event) => {
-        this.root.style.setProperty(
-          '--pb-accent-text',
-          accentText(theme.accent, event.matches ? 'dark' : 'light'),
-        );
-      });
-    }
   }
+
+  // The stylesheet follows the OS by itself in auto; only the accent text needs recomputing.
+  private readonly onSystemSchemeChange = () => this.applyTheme();
 
   private renderLauncher() {
     // The open palette is a modal with its own close button; the pill left floating beside it

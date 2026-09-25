@@ -2,6 +2,6 @@
 // window.Parbot, so the names exported here are the widget's public API.
 import { boot } from './boot';
 
-export { ask, close, open, setMode, toggle } from './boot';
+export { ask, close, destroy, open, setMode, setScheme, toggle } from './boot';
 
 void boot();

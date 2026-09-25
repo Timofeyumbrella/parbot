@@ -1,7 +1,8 @@
-import { type ChatStreamEvent, encodeSseEvent, type WidgetConfig } from '@parbot/shared';
+import { type ChatStreamEvent, encodeSseEvent, type WidgetConfig, type WidgetScheme } from '@parbot/shared';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { ask, boot, resetForTests } from './boot';
+import { ask, boot, destroy, resetForTests, setScheme } from './boot';
+import { accentText } from './config';
 
 const API = 'https://app.parbot.test';
 const KEY = 'pb_testkey0000000000000000000000';
@@ -575,6 +576,85 @@ describe('widget', () => {
     );
     expect(widget!.opened).toBe(true);
     expect(shadowOf(widget!).activeElement).toBeNull();
+  });
+
+  it('wears the scheme the host page picks over the saved one, and switches when the page does', async () => {
+    // A light accent is darkened on light backgrounds only, so the accent text shows the scheme.
+    const accent = '#f5f5f5';
+    installFetch({ theme: { ...config.theme, scheme: 'auto', accent } });
+    const widget = await boot(mountScript({ 'data-scheme': 'dark' }));
+    const root = shadowOf(widget!).querySelector<HTMLElement>('.pb-root')!;
+
+    expect(root.dataset.scheme).toBe('dark');
+    expect(root.style.getPropertyValue('--pb-accent-text')).toBe(accentText(accent, 'dark'));
+
+    setScheme('light');
+    expect(root.dataset.scheme).toBe('light');
+    expect(root.style.getPropertyValue('--pb-accent-text')).toBe(accentText(accent, 'light'));
+
+    setScheme('sepia' as WidgetScheme);
+    expect(root.dataset.scheme).toBe('light');
+  });
+
+  it('follows the OS in auto, keeps a scheme the page set, and stops listening when destroyed', async () => {
+    const accent = '#f5f5f5';
+    const listeners = new Set<() => void>();
+    let osDark = false;
+    vi.stubGlobal('matchMedia', (media: string) => ({
+      media,
+      get matches() {
+        return osDark;
+      },
+      addEventListener: (_type: string, listener: () => void) => listeners.add(listener),
+      removeEventListener: (_type: string, listener: () => void) => listeners.delete(listener),
+    }));
+    const flipOs = (dark: boolean) => {
+      osDark = dark;
+      listeners.forEach((listener) => listener());
+    };
+
+    installFetch({ theme: { ...config.theme, scheme: 'auto', accent } });
+    const widget = await boot(mountScript());
+    const root = shadowOf(widget!).querySelector<HTMLElement>('.pb-root')!;
+
+    expect(root.dataset.scheme).toBe('auto');
+    expect(root.style.getPropertyValue('--pb-accent-text')).toBe(accentText(accent, 'light'));
+
+    flipOs(true);
+    expect(root.style.getPropertyValue('--pb-accent-text')).toBe(accentText(accent, 'dark'));
+
+    setScheme('light');
+    flipOs(true);
+    expect(root.style.getPropertyValue('--pb-accent-text')).toBe(accentText(accent, 'light'));
+    expect(listeners.size).toBe(1);
+
+    resetForTests();
+    expect(listeners.size).toBe(0);
+  });
+
+  it('leaves the page for good when destroyed, even while it is still starting', async () => {
+    installFetch({ mode: 'palette' });
+    const widget = await boot(mountScript());
+
+    destroy();
+    expect(document.getElementById('parbot-widget')).toBeNull();
+
+    // Its shortcut goes with it: Cmd+K belongs to the page again.
+    const shortcut = new KeyboardEvent('keydown', { key: 'k', metaKey: true, bubbles: true, cancelable: true });
+    document.dispatchEvent(shortcut);
+    expect(shortcut.defaultPrevented).toBe(false);
+    expect(widget!.opened).toBe(false);
+
+    resetForTests();
+    document.head.innerHTML = '';
+
+    // Destroyed before the config arrived: it never mounts, and later calls are dropped.
+    const starting = boot(mountScript());
+    destroy();
+    ask('Anyone there?');
+
+    expect(await starting).toBeNull();
+    expect(document.getElementById('parbot-widget')).toBeNull();
   });
 
   it('does nothing without a key and warns when the config cannot load', async () => {

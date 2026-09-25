@@ -28,13 +28,22 @@ describe('readScriptOptions', () => {
       launcher: true,
       version: null,
       open: false,
+      scheme: null,
     });
   });
 
   it('falls back to the page origin without a src and honours overrides', () => {
     expect(
       readScriptOptions(script({ 'data-parbot': 'pb_1', 'data-mode': 'Palette', 'data-launcher': 'false', 'data-api': 'http://localhost:3104/' })),
-    ).toEqual({ key: 'pb_1', api: 'http://localhost:3104', mode: 'palette', launcher: false, version: null, open: false });
+    ).toEqual({
+      key: 'pb_1',
+      api: 'http://localhost:3104',
+      mode: 'palette',
+      launcher: false,
+      version: null,
+      open: false,
+      scheme: null,
+    });
 
     expect(readScriptOptions(script({ 'data-parbot': 'pb_1', 'data-mode': 'weird' }))).toMatchObject({
       api: window.location.origin,
@@ -51,6 +60,15 @@ describe('readScriptOptions', () => {
       version: null,
       open: false,
     });
+  });
+
+  it('reads the scheme a host page picks and ignores anything but light, dark or auto', () => {
+    const scheme = (value: string) => readScriptOptions(script({ 'data-parbot': 'pb_1', 'data-scheme': value }))?.scheme;
+
+    expect(scheme(' Dark ')).toBe('dark');
+    expect(scheme('light')).toBe('light');
+    expect(scheme('auto')).toBe('auto');
+    expect(scheme('sepia')).toBeNull();
   });
 });
 

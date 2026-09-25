@@ -1,7 +1,7 @@
 import { Reveal } from '@/components/marketing/reveal';
 import { Container, Section, SectionHeading } from '@/components/marketing/section';
 
-const STEPS = [
+export const STEPS = [
   {
     title: 'Point it at your docs',
     body: 'Give Parbot a docs URL, a sitemap, or files: PDF, Word, Markdown, HTML or plain text. It fetches each page, strips the navigation and splits the content into passages along its headings.',
@@ -10,11 +10,11 @@ const STEPS = [
   {
     title: 'Parbot indexes and keeps it fresh',
     body: 'Each passage is embedded and stored with its heading path. When the docs change, re-index from Knowledge: unchanged pages are skipped, removed pages are dropped, and the next question uses the new content.',
-    detail: '142 pages · 1,318 passages · indexed 2 minutes ago',
+    detail: '142 pages · 1,318 passages · indexed 2 min ago',
   },
   {
     title: 'Readers get cited answers',
-    body: 'A question pulls the passages closest to it, and only those go to the model. The answer streams in with numbered markers that link back to the pages it came from.',
+    body: 'A question pulls the passages closest to it, and only those go to the model. The answer streams in with numbered markers pointing at the passages it came from.',
     detail: '[1] Guide › Authentication › API keys',
   },
 ] as const;
@@ -46,7 +46,7 @@ export const HowItWorks = () => (
               <h3 className="text-lg font-semibold tracking-tight">{step.title}</h3>
               <p className="text-muted-foreground text-sm leading-relaxed">{step.body}</p>
             </div>
-            <p className="bg-muted text-muted-foreground mt-auto truncate rounded-md px-3 py-2 font-mono text-xs">
+            <p className="bg-muted text-muted-foreground mt-auto break-words rounded-md px-3 py-2 font-mono text-xs">
               {step.detail}
             </p>
           </Reveal>
