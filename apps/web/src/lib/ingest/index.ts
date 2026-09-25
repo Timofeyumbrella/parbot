@@ -103,7 +103,21 @@ const readStorageObject = async (service: ServiceClient, path: string) => {
   return new Uint8Array(await data.arrayBuffer());
 };
 
-/** Pages the account may still add: the plan's allowance minus documents outside this source. */
+const removeDocuments = async (service: ServiceClient, ids: string[], failure: string) => {
+  for (const batch of inBatches(ids)) {
+    const { error } = await service.from('documents').delete().in('id', batch);
+
+    if (error) {
+      throw new IngestError(failure);
+    }
+  }
+};
+
+/**
+ * Pages the account may still add: the plan's allowance minus documents outside this source. A
+ * first look that sizes the crawl; the limit itself is held by every insert, so two runs that start
+ * together cannot both spend the same allowance.
+ */
 const remainingPages = async (service: ServiceClient, source: Pick<Source, 'id' | 'owner_id'>) => {
   const [{ data: subscription }, account, own] = await Promise.all([
     service.from('subscriptions').select('plan_id, status').eq('account_id', source.owner_id).maybeSingle(),
@@ -347,9 +361,19 @@ export const ingestSource = async (params: IngestParams): Promise<IngestResult> 
 
     const keyOf = (url: string | null) => url ?? '';
     const previousByKey = new Map((existing ?? []).map((document) => [keyOf(document.url), document]));
+    const planned = new Set(readable.map((page) => keyOf(page.url)));
+
+    // Pages that vanished go first: they should not count against the plan while the rest is written.
+    await removeDocuments(
+      service,
+      (existing ?? []).filter((document) => !planned.has(keyOf(document.url))).map((document) => document.id),
+      'Pages that no longer exist could not be removed. Re-index to try again.',
+    );
+
     const seen = new Set<string>();
     let done = 0;
     let unchanged = 0;
+    let stoppedAtLimit = false;
 
     for (const page of readable) {
       const key = keyOf(page.url);
@@ -374,43 +398,45 @@ export const ingestSource = async (params: IngestParams): Promise<IngestResult> 
       const chunks = chunkMarkdown(page.markdown);
 
       if (chunks.length === 0) {
-        seen.delete(key);
+        // Nothing left to index on this page; an earlier copy would answer with text that is gone.
+        await removeDocuments(
+          service,
+          previous ? [previous.id] : [],
+          'An earlier copy of a page could not be removed. Re-index to try again.',
+        );
         continue;
       }
 
       const vectors = await embedChunks(provider, chunks, title);
 
-      if (previous) {
-        const { error } = await service.from('documents').delete().eq('id', previous.id);
+      // The insert checks the account's page count in the same transaction, so runs that overlap
+      // share one allowance. A null id means the limit is reached; the earlier copy, if any, stays.
+      const { data: documentId, error: documentError } = await service.rpc('insert_document_within_limit', {
+        page_limit: capacity.limit,
+        assistant: source.assistant_id,
+        owner: source.owner_id,
+        source: source.id,
+        page_url: page.url ?? undefined,
+        page_title: title,
+        page_content: page.markdown,
+        page_checksum: checksum,
+        page_token_count: estimateTokens(page.markdown),
+        replaces: previous?.id,
+      });
 
-        if (error) {
-          throw new IngestError('An earlier copy of a page could not be replaced. Re-index to try again.');
-        }
+      if (documentError) {
+        throw new IngestError('A page could not be saved. Re-index to try again.');
       }
 
-      const { data: document, error: documentError } = await service
-        .from('documents')
-        .insert({
-          assistant_id: source.assistant_id,
-          owner_id: source.owner_id,
-          source_id: source.id,
-          url: page.url,
-          title,
-          content: page.markdown,
-          checksum,
-          token_count: estimateTokens(page.markdown),
-        })
-        .select('id')
-        .single();
-
-      if (documentError || !document) {
-        throw new IngestError('A page could not be saved. Re-index to try again.');
+      if (!documentId) {
+        stoppedAtLimit = true;
+        break;
       }
 
       const rows = chunks.map((chunk, position) => ({
         assistant_id: source.assistant_id,
         owner_id: source.owner_id,
-        document_id: document.id,
+        document_id: documentId,
         position,
         heading: chunk.heading,
         content: chunk.content,
@@ -423,23 +449,13 @@ export const ingestSource = async (params: IngestParams): Promise<IngestResult> 
 
         if (error) {
           // A document without its chunks would be invisible to retrieval; leave nothing behind.
-          await service.from('documents').delete().eq('id', document.id);
+          await service.from('documents').delete().eq('id', documentId);
           throw new IngestError('The passages of a page could not be saved. Re-index to try again.');
         }
       }
 
       done += 1;
       progress.set({ pages_done: done });
-    }
-
-    const stale = (existing ?? []).filter((document) => !seen.has(keyOf(document.url)));
-
-    for (const batch of inBatches(stale.map((document) => document.id))) {
-      const { error } = await service.from('documents').delete().in('id', batch);
-
-      if (error) {
-        throw new IngestError('Pages that no longer exist could not be removed. Re-index to try again.');
-      }
     }
 
     // One request for the whole source, however many pages it has: no id list in the URL.
@@ -453,8 +469,21 @@ export const ingestSource = async (params: IngestParams): Promise<IngestResult> 
     }
 
     const documents = counted ?? [];
+
+    // Another run spent the allowance before this one wrote a page: the same outcome as a full plan
+    // at the start, not an empty source marked ready.
+    if (stoppedAtLimit && documents.length === 0) {
+      throw new IngestError(PAGE_LIMIT_MESSAGE);
+    }
+
     const chunkCount = documents.reduce((sum, document) => sum + (document.chunks[0]?.count ?? 0), 0);
-    const note = describeRun({ pages: readable.length, truncated, problems, atPlanLimit });
+    const indexed = stoppedAtLimit ? done : readable.length;
+    const note = describeRun({
+      pages: indexed,
+      truncated: truncated || stoppedAtLimit,
+      problems,
+      atPlanLimit: atPlanLimit || stoppedAtLimit,
+    });
     const title = sourceTitleAfterCrawl(source, readable);
 
     await update({
@@ -467,7 +496,7 @@ export const ingestSource = async (params: IngestParams): Promise<IngestResult> 
       ...(title ? { title } : {}),
     });
 
-    return { status: 'ready', pages: readable.length, documents: documents.length, chunks: chunkCount, unchanged, note };
+    return { status: 'ready', pages: indexed, documents: documents.length, chunks: chunkCount, unchanged, note };
   } catch (cause) {
     const error = humanizeIngestError(cause);
 

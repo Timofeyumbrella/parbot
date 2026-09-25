@@ -1,13 +1,18 @@
 // @vitest-environment node
+import { readFileSync } from 'node:fs';
+
 import { createClient } from '@supabase/supabase-js';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { createStubProvider } from '@/lib/ai';
 import type { Database } from '@/lib/db';
+import { PLANS } from '@/lib/plans';
+import { storagePathFor, UPLOAD_TYPES } from '@/lib/uploads';
 
+import { minimalPdf } from './fixtures/pdf';
 import { publicLookup } from './guard';
 import type { FetchImpl } from './http';
-import { ingestSource, STORAGE_BUCKET } from './index';
+import { ingestSource, PAGE_LIMIT_MESSAGE, STORAGE_BUCKET } from './index';
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'http://127.0.0.1:54321';
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -38,7 +43,7 @@ const siteWithBrokenLink: Record<string, () => Response> = {
 };
 
 /** A sitemap of `count` pages, each with its own paragraph, to push the id lists past one request. */
-const bigSite = (count: number, prefix: string) => {
+const bigSite = (count: number, prefix: string, sitemap = 'https://docs.test/sitemap.xml') => {
   const site: Record<string, () => Response> = {};
   const locs: string[] = [];
 
@@ -49,7 +54,7 @@ const bigSite = (count: number, prefix: string) => {
     site[page] = () => html(`Page ${index}`, `<h1>Page ${index}</h1><p>Paragraph number ${index} of the ${prefix} manual.</p>`);
   }
 
-  site['https://docs.test/sitemap.xml'] = () =>
+  site[sitemap] = () =>
     new Response(`<urlset>${locs.join('')}</urlset>`, { status: 200, headers: { 'content-type': 'application/xml' } });
 
   return site;
@@ -71,10 +76,12 @@ describe.skipIf(!serviceKey)('ingestSource against the local database', () => {
   let assistantId = '';
   const storagePaths: string[] = [];
 
-  const createSource = async (row: Omit<Database['public']['Tables']['sources']['Insert'], 'assistant_id' | 'owner_id'>) => {
+  type SourceRow = Omit<Database['public']['Tables']['sources']['Insert'], 'assistant_id' | 'owner_id'>;
+
+  const createSourceFor = async (owner: string, assistant: string, row: SourceRow) => {
     const { data, error } = await service
       .from('sources')
-      .insert({ assistant_id: assistantId, owner_id: userId, ...row })
+      .insert({ assistant_id: assistant, owner_id: owner, ...row })
       .select('id')
       .single();
 
@@ -83,6 +90,50 @@ describe.skipIf(!serviceKey)('ingestSource against the local database', () => {
     }
 
     return data.id;
+  };
+
+  const createSource = (row: SourceRow) => createSourceFor(userId, assistantId, row);
+
+  /** A user of its own with one assistant: the shared demo account's page count cannot interfere. */
+  const createAccount = async (plan: Database['public']['Enums']['plan_id']) => {
+    const stamp = `${Date.now().toString(36)}-${crypto.randomUUID().slice(0, 6)}`;
+    const { data: created, error: userError } = await service.auth.admin.createUser({
+      email: `ingest-${stamp}@test.parbot.dev`,
+      password: `pw-${crypto.randomUUID()}`,
+      email_confirm: true,
+    });
+
+    if (userError || !created.user) {
+      throw new Error(userError?.message ?? 'no user');
+    }
+
+    const owner = created.user.id;
+    const { error: planError } = await service
+      .from('subscriptions')
+      .update({ plan_id: plan, billing_interval: 'monthly', status: 'active' })
+      .eq('account_id', owner);
+
+    if (planError) {
+      throw new Error(planError.message);
+    }
+
+    const { data, error } = await service
+      .from('assistants')
+      .insert({ owner_id: owner, name: 'Ingest test', slug: `ingest-${stamp}` })
+      .select('id')
+      .single();
+
+    if (error || !data) {
+      throw new Error(error?.message ?? 'no assistant');
+    }
+
+    return { owner, assistant: data.id };
+  };
+
+  const countDocuments = async (owner: string) => {
+    const { count } = await service.from('documents').select('id', { count: 'exact', head: true }).eq('owner_id', owner);
+
+    return count ?? 0;
   };
 
   const loadSource = async (id: string) => {
@@ -98,40 +149,7 @@ describe.skipIf(!serviceKey)('ingestSource against the local database', () => {
   };
 
   beforeAll(async () => {
-    // A user of its own on the Growth plan: the shared demo account's page count cannot interfere.
-    const stamp = Date.now().toString(36);
-    const { data: created, error: userError } = await service.auth.admin.createUser({
-      email: `ingest-${stamp}@test.parbot.dev`,
-      password: `pw-${crypto.randomUUID()}`,
-      email_confirm: true,
-    });
-
-    if (userError || !created.user) {
-      throw new Error(userError?.message ?? 'no user');
-    }
-
-    userId = created.user.id;
-
-    const { error: planError } = await service
-      .from('subscriptions')
-      .update({ plan_id: 'growth', billing_interval: 'monthly', status: 'active' })
-      .eq('account_id', userId);
-
-    if (planError) {
-      throw new Error(planError.message);
-    }
-
-    const { data, error } = await service
-      .from('assistants')
-      .insert({ owner_id: userId, name: 'Ingest test', slug: `ingest-${stamp}` })
-      .select('id')
-      .single();
-
-    if (error || !data) {
-      throw new Error(error?.message ?? 'no assistant');
-    }
-
-    assistantId = data.id;
+    ({ owner: userId, assistant: assistantId } = await createAccount('growth'));
   });
 
   afterAll(async () => {
@@ -285,6 +303,55 @@ describe.skipIf(!serviceKey)('ingestSource against the local database', () => {
     expect((await loadSource(sourceId)).status).toBe('ready');
   });
 
+  it.each([
+    {
+      type: 'docx' as const,
+      fileName: 'handbook.docx',
+      bytes: () => new Uint8Array(readFileSync(new URL('./fixtures/handbook.docx', import.meta.url))),
+      title: 'Handbook',
+      passage: 'Refunds are issued within 30 days of purchase.',
+    },
+    {
+      type: 'pdf' as const,
+      fileName: 'guide.pdf',
+      bytes: () => minimalPdf('Hello Parbot', 'Welcome guide'),
+      title: 'Welcome guide',
+      passage: 'Hello Parbot',
+    },
+  ])('indexes an uploaded $type file from the bucket under the title inside it', async ({ type, fileName, bytes, title, passage }) => {
+    // Stored the way POST /api/sources stores an upload: under the account, typed by its extension.
+    const spec = UPLOAD_TYPES[type];
+    const path = storagePathFor(userId, assistantId, spec.extensions[0]!);
+
+    storagePaths.push(path);
+
+    const { error: uploadError } = await service.storage
+      .from(STORAGE_BUCKET)
+      .upload(path, new Blob([bytes()], { type: spec.mime }), { contentType: spec.mime });
+
+    expect(uploadError).toBeNull();
+
+    const sourceId = await createSource({ kind: 'upload', title: fileName, storage_path: path, mime_type: spec.mime });
+    const result = await ingestSource({ service, provider, sourceId });
+
+    expect(result).toMatchObject({ status: 'ready', pages: 1, documents: 1, note: null });
+
+    const [document] = await loadDocuments(sourceId);
+
+    expect(document).toMatchObject({ url: null, title });
+
+    const { data: chunks } = await service.from('chunks').select('content').eq('document_id', document!.id);
+
+    expect(chunks?.some((chunk) => chunk.content.includes(passage))).toBe(true);
+    expect(await loadSource(sourceId)).toMatchObject({
+      status: 'ready',
+      error: null,
+      pages_done: 1,
+      document_count: 1,
+      chunk_count: chunks?.length,
+    });
+  });
+
   it('reports a source that does not exist', async () => {
     await expect(ingestSource({ service, provider, sourceId: crypto.randomUUID() })).resolves.toEqual({
       status: 'failed',
@@ -309,5 +376,110 @@ describe.skipIf(!serviceKey)('ingestSource against the local database', () => {
 
     expect(second).toMatchObject({ status: 'ready', pages: 3, documents: 3, chunks: 3, unchanged: 0 });
     expect(await loadSource(sourceId)).toMatchObject({ status: 'ready', document_count: 3, chunk_count: 3 });
+  });
+
+  it('holds the plan limit when two sources of one account index at the same time', { timeout: 120_000 }, async () => {
+    // Two Add source submissions run side by side through after(); each once saw the full allowance.
+    const account = await createAccount('hobby');
+
+    try {
+      const [first, second] = await Promise.all([
+        createSourceFor(account.owner, account.assistant, { kind: 'sitemap', title: 'A', uri: 'https://docs.test/a/sitemap.xml' }),
+        createSourceFor(account.owner, account.assistant, { kind: 'sitemap', title: 'B', uri: 'https://docs.test/b/sitemap.xml' }),
+      ]);
+      const results = await Promise.all([
+        ingestSource({ service, provider, sourceId: first, fetchImpl: serve(bigSite(70, 'a', 'https://docs.test/a/sitemap.xml')), lookup }),
+        ingestSource({ service, provider, sourceId: second, fetchImpl: serve(bigSite(70, 'b', 'https://docs.test/b/sitemap.xml')), lookup }),
+      ]);
+
+      expect(results.map((result) => result.status)).toEqual(['ready', 'ready']);
+      expect(await countDocuments(account.owner)).toBe(PLANS.hobby.pages);
+
+      const notes = results.map((result) => (result.status === 'ready' ? result.note : null));
+
+      expect(notes.some((note) => note?.includes("Stopped at your plan's page limit"))).toBe(true);
+
+      // The rows agree with the table: pages_done and document_count are what was really written.
+      const rows = await Promise.all([loadSource(first), loadSource(second)]);
+
+      expect(rows.reduce((sum, row) => sum + row.document_count, 0)).toBe(PLANS.hobby.pages);
+      expect(rows.every((row) => row.status === 'ready' && row.pages_done === row.document_count)).toBe(true);
+    } finally {
+      await service.auth.admin.deleteUser(account.owner);
+    }
+  });
+
+  describe('when another run fills the allowance while this one crawls', () => {
+    const sitemap = 'https://docs.test/late/sitemap.xml';
+
+    /** Writes `count` pages for the account the moment the crawl starts, after the first look at the limit. */
+    const otherRunWrites = (account: { owner: string; assistant: string }, count: number, fetchImpl: FetchImpl): FetchImpl => {
+      let written: Promise<void> | null = null;
+
+      const write = async () => {
+        const other = await createSourceFor(account.owner, account.assistant, {
+          kind: 'text',
+          title: 'Other run',
+          storage_path: `${account.owner}/other.md`,
+        });
+        const rows = Array.from({ length: count }, (_, index) => ({
+          assistant_id: account.assistant,
+          owner_id: account.owner,
+          source_id: other,
+          title: `Other ${index}`,
+          content: `Other page ${index}.`,
+          checksum: `other-${index}`,
+        }));
+        const { error } = await service.from('documents').insert(rows);
+
+        if (error) {
+          throw new Error(error.message);
+        }
+      };
+
+      return async (input, init) => {
+        written ??= write();
+        await written;
+
+        return fetchImpl(input, init);
+      };
+    };
+
+    it('indexes what still fits and says it stopped at the plan limit', { timeout: 60_000 }, async () => {
+      const account = await createAccount('hobby');
+
+      try {
+        const sourceId = await createSourceFor(account.owner, account.assistant, { kind: 'sitemap', title: 'Late', uri: sitemap });
+        const fetchImpl = otherRunWrites(account, PLANS.hobby.pages - 10, serve(bigSite(20, 'late', sitemap)));
+        const result = await ingestSource({ service, provider, sourceId, fetchImpl, lookup });
+
+        expect(result).toMatchObject({
+          status: 'ready',
+          pages: 10,
+          documents: 10,
+          note: "Stopped at your plan's page limit after 10 pages. Upgrade on the Billing page or remove a source to index the rest.",
+        });
+        expect(await loadSource(sourceId)).toMatchObject({ status: 'ready', pages_done: 10, document_count: 10 });
+        expect(await countDocuments(account.owner)).toBe(PLANS.hobby.pages);
+      } finally {
+        await service.auth.admin.deleteUser(account.owner);
+      }
+    });
+
+    it('fails with the plan-limit message when no page fits any more', { timeout: 60_000 }, async () => {
+      const account = await createAccount('hobby');
+
+      try {
+        const sourceId = await createSourceFor(account.owner, account.assistant, { kind: 'sitemap', title: 'Late', uri: sitemap });
+        const fetchImpl = otherRunWrites(account, PLANS.hobby.pages, serve(bigSite(5, 'late', sitemap)));
+        const result = await ingestSource({ service, provider, sourceId, fetchImpl, lookup });
+
+        expect(result).toEqual({ status: 'failed', error: PAGE_LIMIT_MESSAGE });
+        expect(await loadSource(sourceId)).toMatchObject({ status: 'failed', error: PAGE_LIMIT_MESSAGE, document_count: 0 });
+        expect(await countDocuments(account.owner)).toBe(PLANS.hobby.pages);
+      } finally {
+        await service.auth.admin.deleteUser(account.owner);
+      }
+    });
   });
 });

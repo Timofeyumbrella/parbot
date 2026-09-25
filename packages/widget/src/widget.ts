@@ -66,13 +66,17 @@ const NETWORK_ERROR = 'Could not reach the assistant. Check your connection and 
 const errorCopy = (code: ChatErrorCode | 'network') => (code === 'network' ? NETWORK_ERROR : ERROR_COPY[code]);
 
 const LEAD_FAILED = 'The message could not be sent. Try again.';
+const LEAD_BAD_EMAIL = 'Check the email address and retry.';
 
 /** Lead form failures that deserve their own sentence; every other code reads as LEAD_FAILED. */
 const LEAD_ERROR_COPY: Partial<Record<ChatErrorCode, string>> = {
   rate_limited: 'Too many attempts in a short time. Wait a moment and retry.',
   unauthorized: 'This assistant does not take email addresses.',
-  bad_request: 'Check the email address and retry.',
+  bad_request: LEAD_BAD_EMAIL,
 };
+
+/** A first check before the request; the lead route validates the address properly. */
+const LOOKS_LIKE_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const isErrorCode = (value: unknown): value is ChatErrorCode => typeof value === 'string' && value in ERROR_COPY;
 
@@ -664,6 +668,12 @@ export class ParbotWidget {
       return;
     }
 
+    if (!LOOKS_LIKE_EMAIL.test(email)) {
+      status.textContent = LEAD_BAD_EMAIL;
+
+      return;
+    }
+
     button.disabled = true;
     status.textContent = 'Sending';
 
@@ -861,6 +871,8 @@ export class ParbotWidget {
   private renderLeadForm(message: Message) {
     const form = el('form', 'pb-lead');
     form.setAttribute('aria-label', 'Leave your email');
+    // The browser's bubble ignores the widget's theme; submitLead says the same thing in the hint.
+    form.noValidate = true;
     form.innerHTML = `
       <p>Leave your email and the team will follow up with an answer.</p>
       <input name="email" type="email" autocomplete="email" placeholder="you@company.com" aria-label="Email" required>

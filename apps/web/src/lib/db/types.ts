@@ -618,6 +618,21 @@ export type Database = {
         }
         Returns: number
       }
+      insert_document_within_limit: {
+        Args: {
+          assistant: string
+          owner: string
+          page_checksum: string
+          page_content: string
+          page_limit: number
+          page_title: string
+          page_token_count: number
+          page_url?: string
+          replaces?: string
+          source: string
+        }
+        Returns: string
+      }
       match_chunks: {
         Args: {
           assistant: string

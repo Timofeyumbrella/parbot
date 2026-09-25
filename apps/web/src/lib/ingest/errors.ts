@@ -26,9 +26,14 @@ export const humanizeIngestError = (cause: unknown): string => {
   }
 
   if (cause instanceof ProviderError) {
-    return cause.status === 401 || cause.status === 403
-      ? 'The embedding provider refused the API key. Check GEMINI_API_KEY and re-index.'
-      : `The embedding provider could not process the passages (HTTP ${cause.status}). Re-index in a moment.`;
+    if (cause.status === 401 || cause.status === 403) {
+      // The key is the operator's to fix; the row speaks to the account that added the source.
+      console.error('[ingest] the embedding provider refused the API key; check GEMINI_API_KEY', cause);
+
+      return 'The embedding provider turned the request down, so nothing new was indexed. Re-index later.';
+    }
+
+    return `The embedding provider could not process the passages (HTTP ${cause.status}). Re-index in a moment.`;
   }
 
   if (cause instanceof Error && (cause.name === 'TimeoutError' || cause.name === 'AbortError')) {

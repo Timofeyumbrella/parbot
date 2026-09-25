@@ -16,12 +16,20 @@ describe('humanizeIngestError', () => {
     expect(humanizeIngestError(new ModelBusyError(['gemini-embedding-2']))).toBe(
       'The embedding model is busy right now. Re-index in a few minutes.',
     );
-    expect(humanizeIngestError(new ProviderError(403, 'API key not valid. Please pass a valid API key.'))).toBe(
-      'The embedding provider refused the API key. Check GEMINI_API_KEY and re-index.',
-    );
     expect(humanizeIngestError(new ProviderError(502, 'Expected 3 embeddings, received 2.'))).toBe(
       'The embedding provider could not process the passages (HTTP 502). Re-index in a moment.',
     );
+  });
+
+  it('keeps the key setting out of the row and in the server log', () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const message = humanizeIngestError(new ProviderError(403, 'API key not valid. Please pass a valid API key.'));
+
+    expect(message).toBe('The embedding provider turned the request down, so nothing new was indexed. Re-index later.');
+    expect(message).not.toMatch(/[A-Z]+_[A-Z_]+|API key/);
+    expect(error).toHaveBeenCalledWith(expect.stringContaining('GEMINI_API_KEY'), expect.any(ProviderError));
+
+    error.mockRestore();
   });
 
   it('never shows library text and logs it instead', () => {
