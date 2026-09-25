@@ -11,9 +11,14 @@ import { ParbotWidget } from './widget';
 type Command = (widget: ParbotWidget) => void;
 
 let widget: ParbotWidget | null = null;
+let destroyed = false;
 const queue: Command[] = [];
 
 const run = (command: Command) => {
+  if (destroyed) {
+    return;
+  }
+
   if (widget) {
     command(widget);
   } else {
@@ -27,6 +32,17 @@ export const toggle = () => run((instance) => instance.toggle());
 export const setMode = (mode: WidgetMode) => run((instance) => instance.setMode(mode));
 export const setScheme = (scheme: WidgetScheme) => run((instance) => instance.setScheme(scheme));
 export const ask = (question: string) => run((instance) => instance.ask(question));
+
+/**
+ * Takes the widget off the page for good, even if it is still starting. A single-page app that
+ * shows it on one screen calls this when the visitor leaves; loading the script again brings it back.
+ */
+export const destroy = () => {
+  destroyed = true;
+  widget?.destroy();
+  widget = null;
+  queue.length = 0;
+};
 
 const whenReady = () =>
   new Promise<void>((resolve) => {
@@ -57,7 +73,7 @@ export const boot = async (script = findScript()): Promise<ParbotWidget | null> 
 
     await whenReady();
 
-    if (widget || document.getElementById('parbot-widget')) {
+    if (destroyed || widget || document.getElementById('parbot-widget')) {
       return widget;
     }
 
@@ -90,7 +106,6 @@ export const boot = async (script = findScript()): Promise<ParbotWidget | null> 
 
 /** Test hook: forgets the mounted widget so the next boot starts fresh. */
 export const resetForTests = () => {
-  widget?.destroy();
-  widget = null;
-  queue.length = 0;
+  destroy();
+  destroyed = false;
 };

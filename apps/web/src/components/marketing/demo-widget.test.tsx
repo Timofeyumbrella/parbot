@@ -7,7 +7,8 @@ import { ThemeToggle } from '@/components/theme-toggle';
 
 import { DemoWidget, WIDE_HERO_QUERY } from './demo-widget';
 
-type WidgetWindow = Window & { Parbot?: { setScheme: (scheme: string) => void } };
+type WidgetApi = { setScheme: ReturnType<typeof vi.fn>; destroy: ReturnType<typeof vi.fn> };
+type WidgetWindow = Window & { Parbot?: WidgetApi };
 
 /** The site's own provider settings: dark unless the visitor picks light, whatever the OS says. */
 const renderLanding = () =>
@@ -19,6 +20,16 @@ const renderLanding = () =>
   );
 
 const widgetScripts = () => document.querySelectorAll<HTMLScriptElement>('script[data-parbot]');
+
+/** jsdom never runs the script; this does what the browser does when it has. */
+const runScript = (script: HTMLScriptElement) => {
+  const api: WidgetApi = { setScheme: vi.fn(), destroy: vi.fn() };
+
+  (window as WidgetWindow).Parbot = api;
+  script.dispatchEvent(new Event('load'));
+
+  return api;
+};
 
 describe('DemoWidget', () => {
   let wide = false;
@@ -41,17 +52,11 @@ describe('DemoWidget', () => {
   });
 
   afterEach(() => {
-    for (const script of widgetScripts()) {
-      script.remove();
-    }
-
     delete (window as WidgetWindow).Parbot;
     vi.unstubAllGlobals();
   });
 
-  it('loads the palette once, in the dark scheme the page shows rather than the light OS one', () => {
-    // Leaving the landing and coming back must not load a second widget.
-    renderLanding().unmount();
+  it('loads the palette in the dark scheme the page shows rather than the light OS one', () => {
     renderLanding();
 
     expect(widgetScripts()).toHaveLength(1);
@@ -68,34 +73,62 @@ describe('DemoWidget', () => {
 
   it('keeps the pill off where the hero stacks, so it cannot cover the demo panel', () => {
     renderLanding().unmount();
-    expect(widgetScripts()[0]?.dataset.launcher).toBe('false');
 
-    widgetScripts()[0]?.remove();
     wide = true;
     renderLanding();
     expect(widgetScripts()[0]?.dataset.launcher).toBe('true');
   });
 
+  it('shows no pill on a phone or a tablet', () => {
+    renderLanding();
+    expect(widgetScripts()[0]?.dataset.launcher).toBe('false');
+  });
+
   it('follows the header toggle, whether or not the widget has started', async () => {
     const user = userEvent.setup();
-    const setScheme = vi.fn();
 
     renderLanding();
 
     const toggle = screen.getByRole('button', { name: 'Toggle colour scheme' });
+    const script = widgetScripts()[0]!;
 
-    // Before the script has run there is no window.Parbot; the attribute is what it will read.
+    // Before the script has run, the attribute is what it will read.
     await user.click(toggle);
-    expect(widgetScripts()[0]?.dataset.scheme).toBe('light');
+    expect(script.dataset.scheme).toBe('light');
 
-    (window as WidgetWindow).Parbot = { setScheme };
-
-    await user.click(toggle);
-    expect(widgetScripts()[0]?.dataset.scheme).toBe('dark');
-    expect(setScheme).toHaveBeenLastCalledWith('dark');
+    const api = runScript(script);
 
     await user.click(toggle);
-    expect(setScheme).toHaveBeenLastCalledWith('light');
+    expect(script.dataset.scheme).toBe('dark');
+    expect(api.setScheme).toHaveBeenLastCalledWith('dark');
+
+    await user.click(toggle);
+    expect(api.setScheme).toHaveBeenLastCalledWith('light');
     expect(widgetScripts()).toHaveLength(1);
+  });
+
+  it('takes the widget away when the visitor leaves the landing, and brings one back on return', () => {
+    const view = renderLanding();
+    const api = runScript(widgetScripts()[0]!);
+
+    view.unmount();
+
+    expect(api.destroy).toHaveBeenCalledTimes(1);
+    expect(widgetScripts()).toHaveLength(0);
+
+    renderLanding();
+    expect(widgetScripts()).toHaveLength(1);
+  });
+
+  it('stops a copy that was still loading when the visitor left', () => {
+    const view = renderLanding();
+    const script = widgetScripts()[0]!;
+
+    view.unmount();
+
+    // The browser still runs a script removed mid-download; it must not mount on the next page.
+    const api = runScript(script);
+
+    expect(api.destroy).toHaveBeenCalledTimes(1);
   });
 });

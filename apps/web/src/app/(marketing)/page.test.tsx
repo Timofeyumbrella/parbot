@@ -29,7 +29,6 @@ describe('landing page', () => {
 
   afterEach(() => {
     cleanup();
-    document.querySelectorAll('script[data-parbot]').forEach((script) => script.remove());
     vi.unstubAllEnvs();
     vi.restoreAllMocks();
   });

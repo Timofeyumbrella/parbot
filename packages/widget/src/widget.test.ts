@@ -1,7 +1,7 @@
 import { type ChatStreamEvent, encodeSseEvent, type WidgetConfig, type WidgetScheme } from '@parbot/shared';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { ask, boot, resetForTests, setScheme } from './boot';
+import { ask, boot, destroy, resetForTests, setScheme } from './boot';
 import { accentText } from './config';
 
 const API = 'https://app.parbot.test';
@@ -500,6 +500,31 @@ describe('widget', () => {
 
     resetForTests();
     expect(listeners.size).toBe(0);
+  });
+
+  it('leaves the page for good when destroyed, even while it is still starting', async () => {
+    installFetch({ mode: 'palette' });
+    const widget = await boot(mountScript());
+
+    destroy();
+    expect(document.getElementById('parbot-widget')).toBeNull();
+
+    // Its shortcut goes with it: Cmd+K belongs to the page again.
+    const shortcut = new KeyboardEvent('keydown', { key: 'k', metaKey: true, bubbles: true, cancelable: true });
+    document.dispatchEvent(shortcut);
+    expect(shortcut.defaultPrevented).toBe(false);
+    expect(widget!.opened).toBe(false);
+
+    resetForTests();
+    document.head.innerHTML = '';
+
+    // Destroyed before the config arrived: it never mounts, and later calls are dropped.
+    const starting = boot(mountScript());
+    destroy();
+    ask('Anyone there?');
+
+    expect(await starting).toBeNull();
+    expect(document.getElementById('parbot-widget')).toBeNull();
   });
 
   it('does nothing without a key and warns when the config cannot load', async () => {

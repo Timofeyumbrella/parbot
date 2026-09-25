@@ -1,11 +1,14 @@
 'use client';
 
 import { useTheme } from 'next-themes';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 
 type Scheme = 'light' | 'dark';
 
-type WidgetApi = { setScheme?: (scheme: Scheme) => void };
+/** The part of window.Parbot the landing uses. */
+type WidgetApi = { setScheme?: (scheme: Scheme) => void; destroy?: () => void };
+
+type LoadedWidget = { script: HTMLScriptElement; api?: WidgetApi };
 
 /**
  * Where the hero goes to two columns (Tailwind's lg). Narrower, the demo panel sits under the copy
@@ -21,27 +24,52 @@ export const WIDE_HERO_QUERY = '(min-width: 64rem)';
 export const DemoWidget = ({ demoKey }: { demoKey: string }) => {
   const { resolvedTheme } = useTheme();
   const scheme: Scheme = resolvedTheme === 'light' ? 'light' : 'dark';
+  const loaded = useRef<LoadedWidget | null>(null);
 
   useEffect(() => {
-    const loaded = document.querySelector<HTMLScriptElement>('script[data-parbot]');
-
-    if (loaded) {
-      // The script reads the attribute when it runs; once it has, the widget takes the call.
-      loaded.dataset.scheme = scheme;
-      (window as Window & { Parbot?: WidgetApi }).Parbot?.setScheme?.(scheme);
-
-      return;
-    }
-
     const script = document.createElement('script');
+    const widget: LoadedWidget = { script };
+    let left = false;
+
+    // Fired straight after the script runs, so window.Parbot is still this copy's API.
+    script.addEventListener(
+      'load',
+      () => {
+        widget.api = (window as Window & { Parbot?: WidgetApi }).Parbot;
+
+        if (left) {
+          widget.api?.destroy?.();
+        }
+      },
+      { once: true },
+    );
 
     script.src = '/widget.js';
     script.async = true;
     script.dataset.parbot = demoKey;
     script.dataset.mode = 'palette';
-    script.dataset.scheme = scheme;
     script.dataset.launcher = String(window.matchMedia(WIDE_HERO_QUERY).matches);
     document.body.append(script);
+    loaded.current = widget;
+
+    return () => {
+      // The demo belongs to this page. Left running, it followed the visitor into sign-up and the
+      // app, where ⌘K is the chat search. A copy still loading is stopped as soon as it runs.
+      left = true;
+      widget.api?.destroy?.();
+      script.remove();
+      loaded.current = null;
+    };
+  }, [demoKey]);
+
+  useEffect(() => {
+    const widget = loaded.current;
+
+    // The script reads the attribute when it runs; after that the widget takes the call.
+    if (widget) {
+      widget.script.dataset.scheme = scheme;
+      widget.api?.setScheme?.(scheme);
+    }
   }, [demoKey, scheme]);
 
   return null;
