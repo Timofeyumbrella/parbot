@@ -5,6 +5,7 @@ import type { Database } from '@/lib/db';
 
 import {
   activityStamp,
+  compareActivity,
   conversationListKey,
   conversationPage,
   type ConversationRow,
@@ -114,6 +115,30 @@ describe('activityStamp and keys', () => {
     expect(inboxKey('a1')).toEqual(['inbox', 'a1']);
     expect(conversationListKey('a1', 'widget')).toEqual(['inbox', 'a1', 'conversations', 'widget']);
     expect(inboxCountsKey('a1')).toEqual(['inbox', 'a1', 'counts']);
+  });
+});
+
+describe('compareActivity', () => {
+  it('sorts like the query: last message first, rows without one last, then id descending', () => {
+    const later = row({ id: 'b0000000-0000-4000-8000-000000000000', last_message_at: '2026-09-23T11:00:00.5+00:00' });
+    const earlier = row({ id: 'a0000000-0000-4000-8000-000000000000', last_message_at: '2026-09-23T11:00:00+00:00' });
+    const tieLow = row({ id: 'e0000000-0000-4000-8000-000000000000', last_message_at: '2026-09-22T11:00:00+00:00' });
+    const tieHigh = row({ id: 'f0000000-0000-4000-8000-000000000000', last_message_at: '2026-09-22T11:00:00+00:00' });
+    // Started after every message above but never had one, so the server pages it last.
+    const startedOnly = row({ id: 'c0000000-0000-4000-8000-000000000000', last_message_at: null, created_at: '2026-09-23T11:59:00+00:00' });
+    const startedEarlier = row({ id: 'd0000000-0000-4000-8000-000000000000', last_message_at: null, created_at: '2026-09-20T11:59:00+00:00' });
+
+    const sorted = [startedOnly, tieLow, startedEarlier, earlier, tieHigh, later].sort(compareActivity);
+
+    expect(sorted.map((item) => item.id[0])).toEqual(['b', 'a', 'f', 'e', 'd', 'c']);
+    expect(compareActivity(later, later)).toBe(0);
+  });
+
+  it('orders messages in the same millisecond by their microseconds, as Postgres does', () => {
+    const first = row({ id: 'f0000000-0000-4000-8000-000000000000', last_message_at: '2026-09-23T11:00:00.123401+00:00' });
+    const second = row({ id: 'a0000000-0000-4000-8000-000000000000', last_message_at: '2026-09-23T11:00:00.12345+00:00' });
+
+    expect([first, second].sort(compareActivity).map((item) => item.id[0])).toEqual(['a', 'f']);
   });
 });
 

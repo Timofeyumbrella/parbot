@@ -68,9 +68,50 @@ export const pageOf = (rows: ConversationRow[]): ConversationPage => {
   };
 };
 
-/** The moment a row is sorted by: its last message, or its start while it has none. */
+/** The moment a row shows as its activity: its last message, or its start while it has none. */
 export const activityStamp = (row: Pick<ConversationRow, 'last_message_at' | 'created_at'>) =>
   row.last_message_at ?? row.created_at;
+
+/**
+ * A timestamp in microseconds since the epoch, the precision Postgres orders by. `Date.parse`
+ * stops at milliseconds, so two messages in the same millisecond would otherwise fall back to
+ * the id and could land in a different order than the server returned them.
+ */
+const microseconds = (stamp: string) => {
+  const fraction = /\.(\d+)/.exec(stamp)?.[1] ?? '';
+
+  return Date.parse(stamp) * 1000 + Number(fraction.slice(3, 6).padEnd(3, '0'));
+};
+
+/**
+ * The list order, exactly as `conversationPage` returns it: last message first, rows that never
+ * had one after every row that did, ties broken by id. The list re-sorts with this after
+ * Realtime changes a row in place; any other rule would show rows in an order the keyset cursor
+ * does not follow, so "Load more" would append rows above ones already shown.
+ */
+export const compareActivity = (
+  a: Pick<ConversationRow, 'last_message_at' | 'id'>,
+  b: Pick<ConversationRow, 'last_message_at' | 'id'>,
+) => {
+  if (a.last_message_at !== b.last_message_at) {
+    if (a.last_message_at === null) {
+      return 1;
+    }
+
+    if (b.last_message_at === null) {
+      return -1;
+    }
+
+    const byTime = microseconds(b.last_message_at) - microseconds(a.last_message_at);
+
+    if (byTime !== 0) {
+      return byTime;
+    }
+  }
+
+  // Postgres compares uuids byte by byte, which is the order of their lowercase hex text.
+  return a.id === b.id ? 0 : a.id < b.id ? 1 : -1;
+};
 
 /** The PostgREST filter that selects everything after `cursor` in the list order. */
 export const cursorFilter = (cursor: PageCursor) =>

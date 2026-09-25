@@ -1,8 +1,16 @@
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
-import { describe, expect, it } from 'vitest';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { render, screen, waitFor } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 
-import type { ConversationRow } from './conversation-query';
-import { applyChange, type ListData } from './conversation-list';
+import { conversationListKey, type ConversationRow } from './conversation-query';
+import { applyChange, ConversationList, type ListData } from './conversation-list';
+
+// The list subscribes to Realtime once the session is ready; these tests drive the cache directly.
+vi.mock('@/lib/supabase/client', () => ({
+  getSupabaseBrowserClient: () => ({ removeChannel: vi.fn() }),
+  realtimeReadyClient: () => new Promise(() => {}),
+}));
 
 const row = (overrides: Partial<ConversationRow> = {}): ConversationRow => ({
   id: crypto.randomUUID(),
@@ -33,6 +41,47 @@ const remove = (id: string): Payload =>
   ({ eventType: 'DELETE', new: {}, old: { id }, schema: 'public', table: 'conversations', commit_timestamp: '', errors: [] }) as Payload;
 
 const ids = (data: ListData) => data.pages.flatMap((page) => page.rows.map((item) => item.id));
+
+const NOW = Date.parse('2026-09-23T12:00:00Z');
+
+const renderList = (initialRows: ConversationRow[]) => {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
+
+  render(
+    <QueryClientProvider client={queryClient}>
+      <ConversationList assistantId="asst" filter="all" initialRows={initialRows} now={NOW} />
+    </QueryClientProvider>,
+  );
+
+  return queryClient;
+};
+
+const shownIds = () => screen.getAllByRole('listitem').map((item) => item.getAttribute('data-conversation-id'));
+
+describe('ConversationList', () => {
+  it('shows rows in the order the server pages them, a row without a message last', async () => {
+    // Started most recently but never had a message: sorting by start time would lift it to the top.
+    const queryClient = renderList([
+      row({ id: 'b', last_message_at: '2026-09-23T11:00:00+00:00' }),
+      row({ id: 'a', last_message_at: '2026-09-23T10:00:00+00:00' }),
+      row({ id: 'z', last_message_at: null, created_at: '2026-09-23T11:59:00+00:00' }),
+    ]);
+
+    expect(shownIds()).toEqual(['b', 'a', 'z']);
+    // It still shows when it was started, the only activity it has.
+    expect(screen.getByText('1 min ago')).toBeInTheDocument();
+
+    // Its first message arrives over Realtime and only then does it move to the top.
+    queryClient.setQueryData<ListData>(conversationListKey('asst', 'all'), (data) =>
+      data
+        ? applyChange(data, update(row({ id: 'z', last_message_at: '2026-09-23T11:59:30+00:00' })), 'all').data
+        : data,
+    );
+
+    // TanStack Query notifies observers on the next tick.
+    await waitFor(() => expect(shownIds()).toEqual(['z', 'b', 'a']));
+  });
+});
 
 describe('applyChange', () => {
   it('prepends an inserted row that fits the filter and reports it as new', () => {
