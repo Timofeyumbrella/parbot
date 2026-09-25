@@ -24,8 +24,8 @@ export type KnowledgeScreenProps = {
   liveAi: boolean;
 };
 
-export const STUB_NOTICE =
-  'Running on the built-in stub provider: indexing works, answers are placeholders. Add GEMINI_API_KEY to .env for real answers.';
+/** Written for the account, not the operator: how to connect a model lives in the README. */
+export const STUB_NOTICE = 'Answers are placeholders until an AI model is connected. Sources are indexed as usual.';
 
 const EmptyState = ({ onPick }: { onPick: (tab: AddSourceTab) => void }) => (
   <section className="flex flex-col items-center gap-5 rounded-xl border border-dashed px-6 py-12 text-center">

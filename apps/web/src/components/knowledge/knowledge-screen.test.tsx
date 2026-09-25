@@ -202,7 +202,11 @@ describe('KnowledgeScreen', () => {
   it('explains the stub provider quietly when no model key is set', () => {
     renderScreen([], { liveAi: false });
 
-    expect(screen.getByRole('status')).toHaveTextContent(STUB_NOTICE);
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Answers are placeholders until an AI model is connected. Sources are indexed as usual.',
+    );
+    // Product copy: no environment variables, config files or provider internals.
+    expect(STUB_NOTICE).not.toMatch(/[A-Z]+_[A-Z_]+|\.env|stub/);
   });
 
   it('adds a source the moment the form is sent and swaps in the saved row afterwards', async () => {
