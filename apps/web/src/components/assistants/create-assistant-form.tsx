@@ -76,8 +76,8 @@ export const CreateAssistantForm = () => {
           />
         )}
       </FormField>
-      <div className="flex items-center justify-between gap-4">
-        <p className="text-muted-foreground text-sm">Next you will point it at your docs.</p>
+      {/* What comes next is said once, in the onboarding header above the form. */}
+      <div className="flex justify-end">
         <Button type="submit" disabled={pending}>
           {pending ? <Loader2 className="animate-spin" /> : null}
           Create assistant
