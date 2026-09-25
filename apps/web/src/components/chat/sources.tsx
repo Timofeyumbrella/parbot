@@ -34,10 +34,11 @@ const CHIP =
 
 /**
  * The sources row under an answer, shared by the chat and the Inbox transcript so an answer reads
- * the same on both screens. `id` is where an inline marker without a url points.
+ * the same on both screens. `id` is where an inline marker without a url points; the scroll margin
+ * keeps the row clear of the fixed phone header when a marker jumps to it.
  */
 export const Sources = ({ citations, id }: { citations: Citation[]; id: string }) => (
-  <div id={id} className="flex flex-wrap items-center gap-1.5 pt-1" data-testid="sources">
+  <div id={id} className="flex scroll-mt-16 flex-wrap items-center gap-1.5 pt-1" data-testid="sources">
     <span className="text-muted-foreground mr-0.5 text-xs">Sources</span>
     {byDocument(citations).map(({ citation, indexes, snippets }) => {
       const host = hostnameOf(citation.url);
