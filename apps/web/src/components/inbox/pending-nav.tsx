@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createContext, useContext, useState, useTransition } from 'react';
 
+import { isPlainLeftClick } from '@/components/nav-pending';
+
 type PendingTarget = {
   href: string;
   /** The switch the link belongs to. Only that switch moves; the others keep their state. */
@@ -77,9 +79,6 @@ export const PendingRegion = ({
     </div>
   );
 };
-
-const isPlainLeftClick = (event: React.MouseEvent<HTMLAnchorElement>) =>
-  event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey;
 
 type SegmentedLinkProps = {
   href: string;
