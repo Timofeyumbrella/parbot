@@ -10,7 +10,8 @@ type WelcomeProps = {
 
 /**
  * What an empty conversation shows: who is answering, the welcome line, and questions to start from.
- * The pane is empty, so a long question wraps instead of ending in an ellipsis.
+ * The welcome line already says what to do, so an assistant without suggested questions gets nothing
+ * under it. The pane is empty, so a long question wraps instead of ending in an ellipsis.
  */
 export const Welcome = ({ assistant, onPick, disabled = false }: WelcomeProps) => (
   <div className="flex flex-col items-center gap-4 text-center" data-testid="welcome">
@@ -21,7 +22,7 @@ export const Welcome = ({ assistant, onPick, disabled = false }: WelcomeProps) =
         {assistant.welcome_message}
       </p>
     </div>
-    {assistant.suggested_questions.length > 0 ? (
+    {assistant.suggested_questions.length > 0 && (
       <ul
         className="mt-1 flex max-w-full flex-wrap justify-center gap-2"
         aria-label="Suggested questions"
@@ -39,8 +40,6 @@ export const Welcome = ({ assistant, onPick, disabled = false }: WelcomeProps) =
           </li>
         ))}
       </ul>
-    ) : (
-      <p className="text-muted-foreground text-xs">Ask anything the documentation covers.</p>
     )}
   </div>
 );

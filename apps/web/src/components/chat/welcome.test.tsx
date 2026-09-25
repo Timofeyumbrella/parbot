@@ -42,6 +42,16 @@ describe('Welcome', () => {
     expect(onPick).toHaveBeenCalledWith(LONG_QUESTION);
   });
 
+  it('says the welcome line once when there are no suggested questions', () => {
+    render(<Welcome assistant={{ ...assistant, suggested_questions: [] }} onPick={vi.fn()} />);
+
+    expect(screen.queryByRole('list', { name: 'Suggested questions' })).not.toBeInTheDocument();
+    // Nothing but the name and the welcome line: no fallback hint repeating what it says.
+    expect(screen.getByTestId('welcome')).toHaveTextContent(
+      /^Acme DocsAsk me anything about the Acme docs\.$/,
+    );
+  });
+
   it('disables the chips while a send is in flight', () => {
     render(<Welcome assistant={assistant} onPick={vi.fn()} disabled />);
 
