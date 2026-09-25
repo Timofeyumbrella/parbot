@@ -1,4 +1,10 @@
-export { type AnswerAssistant, type AnswerConversation, type AnswerParams, streamAnswer } from './answer';
+export {
+  ANSWER_ERROR_COPY,
+  type AnswerAssistant,
+  type AnswerConversation,
+  type AnswerParams,
+  streamAnswer,
+} from './answer';
 export {
   buildSystemPrompt,
   conversationTitle,

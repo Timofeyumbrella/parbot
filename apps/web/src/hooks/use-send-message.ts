@@ -4,8 +4,19 @@ import { type AppChatRequest, type ChatStreamEvent, readChatStream } from '@parb
 import { type QueryClient, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useMemo } from 'react';
 
-import { confirmConversation, type ConversationRow, draftTitle, upsertConversation } from '@/lib/chat/conversations';
-import { errorEvent, httpFailure, NETWORK_FAILURE, STREAM_CUT_SHORT } from '@/lib/chat/errors';
+import {
+  confirmConversation,
+  type ConversationRow,
+  draftTitle,
+  upsertConversation,
+} from '@/lib/chat/conversations';
+import {
+  errorEvent,
+  fromServerError,
+  httpFailure,
+  NETWORK_FAILURE,
+  STREAM_CUT_SHORT,
+} from '@/lib/chat/errors';
 import { conversationsKey, INBOX_NAMESPACE, threadKey } from '@/lib/chat/queries';
 import { streamRegistry } from '@/lib/chat/streams';
 import {
@@ -39,7 +50,11 @@ const isEventStream = (response: Response) =>
  * leaves, and every event from the server is folded into the cache from then on. Tokens are
  * coalesced per animation frame so React renders at most once a frame while text streams.
  */
-export const sendMessage = async (queryClient: QueryClient, assistantId: string, input: SendInput) => {
+export const sendMessage = async (
+  queryClient: QueryClient,
+  assistantId: string,
+  input: SendInput,
+) => {
   const content = input.content.trim();
 
   if (!content) {
@@ -54,7 +69,12 @@ export const sendMessage = async (queryClient: QueryClient, assistantId: string,
   const now = new Date().toISOString();
 
   queryClient.setQueryData<Thread>(key, (thread) =>
-    beginExchange(thread ?? emptyThread(), { userId, assistantId: assistantMessageId, content, now }),
+    beginExchange(thread ?? emptyThread(), {
+      userId,
+      assistantId: assistantMessageId,
+      content,
+      now,
+    }),
   );
 
   queryClient.setQueryData<ConversationRow[]>(listKey, (rows) => {
@@ -72,7 +92,9 @@ export const sendMessage = async (queryClient: QueryClient, assistantId: string,
 
   const controller = streamRegistry.start(conversationId);
   const apply = (event: ChatStreamEvent) =>
-    queryClient.setQueryData<Thread>(key, (thread) => applyStreamEvent(thread ?? emptyThread(), event));
+    queryClient.setQueryData<Thread>(key, (thread) =>
+      applyStreamEvent(thread ?? emptyThread(), event),
+    );
 
   let buffer = '';
   let frame: number | null = null;
@@ -126,7 +148,7 @@ export const sendMessage = async (queryClient: QueryClient, assistantId: string,
         continue;
       }
 
-      settle(event);
+      settle(event.type === 'error' ? errorEvent(fromServerError(event)) : event);
 
       if (event.type === 'meta') {
         queryClient.setQueryData<ConversationRow[]>(listKey, (rows) =>
@@ -177,12 +199,19 @@ export const sendMessage = async (queryClient: QueryClient, assistantId: string,
 export const stopMessage = (queryClient: QueryClient, conversationId: string) => {
   if (!streamRegistry.stop(conversationId)) {
     // Nothing is in flight (for instance after a hot reload) but the cache still says so.
-    queryClient.setQueryData<Thread>(threadKey(conversationId), (thread) => (thread ? stopExchange(thread) : thread));
+    queryClient.setQueryData<Thread>(threadKey(conversationId), (thread) =>
+      thread ? stopExchange(thread) : thread,
+    );
   }
 };
 
 /** Drops the failed pair and sends the same text again. */
-export const retryMessage = (queryClient: QueryClient, assistantId: string, conversationId: string, userId: string) => {
+export const retryMessage = (
+  queryClient: QueryClient,
+  assistantId: string,
+  conversationId: string,
+  userId: string,
+) => {
   const key = threadKey(conversationId);
   const thread = queryClient.getQueryData<Thread>(key);
   const failed = thread ? failedMessage(thread, userId) : null;
@@ -199,10 +228,17 @@ export const retryMessage = (queryClient: QueryClient, assistantId: string, conv
 export const useSendMessage = (assistantId: string) => {
   const queryClient = useQueryClient();
 
-  const send = useCallback((input: SendInput) => sendMessage(queryClient, assistantId, input), [queryClient, assistantId]);
-  const stop = useCallback((conversationId: string) => stopMessage(queryClient, conversationId), [queryClient]);
+  const send = useCallback(
+    (input: SendInput) => sendMessage(queryClient, assistantId, input),
+    [queryClient, assistantId],
+  );
+  const stop = useCallback(
+    (conversationId: string) => stopMessage(queryClient, conversationId),
+    [queryClient],
+  );
   const retry = useCallback(
-    (conversationId: string, userId: string) => retryMessage(queryClient, assistantId, conversationId, userId),
+    (conversationId: string, userId: string) =>
+      retryMessage(queryClient, assistantId, conversationId, userId),
     [queryClient, assistantId],
   );
 

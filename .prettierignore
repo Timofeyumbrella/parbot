@@ -5,3 +5,7 @@ pnpm-lock.yaml
 supabase/.temp
 apps/web/src/lib/db/types.ts
 apps/web/public/widget.js
+apps/web/public/widget.js.map
+apps/web/next-env.d.ts
+apps/web/playwright-report
+apps/web/test-results

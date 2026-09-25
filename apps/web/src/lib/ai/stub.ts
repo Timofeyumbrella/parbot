@@ -53,7 +53,9 @@ const firstSentence = (text: string) => {
  * NO_ANSWER marker when they were not. Keeps the app usable without an API key.
  */
 export const stubAnswer = (prompt: string) => {
-  const sources = [...prompt.matchAll(/^\[(\d+)\]\s+(.+)\n([\s\S]*?)(?=^\[\d+\]\s|\n\nQuestion:)/gm)];
+  const sources = [
+    ...prompt.matchAll(/^\[(\d+)\]\s+(.+)\n([\s\S]*?)(?=^\[\d+\]\s|\n\nQuestion:)/gm),
+  ];
 
   if (sources.length === 0) {
     return 'NO_ANSWER';
@@ -70,14 +72,16 @@ export const stubAnswer = (prompt: string) => {
 };
 
 export const createStubProvider = (): AiProvider => {
-  const stream = async function* (input: GenerateInput): AsyncGenerator<GenerateChunk, GenerateResult> {
+  const stream = async function* (
+    input: GenerateInput,
+  ): AsyncGenerator<GenerateChunk, GenerateResult> {
     const last = input.turns.at(-1)?.text ?? '';
     const answer = stubAnswer(last);
     const words = answer.split(' ');
 
     for (let index = 0; index < words.length; index += 1) {
       if (input.signal?.aborted) {
-        // Match the real provider: a stopped stream is an error, so the engine rolls back.
+        // Match the real provider: a stopped stream throws, and the engine keeps what arrived.
         throw new DOMException('The answer was stopped.', 'AbortError');
       }
 
