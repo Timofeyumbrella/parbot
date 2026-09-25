@@ -22,13 +22,17 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import { type ConversationRow, removeConversationRow } from '@/lib/chat/conversations';
+import { conversationsKey, threadKey } from '@/lib/chat/queries';
 
 const initialState: DeleteConversationState = {};
 
 /**
- * A destructive action behind a confirmation dialog. On success every cached list that could
- * still hold the row is dropped before going back: the inbox lists, because Realtime cannot
- * deliver a filtered DELETE, and the chat's list and thread, which live in their own namespace.
+ * A destructive action behind a confirmation dialog. On success every cache that could still
+ * hold the row lets go of it before going back: the inbox lists are dropped, because Realtime
+ * cannot deliver a filtered DELETE, and the row leaves the chat's list and thread directly. The
+ * chat is not mounted here, so its Realtime channel misses the delete, and the layout snapshot
+ * it folds in on return only ever adds rows.
  */
 export const DeleteConversation = ({
   assistantId,
@@ -54,7 +58,10 @@ export const DeleteConversation = ({
 
       if (result.deleted) {
         queryClient.removeQueries({ queryKey: inboxKey(assistantId) });
-        queryClient.removeQueries({ queryKey: ['thread', conversationId] });
+        queryClient.setQueryData<ConversationRow[]>(conversationsKey(assistantId), (rows) =>
+          rows ? removeConversationRow(rows, conversationId) : rows,
+        );
+        queryClient.removeQueries({ queryKey: threadKey(conversationId) });
         void queryClient.invalidateQueries({ queryKey: ['chat'] });
         toast.success('Conversation deleted');
         router.replace(`/a/${assistantId}/inbox`);
