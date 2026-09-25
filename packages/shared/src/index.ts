@@ -88,7 +88,8 @@ export type AppChatRequest = {
 
 export const MAX_MESSAGE_LENGTH = 2000;
 export const VISITOR_ID_PATTERN = /^[A-Za-z0-9_-]{8,64}$/;
-export const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+export const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export const HEX_COLOR_PATTERN = /^#[0-9a-f]{6}$/i;
 
@@ -214,6 +215,27 @@ export const MAX_WELCOME_MESSAGE_LENGTH = 300;
 export const MAX_ALLOWED_ORIGINS = 20;
 export const MAX_LEAD_NOTE_LENGTH = 1000;
 export const MAX_PAGE_URL_LENGTH = 2048;
+
+/**
+ * A visitor-supplied address that is safe to link to: an http(s) URL, trimmed, or null for
+ * anything else (javascript:, data:, relative paths, garbage). The widget API keeps only what
+ * passes, and the inbox runs stored page URLs through it again before rendering them as hrefs.
+ */
+export const safeHttpUrl = (value: unknown): string | null => {
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const trimmed = value.trim();
+
+  try {
+    const { protocol } = new URL(trimmed);
+
+    return protocol === 'http:' || protocol === 'https:' ? trimmed : null;
+  } catch {
+    return null;
+  }
+};
 
 /** Keys default to `pb_<32 hex>` in the database; the pattern is deliberately looser. */
 export const PUBLIC_KEY_PATTERN = /^[A-Za-z0-9_-]{8,80}$/;

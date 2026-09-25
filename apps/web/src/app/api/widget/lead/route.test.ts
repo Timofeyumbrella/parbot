@@ -122,6 +122,15 @@ describe('POST /api/widget/lead', () => {
     ]);
   });
 
+  it('stores no page url when the one sent is not an http(s) address', async () => {
+    const response = await post(body({ pageUrl: 'javascript:alert(document.cookie)' }));
+
+    expect(response.status).toBe(201);
+    expect((holder.service as FakeService).inserted.leads).toEqual([
+      expect.objectContaining({ email: 'ada@example.com', page_url: null }),
+    ]);
+  });
+
   it('says so when the insert fails', async () => {
     (holder.service as FakeService).failInsert('leads', 'boom');
 

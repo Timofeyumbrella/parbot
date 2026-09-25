@@ -12,6 +12,7 @@ import {
   MAX_WELCOME_MESSAGE_LENGTH,
   normalizeWidgetTheme,
   PUBLIC_KEY_PATTERN,
+  safeHttpUrl,
   UUID_PATTERN,
   VISITOR_ID_PATTERN,
   WIDGET_MODES,
@@ -41,7 +42,19 @@ import { type Plan, type PlanLimits, planFor } from '@/lib/plans';
 const key = z.string().regex(PUBLIC_KEY_PATTERN, 'Malformed public key.');
 const visitorId = z.string().regex(VISITOR_ID_PATTERN, 'Malformed visitor id.');
 const conversationId = z.string().regex(UUID_PATTERN, 'Malformed conversation id.');
-const pageUrl = z.string().max(MAX_PAGE_URL_LENGTH).optional();
+/**
+ * The page the widget sat on, later rendered as a link in the owner's inbox. Anything that is
+ * not an http(s) address of sane length is dropped rather than refused: the question still
+ * deserves an answer, the link just goes unrecorded.
+ */
+const pageUrl = z
+  .string()
+  .optional()
+  .transform((value) =>
+    value !== undefined && value.length <= MAX_PAGE_URL_LENGTH
+      ? (safeHttpUrl(value) ?? undefined)
+      : undefined,
+  );
 
 export const widgetChatSchema = z.object({
   key,
