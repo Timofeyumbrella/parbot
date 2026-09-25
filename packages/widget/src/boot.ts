@@ -13,6 +13,8 @@ type Command = (widget: ParbotWidget) => void;
 let widget: ParbotWidget | null = null;
 let destroyed = false;
 const queue: Command[] = [];
+/** Stops holding the shortcut for a widget that is still starting. */
+let releaseShortcut: (() => void) | null = null;
 
 const run = (command: Command) => {
   if (destroyed) {
@@ -39,9 +41,48 @@ export const ask = (question: string) => run((instance) => instance.ask(question
  */
 export const destroy = () => {
   destroyed = true;
+  releaseShortcut?.();
   widget?.destroy();
   widget = null;
   queue.length = 0;
+};
+
+/**
+ * Holds ⌘K / Ctrl+K while the config loads. The palette's own listener exists only once the
+ * widget mounts, a config round trip after the page is ready, and a press in that window used to
+ * be lost. `release` stops listening and says whether the palette should open: the shortcut
+ * toggles, so an even number of presses leaves it closed. A script pinned to the bubble never
+ * opens a palette, so it leaves the keys alone.
+ */
+const holdShortcut = (mode: WidgetMode | null) => {
+  let pressed = false;
+  let listening = mode !== 'bubble';
+
+  const onKeydown = (event: KeyboardEvent) => {
+    if (
+      (event.metaKey || event.ctrlKey) &&
+      typeof event.key === 'string' &&
+      event.key.toLowerCase() === 'k'
+    ) {
+      event.preventDefault();
+      pressed = !pressed;
+    }
+  };
+
+  if (listening) {
+    document.addEventListener('keydown', onKeydown);
+  }
+
+  return {
+    release: () => {
+      if (listening) {
+        listening = false;
+        document.removeEventListener('keydown', onKeydown);
+      }
+
+      return pressed;
+    },
+  };
 };
 
 const whenReady = () =>
@@ -61,6 +102,10 @@ export const boot = async (script = findScript()): Promise<ParbotWidget | null> 
 
     return null;
   }
+
+  const shortcut = holdShortcut(options.mode);
+
+  releaseShortcut = shortcut.release;
 
   try {
     const config = await fetchConfig(options.api, options.key, options.version);
@@ -86,10 +131,17 @@ export const boot = async (script = findScript()): Promise<ParbotWidget | null> 
       scheme: options.scheme,
     }).mount();
 
+    // The widget listens for itself from here; a press while it loaded opens a palette now.
+    const pressed = shortcut.release();
+
     if (options.open) {
       // The preview frame wants the panel visible at once, but must not pull focus away from
       // the settings form the owner is editing next to it.
       widget.open({ focus: false });
+    }
+
+    if (pressed && widget.currentMode === 'palette') {
+      widget.open();
     }
 
     for (const command of queue.splice(0)) {
@@ -104,6 +156,12 @@ export const boot = async (script = findScript()): Promise<ParbotWidget | null> 
     );
 
     return null;
+  } finally {
+    shortcut.release();
+
+    if (releaseShortcut === shortcut.release) {
+      releaseShortcut = null;
+    }
   }
 };
 
