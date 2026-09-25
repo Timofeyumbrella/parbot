@@ -27,12 +27,14 @@ export const streamResponse = (
           controller.enqueue(encoder.encode(encodeSseEvent(event)));
         }
       } catch (cause) {
+        // A thrown error carries library text; the reader gets a sentence, the log gets the cause.
+        console.error('[engine] stream failed', cause);
         controller.enqueue(
           encoder.encode(
             encodeSseEvent({
               type: 'error',
               code: 'internal',
-              message: cause instanceof Error ? cause.message : 'The stream failed.',
+              message: 'The answer could not be produced. Try again in a moment.',
             }),
           ),
         );
@@ -55,6 +57,8 @@ export const streamResponse = (
 };
 
 /** A one-event stream for failures that happen before anything can be answered. */
-export const errorStream = async function* (event: ChatStreamEvent): AsyncGenerator<ChatStreamEvent> {
+export const errorStream = async function* (
+  event: ChatStreamEvent,
+): AsyncGenerator<ChatStreamEvent> {
   yield event;
 };

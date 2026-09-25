@@ -20,7 +20,10 @@ export const STREAM_CUT_SHORT: ChatError = {
 /** For a response that is not an event stream, which our route never sends: a proxy or a crash answered instead. */
 export const httpFailure = (status: number): ChatError => {
   if (status === 401 || status === 403) {
-    return { code: 'unauthorized', message: 'Your session has ended. Sign in again to keep chatting.' };
+    return {
+      code: 'unauthorized',
+      message: 'Your session has ended. Sign in again to keep chatting.',
+    };
   }
 
   if (status === 404) {
@@ -28,15 +31,37 @@ export const httpFailure = (status: number): ChatError => {
   }
 
   if (status === 429) {
-    return { code: 'rate_limited', message: 'Too many messages in a short time. Wait a moment and try again.' };
+    return {
+      code: 'rate_limited',
+      message: 'Too many messages in a short time. Wait a moment and try again.',
+    };
   }
 
   if (status >= 500) {
-    return { code: 'internal', message: `The server could not answer (${status}). Try again in a moment.` };
+    return {
+      code: 'internal',
+      message: `The server could not answer (${status}). Try again in a moment.`,
+    };
   }
 
   return { code: 'internal', message: `The server refused the message (${status}). Try again.` };
 };
+
+/**
+ * Copy for the server's error codes that can carry provider or database text. The route writes
+ * the other codes' messages itself (which field was wrong, how long to wait, which limit was hit),
+ * so those are shown as sent.
+ */
+const SERVER_ERROR_COPY: Partial<Record<ChatErrorCode, string>> = {
+  internal: 'The answer could not be produced. Try again in a moment.',
+  model_busy: 'The assistant is busy right now. Wait a moment and try again.',
+};
+
+/** The error to show for an error event the server streamed. */
+export const fromServerError = (event: Extract<ChatStreamEvent, { type: 'error' }>): ChatError => ({
+  code: event.code,
+  message: SERVER_ERROR_COPY[event.code] ?? event.message,
+});
 
 export type ErrorAction = { href: string; label: string };
 
@@ -53,6 +78,7 @@ export const errorAction = (error: ChatError): ErrorAction | null => {
 };
 
 /** Whether sending the same message again can reasonably succeed. */
-export const canRetry = (error: ChatError) => error.code !== 'unauthorized' && error.code !== 'not_found';
+export const canRetry = (error: ChatError) =>
+  error.code !== 'unauthorized' && error.code !== 'not_found';
 
 export const errorEvent = (error: ChatError): ChatStreamEvent => ({ type: 'error', ...error });

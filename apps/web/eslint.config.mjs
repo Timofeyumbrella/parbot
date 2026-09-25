@@ -15,6 +15,9 @@ const eslintConfig = defineConfig([
     // Built by packages/widget; not our source.
     "public/widget.js",
     "public/widget.js.map",
+    // Written by Playwright; the HTML reporter bundles its own trace viewer.
+    "playwright-report/**",
+    "test-results/**",
   ]),
 ]);
 
