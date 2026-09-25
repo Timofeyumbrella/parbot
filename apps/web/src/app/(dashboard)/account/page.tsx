@@ -10,6 +10,7 @@ import { formatPrice } from '@/lib/plans';
 import { requireUser } from '@/lib/session';
 
 import { EmailForm, PasswordForm, ProfileForm, SignOutButton } from './account-forms';
+import { DeleteAccountCard } from './delete-account-card';
 
 export const metadata: Metadata = { title: 'Account' };
 
@@ -23,7 +24,9 @@ export default async function AccountPage() {
     getAccountPlan(),
   ]);
 
-  const fullName = profile?.full_name ?? (typeof user.user_metadata.full_name === 'string' ? user.user_metadata.full_name : '');
+  const fullName =
+    profile?.full_name ??
+    (typeof user.user_metadata.full_name === 'string' ? user.user_metadata.full_name : '');
   const email = user.email ?? profile?.email ?? '';
   const pendingEmail = user.new_email ?? null;
   const { plan } = account;
@@ -37,7 +40,10 @@ export default async function AccountPage() {
 
   return (
     <PageContainer className="max-w-3xl">
-      <PageHeader title="Account" description="Your name, how you sign in, and the plan this account is on." />
+      <PageHeader
+        title="Account"
+        description="Your name, how you sign in, and the plan this account is on."
+      />
 
       <Card>
         <CardHeader>
@@ -70,12 +76,21 @@ export default async function AccountPage() {
       <Card>
         <CardHeader>
           <CardTitle>Sign out</CardTitle>
-          <CardDescription>Ends this session on this device. Your assistants keep running.</CardDescription>
+          <CardDescription>
+            Ends this session on this device. Your assistants keep running.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <SignOutButton />
         </CardContent>
       </Card>
+
+      <section aria-label="Danger zone" className="flex flex-col gap-3">
+        <h2 className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+          Danger zone
+        </h2>
+        <DeleteAccountCard email={email} />
+      </section>
     </PageContainer>
   );
 }

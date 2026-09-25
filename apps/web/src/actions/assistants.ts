@@ -21,6 +21,8 @@ import { type FormState, formValues, parseForm } from '@/lib/form';
 import { checkCapacity } from '@/lib/plans';
 import { requireUser } from '@/lib/session';
 import { slugify, uniqueSlug } from '@/lib/slug';
+import { removeStoredFiles } from '@/lib/source-files';
+import { createSupabaseServiceClient } from '@/lib/supabase/service';
 
 /** Postgres: a unique index rejected the row. */
 const UNIQUE_VIOLATION = '23505';
@@ -103,7 +105,8 @@ export const updateAssistant = async (
   }
 
   const { supabase } = await requireUser();
-  const { assistantId, name, slug, description, instructions, welcomeMessage, suggestedQuestions } = parsed.data;
+  const { assistantId, name, slug, description, instructions, welcomeMessage, suggestedQuestions } =
+    parsed.data;
 
   // Row level security limits the update to the visitor's own rows: a foreign id updates nothing.
   const { data, error } = await supabase
@@ -143,7 +146,15 @@ export const updateAssistant = async (
   return {
     status: 'success',
     message: 'Settings saved.',
-    values: { ...values, name, slug, description, instructions, welcomeMessage, suggestedQuestions: suggestedQuestions.join('\n') },
+    values: {
+      ...values,
+      name,
+      slug,
+      description,
+      instructions,
+      welcomeMessage,
+      suggestedQuestions: suggestedQuestions.join('\n'),
+    },
   };
 };
 
@@ -189,7 +200,8 @@ export const deleteAssistant = async (
     return parsed.state;
   }
 
-  const { supabase } = await requireUser();
+  const { supabase, user } = await requireUser();
+  // Row level security only shows the visitor's own rows, so a hit here proves ownership.
   const { data: assistant } = await supabase
     .from('assistants')
     .select('id, name')
@@ -206,6 +218,23 @@ export const deleteAssistant = async (
       values,
       error: 'The name did not match.',
       fieldErrors: { confirmName: `Type ${assistant.name} exactly as shown.` },
+    };
+  }
+
+  // The row cascade reaches every table but not the bucket, so the uploaded and pasted files go
+  // first. If that fails nothing has been deleted yet and a retry starts over with nothing orphaned.
+  try {
+    await removeStoredFiles(createSupabaseServiceClient(), `${user.id}/${assistant.id}`);
+  } catch (cause) {
+    console.error('[assistants] stored files were not removed', {
+      assistantId: assistant.id,
+      cause,
+    });
+
+    return {
+      status: 'error',
+      values,
+      error: 'The assistant’s files could not be removed. Try again in a moment.',
     };
   }
 
