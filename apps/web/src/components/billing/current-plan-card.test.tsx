@@ -30,13 +30,21 @@ const starter = account({
 describe('renewalLine', () => {
   it('says what happens next for each state', () => {
     expect(renewalLine(account())).toMatch(/Choose a plan below/);
-    expect(renewalLine(starter)).toBe('Renews on 2 November 2026.');
+    expect(renewalLine(starter)).toBe('Renews on Nov 2, 2026.');
     expect(renewalLine({ ...starter, cancelAtPeriodEnd: true })).toBe(
-      'Ends on 2 November 2026. You keep the plan until then.',
+      'Ends on Nov 2, 2026. You keep the plan until then.',
     );
     expect(renewalLine({ ...starter, status: 'past_due' })).toMatch(/payment failed/);
-    expect(renewalLine({ ...starter, status: 'trialing' })).toBe('Trial ends on 2 November 2026.');
+    expect(renewalLine({ ...starter, status: 'trialing' })).toBe('Trial ends on Nov 2, 2026.');
     expect(renewalLine({ ...account(), status: 'canceled' })).toMatch(/ended/);
+  });
+
+  it('explains why an unpaid first payment leaves the account on Hobby', () => {
+    const unpaid = account({ status: 'incomplete', hasStripeCustomer: true });
+
+    expect(renewalLine(unpaid)).toBe(
+      'The first payment has not gone through yet, so you are on Hobby. Finish it in the portal.',
+    );
   });
 });
 
@@ -46,7 +54,7 @@ describe('CurrentPlanCard', () => {
 
     expect(screen.getByText('Starter')).toBeInTheDocument();
     expect(screen.getByText('$290 a year')).toBeInTheDocument();
-    expect(screen.getByText('Renews on 2 November 2026.')).toBeInTheDocument();
+    expect(screen.getByText('Renews on Nov 2, 2026.')).toBeInTheDocument();
     expect(screen.getByText('Active')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Manage subscription' })).toBeEnabled();
   });
@@ -69,5 +77,19 @@ describe('CurrentPlanCard', () => {
     render(<CurrentPlanCard account={{ ...starter, status: 'past_due' }} providerName="stripe" />);
 
     expect(screen.getByText('Past due')).toBeInTheDocument();
+  });
+
+  it('shows Hobby with a pending payment while the first payment is incomplete', () => {
+    render(
+      <CurrentPlanCard
+        account={account({ status: 'incomplete', hasStripeCustomer: true })}
+        providerName="stripe"
+      />,
+    );
+
+    expect(screen.getByText('Hobby')).toBeInTheDocument();
+    expect(screen.getByText('Payment pending')).toBeInTheDocument();
+    expect(screen.getByText(/so you are on Hobby/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Manage subscription' })).toBeEnabled();
   });
 });

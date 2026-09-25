@@ -1,5 +1,7 @@
 // Display helpers shared by server and client components. No server-only imports here.
 
+import type { AccountPlan } from '@/lib/account';
+import { formatDate } from '@/lib/format';
 import { formatPrice, type Plan } from '@/lib/plans';
 
 import type { BillingInterval } from './types';
@@ -25,21 +27,27 @@ export const yearlyNote = (plan: Plan) =>
     ? null
     : `Two months free, ${formatPrice(yearlySavingCents(plan))} less than paying monthly`;
 
-const dateFormatter = new Intl.DateTimeFormat('en-GB', {
-  day: 'numeric',
-  month: 'long',
-  year: 'numeric',
-});
+/**
+ * "Starter, $29 a month. Renews on Oct 24, 2026." for the Account page. The date reads exactly as
+ * the Billing card's, so the two screens never disagree about it. A Hobby row carries no next date,
+ * even when an ended or unpaid subscription left a period end behind.
+ */
+export const planSummary = (account: AccountPlan) => {
+  const { plan } = account;
+  const price = priceLabel(plan, account.billingInterval ?? 'monthly');
+  const lead = `${plan.name}, ${price}.`;
 
-/** "23 October 2026", or null when the value is missing or not a date. */
-export const formatPeriodEnd = (value: string | null | undefined) => {
-  if (!value) {
-    return null;
+  if (plan.id === 'hobby') {
+    return `${lead} Upgrade for more assistants, pages and answers.`;
   }
 
-  const date = new Date(value);
+  if (!account.currentPeriodEnd) {
+    return lead;
+  }
 
-  return Number.isNaN(date.getTime()) ? null : dateFormatter.format(date);
+  const date = formatDate(account.currentPeriodEnd);
+
+  return account.cancelAtPeriodEnd ? `${lead} Ends on ${date}.` : `${lead} Renews on ${date}.`;
 };
 
 /** Percentage of a limit that is used, capped at 100, for a meter. */
