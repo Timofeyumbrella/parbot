@@ -10,6 +10,7 @@ import { useEffect, useState } from 'react';
 import { ChannelBadge, UnansweredBadge } from '@/components/inbox/channel-badge';
 import {
   activityStamp,
+  compareActivity,
   conversationListKey,
   conversationPage,
   type ConversationPage,
@@ -226,8 +227,8 @@ export const ConversationList = ({ assistantId, filter, initialRows, now }: Conv
 
       return true;
     })
-    // Live updates change a row's last message in place; keep the newest activity on top.
-    .sort((a, b) => activityStamp(b).localeCompare(activityStamp(a)));
+    // Live updates change a row's last message in place; put it back where the server pages it.
+    .sort(compareActivity);
 
   if (rows.length === 0) {
     const copy = EMPTY_COPY[filter];
