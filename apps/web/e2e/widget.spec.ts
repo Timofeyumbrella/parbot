@@ -167,6 +167,10 @@ test.describe('widget on the demo page', () => {
 
     const form = widget(page, 'form.pb-lead');
     await expect(form).toBeVisible({ timeout: 15_000 });
+    // A bad address is caught in the widget's own hint, in its theme, not in the browser's bubble.
+    await form.locator('input[name=email]').fill('not-an-email');
+    await form.locator('button[type=submit]').click();
+    await expect(form.locator('.pb-hint')).toHaveText('Check the email address and retry.');
     await form.locator('input[name=email]').fill('ada@example.com');
     await form.locator('button[type=submit]').click();
     await expect(widget(page, '.pb-thanks')).toHaveText('Thanks. The team will reply to ada@example.com.');
