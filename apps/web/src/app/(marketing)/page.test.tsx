@@ -29,6 +29,7 @@ describe('landing page', () => {
 
   afterEach(() => {
     cleanup();
+    document.querySelectorAll('script[data-parbot]').forEach((script) => script.remove());
     vi.unstubAllEnvs();
     vi.restoreAllMocks();
   });
@@ -127,11 +128,11 @@ describe('landing page', () => {
   it('runs the scripted demo and no widget script without a demo key', () => {
     vi.stubEnv('NEXT_PUBLIC_DEMO_ASSISTANT_KEY', '');
 
-    const { container } = render(<LandingPage />);
+    render(<LandingPage />);
 
     expect(screen.queryByText('Live')).not.toBeInTheDocument();
     expect(screen.queryByText(/to try it here/)).not.toBeInTheDocument();
-    expect(container.querySelector('script[data-parbot]')).toBeNull();
+    expect(document.querySelector('script[data-parbot]')).toBeNull();
   });
 
   it('shows the live panel and the keyboard hint when a demo key is set', () => {
@@ -144,5 +145,9 @@ describe('landing page', () => {
     expect(screen.getByRole('textbox', { name: 'Ask a question' })).toBeInTheDocument();
     expect(screen.getByText(/to try it here/)).toBeInTheDocument();
     expect(screen.getByText(/ask the assistant on this page/)).toBeInTheDocument();
+    expect(document.querySelector('script[data-parbot]')).toHaveAttribute(
+      'data-parbot',
+      'pb_demo_key',
+    );
   });
 });

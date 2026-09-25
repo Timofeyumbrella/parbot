@@ -5,6 +5,7 @@ import {
   normalizeWidgetTheme,
   type WidgetConfig,
   type WidgetMode,
+  type WidgetScheme,
 } from '@parbot/shared';
 
 export type ScriptOptions = {
@@ -16,9 +17,14 @@ export type ScriptOptions = {
   version: string | null;
   /** Open the panel as soon as the widget mounts, without taking focus. The preview uses it. */
   open: boolean;
+  /** Overrides the saved scheme: a host page with its own theme toggle knows better than the OS. */
+  scheme: WidgetScheme | null;
 };
 
 const VERSION_PATTERN = /^[A-Za-z0-9_-]{1,32}$/;
+
+export const isWidgetScheme = (value: unknown): value is WidgetScheme =>
+  value === 'auto' || value === 'light' || value === 'dark';
 
 /** Reads the embedding <script> tag. Returns null when there is no key to work with. */
 export const readScriptOptions = (script: HTMLScriptElement | null): ScriptOptions | null => {
@@ -31,6 +37,7 @@ export const readScriptOptions = (script: HTMLScriptElement | null): ScriptOptio
   const mode = script?.getAttribute('data-mode')?.trim().toLowerCase();
   const api = script?.getAttribute('data-api')?.trim().replace(/\/+$/, '');
   const version = script?.getAttribute('data-version')?.trim() ?? '';
+  const scheme = script?.getAttribute('data-scheme')?.trim().toLowerCase();
 
   return {
     key,
@@ -39,6 +46,7 @@ export const readScriptOptions = (script: HTMLScriptElement | null): ScriptOptio
     launcher: script?.getAttribute('data-launcher')?.trim().toLowerCase() !== 'false',
     version: VERSION_PATTERN.test(version) ? version : null,
     open: script?.getAttribute('data-open')?.trim().toLowerCase() === 'true',
+    scheme: isWidgetScheme(scheme) ? scheme : null,
   };
 };
 

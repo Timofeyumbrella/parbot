@@ -1,4 +1,4 @@
-import type { WidgetMode } from '@parbot/shared';
+import type { WidgetMode, WidgetScheme } from '@parbot/shared';
 
 import { fetchConfig, findScript, readScriptOptions } from './config';
 import { ParbotWidget } from './widget';
@@ -25,6 +25,7 @@ export const open = () => run((instance) => instance.open());
 export const close = () => run((instance) => instance.close());
 export const toggle = () => run((instance) => instance.toggle());
 export const setMode = (mode: WidgetMode) => run((instance) => instance.setMode(mode));
+export const setScheme = (scheme: WidgetScheme) => run((instance) => instance.setScheme(scheme));
 export const ask = (question: string) => run((instance) => instance.ask(question));
 
 const whenReady = () =>
@@ -66,6 +67,7 @@ export const boot = async (script = findScript()): Promise<ParbotWidget | null> 
       config,
       mode: options.mode,
       launcher: options.launcher,
+      scheme: options.scheme,
     }).mount();
 
     if (options.open) {

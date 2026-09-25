@@ -1,8 +1,8 @@
 import type { Metadata } from 'next';
-import Script from 'next/script';
 
 import { ClosingCta } from '@/components/marketing/closing-cta';
 import { demoAssistantKey } from '@/components/marketing/demo-key';
+import { DemoWidget } from '@/components/marketing/demo-widget';
 import { EmbedModes } from '@/components/marketing/embed-modes';
 import { Faq } from '@/components/marketing/faq';
 import { Features } from '@/components/marketing/features';
@@ -50,9 +50,7 @@ export default function LandingPage() {
       <Pricing plans={orderedPlans()} />
       <Faq demoKey={demoKey} />
       <ClosingCta />
-      {demoKey ? (
-        <Script src="/widget.js" data-parbot={demoKey} data-mode="palette" strategy="afterInteractive" />
-      ) : null}
+      {demoKey ? <DemoWidget demoKey={demoKey} /> : null}
     </main>
   );
 }
