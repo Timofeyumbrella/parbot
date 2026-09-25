@@ -4,7 +4,7 @@ import type { RealtimeChannel, RealtimePostgresChangesPayload } from '@supabase/
 import { type InfiniteData, useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { cn } from 'cn';
 import { MessageSquare } from 'lucide-react';
-import Link from 'next/link';
+import Link, { useLinkStatus } from 'next/link';
 import { useEffect, useState } from 'react';
 
 import { ChannelBadge, UnansweredBadge } from '@/components/inbox/channel-badge';
@@ -116,6 +116,17 @@ export type ConversationListProps = {
   initialRows: ConversationRow[];
   /** The request's clock, shared by every relative time on the page. */
   now: number;
+};
+
+/**
+ * Marks a row the moment it is clicked while the router still waits for a route it has not
+ * prefetched (the first seconds after the inbox loads, with dozens of rows queued for prefetch).
+ * The row's own classes style it through `has-data-pending`.
+ */
+const RowPending = () => {
+  const { pending } = useLinkStatus();
+
+  return pending ? <span aria-hidden="true" data-pending="" className="hidden" /> : null;
 };
 
 const EMPTY_COPY: Record<ConversationFilter, { title: string; body: string }> = {
@@ -302,10 +313,11 @@ export const ConversationList = ({
               <Link
                 href={`/a/${assistantId}/inbox/${row.id}`}
                 className={cn(
-                  'hover:bg-muted/60 flex items-center gap-3 px-3 py-2.5 text-sm transition-colors',
+                  'hover:bg-muted/60 has-data-pending:bg-muted has-data-pending:animate-pulse flex items-center gap-3 px-3 py-2.5 text-sm transition-colors',
                   isNew && 'bg-primary/5',
                 )}
               >
+                <RowPending />
                 <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                   <div className="flex min-w-0 items-center gap-2">
                     {isNew ? (

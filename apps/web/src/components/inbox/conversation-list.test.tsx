@@ -1,6 +1,8 @@
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { createContext, useContext, useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { conversationListKey, type ConversationRow } from './conversation-query';
@@ -11,6 +13,37 @@ vi.mock('@/lib/supabase/client', () => ({
   getSupabaseBrowserClient: () => ({ removeChannel: vi.fn() }),
   realtimeReadyClient: () => new Promise(() => {}),
 }));
+
+// Next's Link reports `pending` from the click until the route lands. This one stays pending once
+// clicked, the way a link does while the router waits for a route it has not prefetched.
+vi.mock('next/link', () => {
+  const Status = createContext({ pending: false });
+
+  const Link = ({
+    href,
+    children,
+    ...rest
+  }: React.AnchorHTMLAttributes<HTMLAnchorElement> & { href: string }) => {
+    const [pending, setPending] = useState(false);
+
+    return (
+      <Status.Provider value={{ pending }}>
+        <a
+          href={href}
+          onClick={(event) => {
+            event.preventDefault();
+            setPending(true);
+          }}
+          {...rest}
+        >
+          {children}
+        </a>
+      </Status.Provider>
+    );
+  };
+
+  return { default: Link, useLinkStatus: () => useContext(Status) };
+});
 
 const row = (overrides: Partial<ConversationRow> = {}): ConversationRow => ({
   id: crypto.randomUUID(),
@@ -111,6 +144,24 @@ describe('ConversationList', () => {
 
     // TanStack Query notifies observers on the next tick.
     await waitFor(() => expect(shownIds()).toEqual(['z', 'b', 'a']));
+  });
+});
+
+describe('ConversationList rows', () => {
+  it('marks a clicked row as opening before the route lands', async () => {
+    const user = userEvent.setup();
+
+    renderList([row({ id: 'a', title: 'Rotate keys' }), row({ id: 'b', title: 'Webhooks' })]);
+
+    const clicked = screen.getByRole('link', { name: /Webhooks/ });
+
+    expect(clicked.querySelector('[data-pending]')).toBeNull();
+
+    await user.click(clicked);
+
+    expect(clicked.querySelector('[data-pending]')).not.toBeNull();
+    expect(clicked).toHaveClass('has-data-pending:bg-muted');
+    expect(screen.getByRole('link', { name: /Rotate keys/ }).querySelector('[data-pending]')).toBeNull();
   });
 });
 
