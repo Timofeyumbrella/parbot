@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 const unique = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
@@ -47,6 +47,15 @@ const removeAccount = async (service: SupabaseClient, email: string) => {
   }
 };
 
+const signUp = async (page: Page, email: string) => {
+  await page.goto('/signup');
+  await page.getByLabel(/full name/i).fill('Billing Tester');
+  await page.getByLabel(/email/i).fill(email);
+  await page.getByLabel(/^password/i).fill('correct-horse-battery');
+  await page.getByRole('button', { name: /create account/i }).click();
+  await expect(page).toHaveURL(/\/onboarding/);
+};
+
 test.describe('billing in test mode', () => {
   test('a new account moves from Hobby to Starter and back', async ({ page }) => {
     const service = admin();
@@ -55,12 +64,7 @@ test.describe('billing in test mode', () => {
     const currentPlan = page.getByTestId('current-plan');
 
     try {
-      await page.goto('/signup');
-      await page.getByLabel(/full name/i).fill('Billing Tester');
-      await page.getByLabel(/email/i).fill(email);
-      await page.getByLabel(/^password/i).fill('correct-horse-battery');
-      await page.getByRole('button', { name: /create account/i }).click();
-      await expect(page).toHaveURL(/\/onboarding/);
+      await signUp(page, email);
 
       await page.goto('/billing');
       await expect(page.getByText(/test mode/i).first()).toBeVisible();
@@ -99,6 +103,49 @@ test.describe('billing in test mode', () => {
       await expect(page.getByTestId('plan-hobby')).toHaveAttribute('data-current', 'true');
       await expect(page.getByTestId('plan-starter')).not.toHaveAttribute('data-current', 'true');
       await expect.poll(() => storedPlan(service, email)).toBe('hobby');
+    } finally {
+      await removeAccount(service, email);
+    }
+  });
+
+  test('an unpaid first payment leaves every screen on Hobby', async ({ page }) => {
+    const service = admin();
+    const email = `e2e-billing-unpaid-${unique()}@parbot.test`;
+    const currentPlan = page.getByTestId('current-plan');
+
+    try {
+      await signUp(page, email);
+      const id = await accountIdOf(service, email);
+
+      if (!id) {
+        throw new Error(`Signing up ${email} did not create a profile.`);
+      }
+
+      // A row as Stripe's 'incomplete' status would leave it if the paid plan were written with it.
+      const { error } = await service
+        .from('subscriptions')
+        .update({
+          plan_id: 'starter',
+          billing_interval: 'monthly',
+          status: 'incomplete',
+          stripe_customer_id: `cus_e2e_${unique()}`,
+          current_period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        })
+        .eq('account_id', id);
+      expect(error).toBeNull();
+
+      await page.goto('/billing');
+      await expect(currentPlan).toContainText('Hobby');
+      await expect(currentPlan).toContainText('Payment pending');
+      await expect(currentPlan).toContainText('so you are on Hobby');
+      await expect(currentPlan).not.toContainText('Starter');
+      await expect(page.getByTestId('plan-hobby')).toHaveAttribute('data-current', 'true');
+      await expect(page.getByRole('link', { name: /^Billing/ })).toContainText('Hobby');
+
+      await page.goto('/account');
+      await expect(
+        page.getByText('Hobby, Free. Upgrade for more assistants, pages and answers.'),
+      ).toBeVisible();
     } finally {
       await removeAccount(service, email);
     }
