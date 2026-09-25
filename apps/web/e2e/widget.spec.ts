@@ -176,6 +176,8 @@ test.describe('widget on the demo page', () => {
     const panel = widget(page, '.pb-panel');
     await expect(panel).toHaveClass(/pb-open/);
     await expect(panel).toHaveAttribute('aria-modal', 'true');
+    // The modal has its own close button, so the pill does not float beside it.
+    await expect(widget(page, '.pb-launcher')).toBeHidden();
 
     const input = widget(page, 'textarea');
     await input.fill('Could you tell me about the weather forecast for Mars next week please');
@@ -197,6 +199,7 @@ test.describe('widget on the demo page', () => {
 
     await page.keyboard.press('Escape');
     await expect(panel).not.toHaveClass(/pb-open/);
+    await expect(widget(page, '.pb-launcher')).toBeVisible();
   });
 
   test('an unknown key is a real 404 with a way out', async ({ page }) => {
