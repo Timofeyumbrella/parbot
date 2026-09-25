@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "pnpm --filter @parbot/widget build && pnpm --filter web dev",
-    "build": "pnpm --filter @parbot/widget build && pnpm --filter web build",
+    "build": "pnpm --filter web build",
     "start": "pnpm --filter web start",
     "lint": "pnpm -r --if-present lint",
     "typecheck": "pnpm --filter web exec next typegen && pnpm -r --if-present typecheck",
