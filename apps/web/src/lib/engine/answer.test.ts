@@ -1,9 +1,9 @@
 // @vitest-environment node
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { type AiProvider, type GenerateChunk, type GenerateResult, ModelBusyError } from '@/lib/ai';
 
-import { streamAnswer } from './answer';
+import { ANSWER_ERROR_COPY, streamAnswer } from './answer';
 import type { ServiceClient } from './retrieval';
 
 /**
@@ -226,5 +226,69 @@ describe('streamAnswer follow-up retrieval', () => {
     );
 
     expect(seen.slice(0, 4)).toEqual(['Q1', 'A1', 'Q2', 'A2']);
+  });
+});
+
+describe('streamAnswer error copy', () => {
+  it('never sends the provider or database text; the code carries the meaning', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const conversation = {
+      id: 'c1',
+      assistant_id: 'a1',
+      channel: 'app',
+      visitor_id: null,
+      title: 'T',
+    };
+    const { service } = fakeService({ conversation, chunks: [chunk('Relevant.')] });
+    const { provider } = fakeProvider();
+
+    provider.embed = () => Promise.reject(new Error('relation "public.chunks" does not exist'));
+
+    const events = await collect(
+      streamAnswer({
+        service,
+        provider,
+        assistant,
+        conversation: { id: 'c1', channel: 'app' },
+        message: 'A question',
+      }),
+    );
+
+    expect(events.at(-1)).toEqual({
+      type: 'error',
+      code: 'internal',
+      message: ANSWER_ERROR_COPY.internal,
+    });
+    expect(JSON.stringify(events)).not.toMatch(/relation|public\.chunks/);
+  });
+
+  it('maps a busy model to its own code and sentence', async () => {
+    const conversation = {
+      id: 'c1',
+      assistant_id: 'a1',
+      channel: 'app',
+      visitor_id: null,
+      title: 'T',
+    };
+    const { service } = fakeService({ conversation, chunks: [chunk('Relevant.')] });
+    const { provider } = fakeProvider({ failWith: new ModelBusyError(['gemini-3.8-flash']) });
+
+    const events = await collect(
+      streamAnswer({
+        service,
+        provider,
+        assistant,
+        conversation: { id: 'c1', channel: 'app' },
+        message: 'A question',
+      }),
+    );
+
+    expect(events.at(-1)).toEqual({
+      type: 'error',
+      code: 'model_busy',
+      message: ANSWER_ERROR_COPY.model_busy,
+    });
+    expect(JSON.stringify(events)).not.toMatch(/gemini/);
   });
 });

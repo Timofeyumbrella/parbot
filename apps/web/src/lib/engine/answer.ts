@@ -358,11 +358,19 @@ export async function* streamAnswer(params: AnswerParams): AsyncGenerator<ChatSt
   yield { type: 'done', answered, latencyMs };
 }
 
-const providerError = (cause: unknown): ChatStreamEvent =>
-  cause instanceof ModelBusyError
-    ? { type: 'error', code: 'model_busy', message: cause.message }
-    : {
-        type: 'error',
-        code: 'internal',
-        message: cause instanceof Error ? cause.message : 'The assistant could not answer.',
-      };
+/** The sentences a reader sees when the model or the database fails. Never the library's text. */
+export const ANSWER_ERROR_COPY = {
+  model_busy: 'The assistant is busy right now. Wait a moment and try again.',
+  internal: 'The answer could not be produced. Try again in a moment.',
+} as const;
+
+/** Provider and driver messages name models, tables and hosts, so they go to the log, not the wire. */
+const providerError = (cause: unknown): ChatStreamEvent => {
+  if (cause instanceof ModelBusyError) {
+    return { type: 'error', code: 'model_busy', message: ANSWER_ERROR_COPY.model_busy };
+  }
+
+  console.error('[engine] answer failed', cause);
+
+  return { type: 'error', code: 'internal', message: ANSWER_ERROR_COPY.internal };
+};
