@@ -20,7 +20,13 @@ type LiveConfig = Pick<WidgetConfig, 'name' | 'welcomeMessage' | 'suggestedQuest
 
 type Turn =
   | { id: string; role: 'user'; content: string }
-  | { id: string; role: 'assistant'; content: string; citations: Citation[]; status: 'streaming' | 'done' | 'error' };
+  | {
+      id: string;
+      role: 'assistant';
+      content: string;
+      citations: Citation[];
+      status: 'streaming' | 'done' | 'error';
+    };
 
 const FALLBACK_CONFIG: LiveConfig = {
   name: 'Parbot',
@@ -71,7 +77,9 @@ const parseConfig = (value: unknown): LiveConfig | null => {
         ? config.welcomeMessage
         : FALLBACK_CONFIG.welcomeMessage,
     suggestedQuestions: Array.isArray(config.suggestedQuestions)
-      ? config.suggestedQuestions.filter((item): item is string => typeof item === 'string').slice(0, 3)
+      ? config.suggestedQuestions
+          .filter((item): item is string => typeof item === 'string')
+          .slice(0, 3)
       : [],
   };
 };
@@ -134,7 +142,9 @@ export const LiveDemo = ({ demoKey }: { demoKey: string }) => {
     const assistantId = crypto.randomUUID();
     const patch = (update: Partial<Extract<Turn, { role: 'assistant' }>>) =>
       setTurns((previous) =>
-        previous.map((turn) => (turn.id === assistantId && turn.role === 'assistant' ? { ...turn, ...update } : turn)),
+        previous.map((turn) =>
+          turn.id === assistantId && turn.role === 'assistant' ? { ...turn, ...update } : turn,
+        ),
       );
     const fail = (content: string) => patch({ content, status: 'error' });
 
@@ -227,7 +237,7 @@ export const LiveDemo = ({ demoKey }: { demoKey: string }) => {
             maxLength={MAX_MESSAGE_LENGTH}
             autoComplete="off"
             disabled={busy}
-            className="h-9 bg-background px-3"
+            className="bg-background h-9 px-3"
           />
           <Button type="submit" size="icon-lg" aria-label="Send" disabled={busy || !draft.trim()}>
             <SendHorizontal />
@@ -247,7 +257,7 @@ export const LiveDemo = ({ demoKey }: { demoKey: string }) => {
                   <button
                     type="button"
                     onClick={() => void ask(question)}
-                    className="bg-background hover:bg-muted focus-visible:ring-ring/50 rounded-md border px-2 py-1 text-left text-xs transition-colors outline-none focus-visible:ring-3"
+                    className="bg-background hover:bg-muted focus-visible:ring-ring/50 focus-visible:ring-3 rounded-md border px-2 py-1 text-left text-xs outline-none transition-colors"
                   >
                     {question}
                   </button>
@@ -273,7 +283,13 @@ export const LiveDemo = ({ demoKey }: { demoKey: string }) => {
                 <div className="flex flex-col items-start gap-2">
                   <p>{turn.content}</p>
                   {lastQuestion ? (
-                    <Button type="button" variant="outline" size="xs" onClick={() => void ask(lastQuestion)} disabled={busy}>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="xs"
+                      onClick={() => void ask(lastQuestion)}
+                      disabled={busy}
+                    >
                       <RotateCcw data-icon="inline-start" />
                       Try again
                     </Button>

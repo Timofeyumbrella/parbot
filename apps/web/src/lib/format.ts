@@ -3,7 +3,10 @@ const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
 
 const dateFormat = new Intl.DateTimeFormat('en-US', { dateStyle: 'medium' });
-const dateTimeFormat = new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeStyle: 'short' });
+const dateTimeFormat = new Intl.DateTimeFormat('en-US', {
+  dateStyle: 'medium',
+  timeStyle: 'short',
+});
 const relative = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
 
 const toDate = (value: string | number | Date) => (value instanceof Date ? value : new Date(value));
@@ -12,7 +15,8 @@ const toDate = (value: string | number | Date) => (value instanceof Date ? value
 export const formatDate = (value: string | number | Date) => dateFormat.format(toDate(value));
 
 /** "Sep 24, 2026, 2:15 PM" in the viewer's time zone. */
-export const formatDateTime = (value: string | number | Date) => dateTimeFormat.format(toDate(value));
+export const formatDateTime = (value: string | number | Date) =>
+  dateTimeFormat.format(toDate(value));
 
 /**
  * "just now", "5 min ago", "3 hr ago", "yesterday", "4 days ago", then the date. One helper for

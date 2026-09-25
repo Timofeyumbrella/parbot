@@ -56,7 +56,10 @@ const accountNav = [
 ];
 
 export const Brand = ({ className }: { className?: string }) => (
-  <Link href="/dashboard" className={cn('flex items-center gap-2 font-semibold tracking-tight', className)}>
+  <Link
+    href="/dashboard"
+    className={cn('flex items-center gap-2 font-semibold tracking-tight', className)}
+  >
     <span className="bg-primary text-primary-foreground flex size-6 items-center justify-center rounded-md">
       <Bot className="size-4" />
     </span>
@@ -64,11 +67,17 @@ export const Brand = ({ className }: { className?: string }) => (
   </Link>
 );
 
-const SidebarBody = ({ assistants, email, planName, onNavigate }: AppSidebarProps & { onNavigate?: () => void }) => {
+const SidebarBody = ({
+  assistants,
+  email,
+  planName,
+  onNavigate,
+}: AppSidebarProps & { onNavigate?: () => void }) => {
   const pathname = usePathname();
   const params = useParams<{ assistantId?: string }>();
   const [, startSignOut] = useTransition();
-  const active = assistants.find((assistant) => assistant.id === params.assistantId) ?? assistants[0] ?? null;
+  const active =
+    assistants.find((assistant) => assistant.id === params.assistantId) ?? assistants[0] ?? null;
 
   const isActive = (href: string, exact = false) =>
     exact ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
@@ -82,7 +91,11 @@ const SidebarBody = ({ assistants, email, planName, onNavigate }: AppSidebarProp
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="outline" className="h-9 w-full justify-between px-2.5" aria-label="Switch assistant">
+          <Button
+            variant="outline"
+            className="h-9 w-full justify-between px-2.5"
+            aria-label="Switch assistant"
+          >
             <span className="flex min-w-0 items-center gap-2">
               <Bot className="text-muted-foreground size-4 shrink-0" />
               <span className="truncate">{active?.name ?? 'No assistant yet'}</span>

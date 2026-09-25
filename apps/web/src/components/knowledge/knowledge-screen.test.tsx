@@ -9,7 +9,11 @@ import type { Source } from '@/lib/db';
 
 import { KnowledgeScreen, STUB_NOTICE } from './knowledge-screen';
 
-type ChangeHandler = (payload: { eventType: 'INSERT' | 'UPDATE' | 'DELETE'; new: Partial<Source>; old: Partial<Source> }) => void;
+type ChangeHandler = (payload: {
+  eventType: 'INSERT' | 'UPDATE' | 'DELETE';
+  new: Partial<Source>;
+  old: Partial<Source>;
+}) => void;
 
 const { actions, supabase, channel } = vi.hoisted(() => {
   const channel = {
@@ -72,8 +76,13 @@ const source = (overrides: Partial<Source> = {}): Source => ({
 /** What the database would answer a refetch with. Tests move it as the server would. */
 let serverRows: Source[] = [];
 
-const renderScreen = (sources: Source[], props: Partial<React.ComponentProps<typeof KnowledgeScreen>> = {}) => {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
+const renderScreen = (
+  sources: Source[],
+  props: Partial<React.ComponentProps<typeof KnowledgeScreen>> = {},
+) => {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false, staleTime: Infinity } },
+  });
 
   serverRows = sources;
 
@@ -108,8 +117,18 @@ describe('KnowledgeScreen', () => {
     channel.subscribe.mockReturnValue(channel);
     supabase.from.mockImplementation((table: string) =>
       table === 'documents'
-        ? { select: () => Promise.resolve({ count: serverRows.reduce((sum, row) => sum + row.document_count, 0), error: null }) }
-        : { select: () => ({ eq: () => ({ order: () => Promise.resolve({ data: serverRows, error: null }) }) }) },
+        ? {
+            select: () =>
+              Promise.resolve({
+                count: serverRows.reduce((sum, row) => sum + row.document_count, 0),
+                error: null,
+              }),
+          }
+        : {
+            select: () => ({
+              eq: () => ({ order: () => Promise.resolve({ data: serverRows, error: null }) }),
+            }),
+          },
     );
   });
 
@@ -124,7 +143,9 @@ describe('KnowledgeScreen', () => {
 
     const dialog = await screen.findByRole('dialog', { name: 'Add source' });
 
-    expect(within(dialog).getByRole('tab', { name: /Paste text|Text/, selected: true })).toBeInTheDocument();
+    expect(
+      within(dialog).getByRole('tab', { name: /Paste text|Text/, selected: true }),
+    ).toBeInTheDocument();
     expect(within(dialog).getByLabelText('Title')).toBeInTheDocument();
     expect(within(dialog).getByLabelText('Text')).toBeInTheDocument();
   });
@@ -148,7 +169,9 @@ describe('KnowledgeScreen', () => {
       }),
     ]);
 
-    await waitFor(() => expect(supabase.channel).toHaveBeenCalledWith(`knowledge:sources:${ASSISTANT}`));
+    await waitFor(() =>
+      expect(supabase.channel).toHaveBeenCalledWith(`knowledge:sources:${ASSISTANT}`),
+    );
     expect(channel.on).toHaveBeenCalledWith(
       'postgres_changes',
       { event: '*', schema: 'public', table: 'sources', filter: `assistant_id=eq.${ASSISTANT}` },
@@ -172,7 +195,14 @@ describe('KnowledgeScreen', () => {
   });
 
   it('moves a row along as realtime delivers its progress', async () => {
-    const row = source({ title: 'Guide', status: 'crawling', pages_found: 3, pages_done: 0, document_count: 0, chunk_count: 0 });
+    const row = source({
+      title: 'Guide',
+      status: 'crawling',
+      pages_found: 3,
+      pages_done: 0,
+      document_count: 0,
+      chunk_count: 0,
+    });
 
     renderScreen([row]);
 
@@ -180,10 +210,23 @@ describe('KnowledgeScreen', () => {
 
     expect(screen.getByText('Crawling · 3 pages')).toBeInTheDocument();
 
-    act(() => push({ eventType: 'UPDATE', new: { ...row, status: 'indexing', pages_done: 2 }, old: { id: row.id } }));
+    act(() =>
+      push({
+        eventType: 'UPDATE',
+        new: { ...row, status: 'indexing', pages_done: 2 },
+        old: { id: row.id },
+      }),
+    );
     await waitFor(() => expect(screen.getByText('Indexing 2 of 3 pages')).toBeInTheDocument());
 
-    const ready = { ...row, status: 'ready' as const, pages_found: 3, pages_done: 3, document_count: 3, chunk_count: 9 };
+    const ready = {
+      ...row,
+      status: 'ready' as const,
+      pages_found: 3,
+      pages_done: 3,
+      document_count: 3,
+      chunk_count: 9,
+    };
 
     // A finished run makes the screen ask the database again; it answers with the finished row.
     serverRows = [ready];
@@ -193,10 +236,17 @@ describe('KnowledgeScreen', () => {
   });
 
   it('shows a finished run that left pages out', () => {
-    renderScreen([source({ error: "Stopped at your plan's page limit after 100 pages. Upgrade on the Billing page or remove a source to index the rest." })]);
+    renderScreen([
+      source({
+        error:
+          "Stopped at your plan's page limit after 100 pages. Upgrade on the Billing page or remove a source to index the rest.",
+      }),
+    ]);
 
     expect(screen.getByText('Ready')).toBeInTheDocument();
-    expect(screen.getByText(/Stopped at your plan's page limit after 100 pages/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Stopped at your plan's page limit after 100 pages/),
+    ).toBeInTheDocument();
   });
 
   it('explains the stub provider quietly when no model key is set', () => {
@@ -235,7 +285,16 @@ describe('KnowledgeScreen', () => {
     const form = actions.addSource.mock.calls[0]![1];
     const id = form.get('id') as string;
 
-    release({ source: source({ id, title: 'Guide', status: 'crawling', pages_found: 1, document_count: 0, chunk_count: 0 }) });
+    release({
+      source: source({
+        id,
+        title: 'Guide',
+        status: 'crawling',
+        pages_found: 1,
+        document_count: 0,
+        chunk_count: 0,
+      }),
+    });
 
     await waitFor(() => expect(screen.getByText('Guide')).toBeInTheDocument());
     expect(screen.getAllByTestId('source-row')).toHaveLength(1);
@@ -245,32 +304,48 @@ describe('KnowledgeScreen', () => {
   it('takes the row back and reopens the dialog with the reason when the server refuses', async () => {
     const user = userEvent.setup();
 
-    actions.addSource.mockResolvedValue({ error: "Your plan's page limit is reached. Upgrade on the Billing page or remove a source." });
+    actions.addSource.mockResolvedValue({
+      error: "Your plan's page limit is reached. Upgrade on the Billing page or remove a source.",
+    });
 
     renderScreen([source({ title: 'Existing' })]);
 
     await user.click(screen.getByRole('button', { name: 'Add source' }));
-    await user.type(within(await screen.findByRole('dialog')).getByLabelText('Start page'), 'https://docs.example.com/guide/');
+    await user.type(
+      within(await screen.findByRole('dialog')).getByLabelText('Start page'),
+      'https://docs.example.com/guide/',
+    );
     await user.click(screen.getByRole('button', { name: 'Add website' }));
 
     const dialog = await screen.findByRole('dialog', { name: 'Add source' });
 
-    expect(await within(dialog).findByRole('alert')).toHaveTextContent("Your plan's page limit is reached.");
-    expect(within(dialog).getByLabelText('Start page')).toHaveValue('https://docs.example.com/guide/');
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+      "Your plan's page limit is reached.",
+    );
+    expect(within(dialog).getByLabelText('Start page')).toHaveValue(
+      'https://docs.example.com/guide/',
+    );
     expect(screen.getAllByTestId('source-row')).toHaveLength(1);
     expect(screen.getByText('Existing')).toBeInTheDocument();
   });
 
   it('shows the failure reason when asked and lets the row be re-indexed', async () => {
     const user = userEvent.setup();
-    const failed = source({ status: 'failed', error: 'Could not fetch https://docs.example.com/guide/: HTTP 404.' });
+    const failed = source({
+      status: 'failed',
+      error: 'Could not fetch https://docs.example.com/guide/: HTTP 404.',
+    });
 
-    actions.reindexSource.mockResolvedValue({ source: { ...failed, status: 'queued', error: null } });
+    actions.reindexSource.mockResolvedValue({
+      source: { ...failed, status: 'queued', error: null },
+    });
 
     renderScreen([failed]);
 
     await user.click(screen.getByRole('button', { name: 'Show what happened' }));
-    expect(screen.getByText('Could not fetch https://docs.example.com/guide/: HTTP 404.')).toBeInTheDocument();
+    expect(
+      screen.getByText('Could not fetch https://docs.example.com/guide/: HTTP 404.'),
+    ).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: `Actions for ${failed.title}` }));
     await user.click(await screen.findByRole('menuitem', { name: 'Re-index' }));

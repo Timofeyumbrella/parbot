@@ -15,7 +15,12 @@ import {
   removeConversationRow,
   renameConversationRow,
 } from '@/lib/chat/conversations';
-import { conversationsKey, fetchConversations, INBOX_NAMESPACE, threadKey } from '@/lib/chat/queries';
+import {
+  conversationsKey,
+  fetchConversations,
+  INBOX_NAMESPACE,
+  threadKey,
+} from '@/lib/chat/queries';
 import { streamRegistry } from '@/lib/chat/streams';
 import type { Conversation } from '@/lib/db';
 import { getSupabaseBrowserClient, realtimeReadyClient } from '@/lib/supabase/client';
@@ -107,13 +112,20 @@ export const useConversationsRealtime = (assistantId: string) => {
         .channel(`chat:conversations:${assistantId}:${Math.random().toString(36).slice(2)}`)
         .on<Conversation>(
           'postgres_changes',
-          { event: '*', schema: 'public', table: 'conversations', filter: `assistant_id=eq.${assistantId}` },
+          {
+            event: '*',
+            schema: 'public',
+            table: 'conversations',
+            filter: `assistant_id=eq.${assistantId}`,
+          },
           (payload: RealtimePostgresChangesPayload<Conversation>) => {
             if (payload.eventType === 'DELETE') {
               const id = payload.old.id;
 
               if (id) {
-                queryClient.setQueryData<ConversationRow[]>(key, (rows) => (rows ? removeConversationRow(rows, id) : rows));
+                queryClient.setQueryData<ConversationRow[]>(key, (rows) =>
+                  rows ? removeConversationRow(rows, id) : rows,
+                );
               }
 
               return;
@@ -138,7 +150,10 @@ export const useConversationsRealtime = (assistantId: string) => {
         )
         .subscribe((status, error) => {
           if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-            console.warn(`Chat: the conversations channel did not join (${status}).`, error?.message ?? '');
+            console.warn(
+              `Chat: the conversations channel did not join (${status}).`,
+              error?.message ?? '',
+            );
           }
         });
     });
@@ -170,7 +185,9 @@ export const useConversationActions = (assistantId: string) => {
         return false;
       }
 
-      queryClient.setQueryData<ConversationRow[]>(key, (rows) => renameConversationRow(rows ?? [], id, next));
+      queryClient.setQueryData<ConversationRow[]>(key, (rows) =>
+        renameConversationRow(rows ?? [], id, next),
+      );
 
       const result = await renameConversation({ id, title: next });
 
@@ -199,7 +216,9 @@ export const useConversationActions = (assistantId: string) => {
       const thread = queryClient.getQueryData(threadKey(id));
 
       streamRegistry.stop(id);
-      queryClient.setQueryData<ConversationRow[]>(key, (rows) => removeConversationRow(rows ?? [], id));
+      queryClient.setQueryData<ConversationRow[]>(key, (rows) =>
+        removeConversationRow(rows ?? [], id),
+      );
       queryClient.removeQueries({ queryKey: threadKey(id) });
 
       const result = await deleteConversation({ id });

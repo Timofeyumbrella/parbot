@@ -12,7 +12,10 @@ describe('MarketingNav', () => {
     const nav = screen.getAllByRole('navigation', { name: 'Primary' })[0]!;
 
     expect(within(nav).getByRole('link', { name: 'Product' })).toHaveAttribute('href', '/#product');
-    expect(within(nav).getByRole('link', { name: 'How it works' })).toHaveAttribute('href', '/#how-it-works');
+    expect(within(nav).getByRole('link', { name: 'How it works' })).toHaveAttribute(
+      'href',
+      '/#how-it-works',
+    );
     expect(within(nav).getByRole('link', { name: 'Pricing' })).toHaveAttribute('href', '/#pricing');
     expect(within(nav).getByRole('link', { name: 'FAQ' })).toHaveAttribute('href', '/#faq');
     expect(screen.getByRole('link', { name: 'Sign in' })).toHaveAttribute('href', '/login');

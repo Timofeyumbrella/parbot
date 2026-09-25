@@ -9,7 +9,9 @@ const read = (name: string, fallback?: string) => {
     return fallback;
   }
 
-  throw new Error(`Missing environment variable ${name}. Copy .env.example to .env and fill it in.`);
+  throw new Error(
+    `Missing environment variable ${name}. Copy .env.example to .env and fill it in.`,
+  );
 };
 
 /** Values that are safe in the browser. Next.js inlines them, so they must be read literally. */

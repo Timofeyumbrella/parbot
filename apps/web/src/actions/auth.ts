@@ -33,7 +33,11 @@ export const signIn = async (
   });
 
   if (error) {
-    return { status: 'error', error: authErrorMessage(error), values: publicValues(values, ['password']) };
+    return {
+      status: 'error',
+      error: authErrorMessage(error),
+      values: publicValues(values, ['password']),
+    };
   }
 
   redirect(safeNextPath(parsed.data.next) ?? '/dashboard');
@@ -58,7 +62,11 @@ export const signUp = async (
   });
 
   if (error) {
-    return { status: 'error', error: authErrorMessage(error), values: publicValues(values, ['password']) };
+    return {
+      status: 'error',
+      error: authErrorMessage(error),
+      values: publicValues(values, ['password']),
+    };
   }
 
   // With confirmations on (production) there is no session yet; the account exists but the

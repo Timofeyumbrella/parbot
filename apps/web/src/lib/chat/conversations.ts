@@ -35,7 +35,8 @@ export const draftTitle = (message: string) => {
   return `${cut.slice(0, lastSpace > TITLE_LIMIT - 20 ? lastSpace : cut.length).trimEnd()}…`;
 };
 
-const activity = (row: ConversationRow) => (row.last_message_at ? Date.parse(row.last_message_at) : -1);
+const activity = (row: ConversationRow) =>
+  row.last_message_at ? Date.parse(row.last_message_at) : -1;
 
 /** Newest activity first; rows that never had a message sink to the bottom. */
 export const sortConversations = (rows: ConversationRow[]) =>
@@ -43,7 +44,10 @@ export const sortConversations = (rows: ConversationRow[]) =>
 
 export const upsertConversation = (rows: ConversationRow[], row: ConversationRow) => {
   const index = rows.findIndex((existing) => existing.id === row.id);
-  const next = index === -1 ? [row, ...rows] : rows.map((existing) => (existing.id === row.id ? { ...existing, ...row } : existing));
+  const next =
+    index === -1
+      ? [row, ...rows]
+      : rows.map((existing) => (existing.id === row.id ? { ...existing, ...row } : existing));
 
   return sortConversations(next);
 };
@@ -78,7 +82,10 @@ export const confirmConversation = (rows: ConversationRow[], id: string) =>
  * deletions made elsewhere; only rows created optimistically and not yet confirmed survive a
  * read that predates them.
  */
-export const mergeConversationLists = (previous: ConversationRow[] | undefined, fetched: ConversationRow[]) => {
+export const mergeConversationLists = (
+  previous: ConversationRow[] | undefined,
+  fetched: ConversationRow[],
+) => {
   if (!previous) {
     return sortConversations(fetched);
   }
@@ -96,7 +103,10 @@ export const mergeConversationLists = (previous: ConversationRow[] | undefined, 
  * cache is newer, and never dropped because the snapshot lacks it. Removal is the job of the
  * reader's own delete and of `mergeConversationLists`.
  */
-export const mergeSnapshot = (previous: ConversationRow[] | undefined, snapshot: ConversationRow[]) => {
+export const mergeSnapshot = (
+  previous: ConversationRow[] | undefined,
+  snapshot: ConversationRow[],
+) => {
   if (!previous) {
     return sortConversations(snapshot);
   }
@@ -109,7 +119,9 @@ export const mergeSnapshot = (previous: ConversationRow[] | undefined, snapshot:
       return row;
     }
 
-    return activity(fresh) >= activity(row) ? { ...fresh, title: fresh.title ?? row.title, pending: false } : row;
+    return activity(fresh) >= activity(row)
+      ? { ...fresh, title: fresh.title ?? row.title, pending: false }
+      : row;
   });
   const cached = new Set(previous.map((row) => row.id));
   const added = snapshot.filter((row) => !cached.has(row.id));
@@ -128,4 +140,5 @@ export const filterConversations = (rows: ConversationRow[], query: string) => {
   return rows.filter((row) => (row.title ?? 'New chat').toLowerCase().includes(needle));
 };
 
-export const conversationLabel = (row: Pick<ConversationRow, 'title'>) => row.title?.trim() || 'New chat';
+export const conversationLabel = (row: Pick<ConversationRow, 'title'>) =>
+  row.title?.trim() || 'New chat';

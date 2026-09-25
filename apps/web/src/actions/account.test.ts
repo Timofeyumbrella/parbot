@@ -35,7 +35,11 @@ describe('account actions', () => {
       user: USER,
       supabase: {
         auth: { updateUser },
-        from: () => ({ update: (values: unknown) => ({ eq: (column: string, id: string) => profileUpdate(values, column, id) }) }),
+        from: () => ({
+          update: (values: unknown) => ({
+            eq: (column: string, id: string) => profileUpdate(values, column, id),
+          }),
+        }),
       },
     });
   });
@@ -49,9 +53,14 @@ describe('account actions', () => {
       fieldErrors: { email: 'Enter a valid email address.' },
     });
 
-    const password = await updatePassword(idleState, form({ password: 'long enough pass', confirmPassword: 'something else' }));
+    const password = await updatePassword(
+      idleState,
+      form({ password: 'long enough pass', confirmPassword: 'something else' }),
+    );
 
-    expect(password).toMatchObject({ fieldErrors: { confirmPassword: 'The two passwords differ.' } });
+    expect(password).toMatchObject({
+      fieldErrors: { confirmPassword: 'The two passwords differ.' },
+    });
     // Passwords are never sent back to refill the form.
     expect(password.values).toEqual({});
     expect(requireUser).not.toHaveBeenCalled();
@@ -60,7 +69,11 @@ describe('account actions', () => {
   it('saves the name in auth and on the profile, then refreshes the page', async () => {
     const result = await updateProfile(idleState, form({ fullName: '  Ada Lovelace ' }));
 
-    expect(result).toEqual({ status: 'success', message: 'Name saved.', values: { fullName: 'Ada Lovelace' } });
+    expect(result).toEqual({
+      status: 'success',
+      message: 'Name saved.',
+      values: { fullName: 'Ada Lovelace' },
+    });
     expect(updateUser).toHaveBeenCalledWith({ data: { full_name: 'Ada Lovelace' } });
     expect(profileUpdate).toHaveBeenCalledWith({ full_name: 'Ada Lovelace' }, 'id', USER.id);
     expect(revalidatePath).toHaveBeenCalledWith('/account');
@@ -75,9 +88,17 @@ describe('account actions', () => {
       error: 'Your name could not be saved. Try again.',
     });
 
-    updateUser.mockResolvedValue({ data: { user: null }, error: { code: 'same_password', message: 'New password should be different' } });
+    updateUser.mockResolvedValue({
+      data: { user: null },
+      error: { code: 'same_password', message: 'New password should be different' },
+    });
 
-    await expect(updatePassword(idleState, form({ password: 'long enough pass', confirmPassword: 'long enough pass' }))).resolves.toEqual({
+    await expect(
+      updatePassword(
+        idleState,
+        form({ password: 'long enough pass', confirmPassword: 'long enough pass' }),
+      ),
+    ).resolves.toEqual({
       status: 'error',
       error: 'Choose a password that differs from the current one.',
     });
@@ -85,26 +106,34 @@ describe('account actions', () => {
   });
 
   it('refuses the current address and explains a change that waits for confirmation', async () => {
-    await expect(updateEmail(idleState, form({ email: 'ADA@example.com' }))).resolves.toMatchObject({
-      status: 'error',
-      fieldErrors: { email: 'That is already your email address.' },
-    });
+    await expect(updateEmail(idleState, form({ email: 'ADA@example.com' }))).resolves.toMatchObject(
+      {
+        status: 'error',
+        fieldErrors: { email: 'That is already your email address.' },
+      },
+    );
     expect(updateUser).not.toHaveBeenCalled();
 
     const pending = await updateEmail(idleState, form({ email: 'ada@newco.example' }));
 
     expect(pending).toEqual({
       status: 'success',
-      message: 'Confirmation links went to ada@example.com and ada@newco.example. The change applies once you open both.',
+      message:
+        'Confirmation links went to ada@example.com and ada@newco.example. The change applies once you open both.',
       values: { email: 'ada@newco.example' },
     });
     expect(profileUpdate).not.toHaveBeenCalled();
   });
 
   it('writes the profile at once when auth applied the new address', async () => {
-    updateUser.mockResolvedValue({ data: { user: { ...USER, email: 'ada@newco.example' } }, error: null });
+    updateUser.mockResolvedValue({
+      data: { user: { ...USER, email: 'ada@newco.example' } },
+      error: null,
+    });
 
-    await expect(updateEmail(idleState, form({ email: 'ada@newco.example' }))).resolves.toMatchObject({
+    await expect(
+      updateEmail(idleState, form({ email: 'ada@newco.example' })),
+    ).resolves.toMatchObject({
       status: 'success',
       message: 'Email updated.',
     });

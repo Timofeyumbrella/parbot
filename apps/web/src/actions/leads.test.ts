@@ -33,8 +33,12 @@ describe('updateLeadStatus', () => {
   });
 
   it('rejects bad input before touching the database', async () => {
-    expect(await updateLeadStatus({ leadId: 'not-a-uuid', status: 'contacted' })).toMatchObject({ ok: false });
-    expect(await updateLeadStatus({ leadId: LEAD, status: 'archived' })).toMatchObject({ ok: false });
+    expect(await updateLeadStatus({ leadId: 'not-a-uuid', status: 'contacted' })).toMatchObject({
+      ok: false,
+    });
+    expect(await updateLeadStatus({ leadId: LEAD, status: 'archived' })).toMatchObject({
+      ok: false,
+    });
     expect(await updateLeadStatus(null)).toMatchObject({ ok: false });
     expect(session.update).not.toHaveBeenCalled();
   });
@@ -70,7 +74,10 @@ describe('updateLeadStatus', () => {
 
     const result = await updateLeadStatus({ leadId: LEAD, status: 'closed' });
 
-    expect(result).toMatchObject({ ok: false, error: expect.stringContaining('could not be saved') });
+    expect(result).toMatchObject({
+      ok: false,
+      error: expect.stringContaining('could not be saved'),
+    });
     expect(result).not.toMatchObject({ error: expect.stringContaining('connection reset') });
     expect(consoleError).toHaveBeenCalled();
   });

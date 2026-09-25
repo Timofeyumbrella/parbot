@@ -3,7 +3,13 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { threadKey } from '@/lib/chat/queries';
-import { beginExchange, emptyThread, type MessageRow, type Thread, threadFromRows } from '@/lib/chat/thread';
+import {
+  beginExchange,
+  emptyThread,
+  type MessageRow,
+  type Thread,
+  threadFromRows,
+} from '@/lib/chat/thread';
 
 import { useFeedback, useThread } from './use-thread';
 
@@ -36,8 +42,26 @@ vi.mock('@/lib/supabase/client', () => ({
 const CONVERSATION = '22222222-2222-4222-8222-222222222222';
 
 const rows: MessageRow[] = [
-  { id: 'u1', role: 'user', content: 'q', citations: [], answered: null, feedback: null, created_at: 't1', latency_ms: null },
-  { id: 'a1', role: 'assistant', content: 'a', citations: [], answered: true, feedback: null, created_at: 't2', latency_ms: 300 },
+  {
+    id: 'u1',
+    role: 'user',
+    content: 'q',
+    citations: [],
+    answered: null,
+    feedback: null,
+    created_at: 't1',
+    latency_ms: null,
+  },
+  {
+    id: 'a1',
+    role: 'assistant',
+    content: 'a',
+    citations: [],
+    answered: true,
+    feedback: null,
+    created_at: 't2',
+    latency_ms: 300,
+  },
 ];
 
 let queryClient: QueryClient;
@@ -47,7 +71,9 @@ const wrapper = ({ children }: { children: React.ReactNode }) => (
 );
 
 beforeEach(() => {
-  queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 30_000 } } });
+  queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false, staleTime: 30_000 } },
+  });
   db.rows = rows;
   db.error = null;
 });
@@ -65,8 +91,12 @@ describe('useThread', () => {
     await waitFor(() => {
       expect(result.current.data?.messages.map((message) => message.id)).toEqual(['u1', 'a1']);
     });
-    expect(db.select).toHaveBeenCalledWith('id, role, content, citations, answered, feedback, created_at, latency_ms');
-    expect(result.current.data?.messages.every((message) => message.status === 'complete')).toBe(true);
+    expect(db.select).toHaveBeenCalledWith(
+      'id, role, content, citations, answered, feedback, created_at, latency_ms',
+    );
+    expect(result.current.data?.messages.every((message) => message.status === 'complete')).toBe(
+      true,
+    );
   });
 
   it('renders straight from the cache and does not fetch while an answer streams', () => {
@@ -110,13 +140,20 @@ describe('useFeedback', () => {
       pending = result.current('a1', 1);
     });
 
-    expect(queryClient.getQueryData<Thread>(threadKey(CONVERSATION))?.messages[1]!.feedback).toBe(1);
+    expect(queryClient.getQueryData<Thread>(threadKey(CONVERSATION))?.messages[1]!.feedback).toBe(
+      1,
+    );
     await act(async () => {
       await pending;
     });
 
-    expect(fetch).toHaveBeenCalledWith('/api/messages/a1/feedback', expect.objectContaining({ method: 'POST', body: '{"value":1}' }));
-    expect(queryClient.getQueryData<Thread>(threadKey(CONVERSATION))?.messages[1]!.feedback).toBe(1);
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/messages/a1/feedback',
+      expect.objectContaining({ method: 'POST', body: '{"value":1}' }),
+    );
+    expect(queryClient.getQueryData<Thread>(threadKey(CONVERSATION))?.messages[1]!.feedback).toBe(
+      1,
+    );
     expect(toast.error).not.toHaveBeenCalled();
   });
 
@@ -133,7 +170,9 @@ describe('useFeedback', () => {
       await result.current('a1', -1);
     });
 
-    expect(queryClient.getQueryData<Thread>(threadKey(CONVERSATION))?.messages[1]!.feedback).toBeNull();
+    expect(
+      queryClient.getQueryData<Thread>(threadKey(CONVERSATION))?.messages[1]!.feedback,
+    ).toBeNull();
     expect(toast.error).toHaveBeenCalledWith('That message does not exist.');
   });
 });

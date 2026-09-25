@@ -70,7 +70,17 @@ const createTurndown = (baseUrl?: string) => {
     hr: '---',
   });
 
-  service.remove(['script', 'style', 'noscript', 'iframe', 'nav', 'footer', 'aside', 'button', 'template']);
+  service.remove([
+    'script',
+    'style',
+    'noscript',
+    'iframe',
+    'nav',
+    'footer',
+    'aside',
+    'button',
+    'template',
+  ]);
 
   service.addRule('fencedCode', {
     filter: (node) => node.nodeName === 'PRE',
@@ -125,7 +135,11 @@ const createTurndown = (baseUrl?: string) => {
       const isParagraph = /\n$/.test(content);
       const body = content.replace(/^\n+/, '').replace(/\n+$/, '') + (isParagraph ? '\n' : '');
 
-      return prefix + body.replace(/\n/gm, `\n${' '.repeat(prefix.length)}`) + (node.nextSibling ? '\n' : '');
+      return (
+        prefix +
+        body.replace(/\n/gm, `\n${' '.repeat(prefix.length)}`) +
+        (node.nextSibling ? '\n' : '')
+      );
     },
   });
 
@@ -167,7 +181,11 @@ export const cleanTitle = (title: string, heading: string | null, siteName: stri
   const trimmed = collapse(title);
   const h1 = collapse(heading ?? '');
 
-  if (h1.length >= 2 && h1.length < trimmed.length && trimmed.toLowerCase().includes(h1.toLowerCase())) {
+  if (
+    h1.length >= 2 &&
+    h1.length < trimmed.length &&
+    trimmed.toLowerCase().includes(h1.toLowerCase())
+  ) {
     return h1;
   }
 
@@ -205,14 +223,18 @@ const hostOf = (baseUrl?: string) => {
 const isSiteName = (text: string, siteName: string | null, host: string | null) => {
   const value = collapse(text).toLowerCase();
 
-  return Boolean(value) && (value === collapse(siteName ?? '').toLowerCase() || value === host || value === `www.${host}`);
+  return (
+    Boolean(value) &&
+    (value === collapse(siteName ?? '').toLowerCase() || value === host || value === `www.${host}`)
+  );
 };
 
 const pageTitle = (document: Document, host: string | null) => {
   const headings = Array.from(document.querySelectorAll('h1'))
     .map((element) => collapse(element.textContent ?? ''))
     .filter(Boolean);
-  const declaredSite = document.querySelector('meta[property="og:site_name"]')?.getAttribute('content') ?? null;
+  const declaredSite =
+    document.querySelector('meta[property="og:site_name"]')?.getAttribute('content') ?? null;
   // Many sites put their logo in an h1; that heading names the site, and the page heading comes after it.
   const siteName = declaredSite ?? headings.find((text) => isSiteName(text, null, host)) ?? null;
   const heading = headings.find((text) => !isSiteName(text, siteName, host)) ?? null;
@@ -259,7 +281,9 @@ const withTitleHeading = (markdown: string, title: string | null) =>
  * headings, fenced code, lists, links and tables.
  */
 export const htmlToMarkdown = (html: string, options: HtmlOptions = {}): ExtractedHtml => {
-  const source = /<body[\s>]/i.test(html) ? html : `<!doctype html><html><body>${html}</body></html>`;
+  const source = /<body[\s>]/i.test(html)
+    ? html
+    : `<!doctype html><html><body>${html}</body></html>`;
   const { document } = parseHTML(source);
   const links = Array.from(document.querySelectorAll('a[href]'))
     .map((anchor) => anchor.getAttribute('href') ?? '')
@@ -278,7 +302,9 @@ export const htmlToMarkdown = (html: string, options: HtmlOptions = {}): Extract
 
   if (options.readability !== false) {
     try {
-      const article = new Readability(document as unknown as Document, { keepClasses: true }).parse();
+      const article = new Readability(document as unknown as Document, {
+        keepClasses: true,
+      }).parse();
       const articleLength = collapse(article?.textContent ?? '').length;
       const tooThin = isSectioned && articleLength < fallbackLength * READABILITY_MIN_SHARE;
 
@@ -288,7 +314,9 @@ export const htmlToMarkdown = (html: string, options: HtmlOptions = {}): Extract
     }
   }
 
-  const markdown = tidyMarkdown(createTurndown(options.baseUrl).turndown(contentHtml || fallbackHtml));
+  const markdown = tidyMarkdown(
+    createTurndown(options.baseUrl).turndown(contentHtml || fallbackHtml),
+  );
 
   return { title, markdown: withTitleHeading(markdown, title), links };
 };

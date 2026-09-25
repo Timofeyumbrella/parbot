@@ -30,7 +30,9 @@ const fakeChat = () => {
       }
     });
 
-    return Promise.resolve(new Response(stream, { headers: { 'content-type': 'text/event-stream' } }));
+    return Promise.resolve(
+      new Response(stream, { headers: { 'content-type': 'text/event-stream' } }),
+    );
   });
 
   return {
@@ -67,7 +69,10 @@ describe('sendMessage', () => {
 
     vi.stubGlobal('fetch', chat.fetch);
 
-    const pending = sendMessage(queryClient, ASSISTANT, { conversationId: CONVERSATION, content: '  Where are API keys?  ' });
+    const pending = sendMessage(queryClient, ASSISTANT, {
+      conversationId: CONVERSATION,
+      content: '  Where are API keys?  ',
+    });
 
     const before = thread();
 
@@ -78,14 +83,23 @@ describe('sendMessage', () => {
     expect(before?.messages[0]!.content).toBe('Where are API keys?');
     expect(before?.messages.every((message) => isTempId(message.id))).toBe(true);
     expect(list()).toEqual([
-      expect.objectContaining({ id: CONVERSATION, title: 'Where are API keys?', pending: true, message_count: 1 }),
+      expect.objectContaining({
+        id: CONVERSATION,
+        title: 'Where are API keys?',
+        pending: true,
+        message_count: 1,
+      }),
     ]);
 
     expect(chat.fetch).toHaveBeenCalledWith(
       '/api/chat',
       expect.objectContaining({
         method: 'POST',
-        body: JSON.stringify({ assistantId: ASSISTANT, conversationId: CONVERSATION, message: 'Where are API keys?' }),
+        body: JSON.stringify({
+          assistantId: ASSISTANT,
+          conversationId: CONVERSATION,
+          message: 'Where are API keys?',
+        }),
         signal: expect.any(AbortSignal),
       }),
     );
@@ -101,7 +115,10 @@ describe('sendMessage', () => {
 
     vi.stubGlobal('fetch', chat.fetch);
 
-    const pending = sendMessage(queryClient, ASSISTANT, { conversationId: CONVERSATION, content: 'Where are API keys?' });
+    const pending = sendMessage(queryClient, ASSISTANT, {
+      conversationId: CONVERSATION,
+      content: 'Where are API keys?',
+    });
 
     chat.push(meta);
     chat.push({ type: 'token', text: 'In ' });
@@ -109,7 +126,15 @@ describe('sendMessage', () => {
     chat.push({ type: 'token', text: '[1]' });
     chat.push({
       type: 'citations',
-      citations: [{ index: 1, documentId: 'd1', title: 'Auth', url: 'https://docs.acme.test/auth', snippet: 's' }],
+      citations: [
+        {
+          index: 1,
+          documentId: 'd1',
+          title: 'Auth',
+          url: 'https://docs.acme.test/auth',
+          snippet: 's',
+        },
+      ],
     });
     chat.push({ type: 'done', answered: true, latencyMs: 640 });
     chat.close();
@@ -129,7 +154,12 @@ describe('sendMessage', () => {
     });
     expect(after?.messages[1]!.citations).toHaveLength(1);
     expect(list()).toEqual([
-      expect.objectContaining({ id: CONVERSATION, pending: false, message_count: 2, unanswered_count: 0 }),
+      expect.objectContaining({
+        id: CONVERSATION,
+        pending: false,
+        message_count: 2,
+        unanswered_count: 0,
+      }),
     ]);
     expect(streamRegistry.isStreaming(CONVERSATION)).toBe(false);
   });
@@ -139,7 +169,10 @@ describe('sendMessage', () => {
 
     vi.stubGlobal('fetch', chat.fetch);
 
-    const pending = sendMessage(queryClient, ASSISTANT, { conversationId: CONVERSATION, content: 'Unknown thing?' });
+    const pending = sendMessage(queryClient, ASSISTANT, {
+      conversationId: CONVERSATION,
+      content: 'Unknown thing?',
+    });
 
     chat.push(meta);
     chat.push({ type: 'token', text: 'I could not find that.' });
@@ -154,15 +187,30 @@ describe('sendMessage', () => {
 
   it('moves an existing conversation to the top and keeps its title', async () => {
     queryClient.setQueryData<ConversationRow[]>(conversationsKey(ASSISTANT), [
-      { id: 'other', title: 'Newer', last_message_at: '2026-09-23T12:00:00.000Z', message_count: 2, unanswered_count: 0 },
-      { id: CONVERSATION, title: 'Older', last_message_at: '2026-09-23T11:00:00.000Z', message_count: 2, unanswered_count: 0 },
+      {
+        id: 'other',
+        title: 'Newer',
+        last_message_at: '2026-09-23T12:00:00.000Z',
+        message_count: 2,
+        unanswered_count: 0,
+      },
+      {
+        id: CONVERSATION,
+        title: 'Older',
+        last_message_at: '2026-09-23T11:00:00.000Z',
+        message_count: 2,
+        unanswered_count: 0,
+      },
     ]);
 
     const chat = fakeChat();
 
     vi.stubGlobal('fetch', chat.fetch);
 
-    const pending = sendMessage(queryClient, ASSISTANT, { conversationId: CONVERSATION, content: 'Follow-up' });
+    const pending = sendMessage(queryClient, ASSISTANT, {
+      conversationId: CONVERSATION,
+      content: 'Follow-up',
+    });
 
     expect(list()?.map((row) => row.id)).toEqual([CONVERSATION, 'other']);
     expect(list()?.[0]).toMatchObject({ title: 'Older', message_count: 3 });
@@ -179,7 +227,10 @@ describe('sendMessage', () => {
 
     vi.stubGlobal('fetch', first.fetch);
 
-    const pending = sendMessage(queryClient, ASSISTANT, { conversationId: CONVERSATION, content: 'Where are API keys?' });
+    const pending = sendMessage(queryClient, ASSISTANT, {
+      conversationId: CONVERSATION,
+      content: 'Where are API keys?',
+    });
 
     first.push({ type: 'error', code: 'quota_exceeded', message: 'Out of answers this month.' });
     first.close();
@@ -203,7 +254,9 @@ describe('sendMessage', () => {
 
     expect(thread()?.messages.map((message) => message.status)).toEqual(['pending', 'streaming']);
     expect(second.fetch).toHaveBeenCalledTimes(1);
-    expect(JSON.parse(second.fetch.mock.calls[0]![1]!.body as string)).toMatchObject({ message: 'Where are API keys?' });
+    expect(JSON.parse(second.fetch.mock.calls[0]![1]!.body as string)).toMatchObject({
+      message: 'Where are API keys?',
+    });
 
     second.push(meta);
     second.push({ type: 'token', text: 'Settings.' });
@@ -232,7 +285,10 @@ describe('sendMessage', () => {
 
     vi.stubGlobal('fetch', chat.fetch);
 
-    const pending = sendMessage(queryClient, ASSISTANT, { conversationId: CONVERSATION, content: 'Long one?' });
+    const pending = sendMessage(queryClient, ASSISTANT, {
+      conversationId: CONVERSATION,
+      content: 'Long one?',
+    });
 
     chat.push(meta);
     chat.push({ type: 'token', text: 'The first half' });
@@ -249,7 +305,11 @@ describe('sendMessage', () => {
 
     expect(signal.aborted).toBe(true);
     expect(thread()?.active).toBeNull();
-    expect(thread()?.messages[1]).toMatchObject({ id: 'a1', status: 'stopped', content: 'The first half' });
+    expect(thread()?.messages[1]).toMatchObject({
+      id: 'a1',
+      status: 'stopped',
+      content: 'The first half',
+    });
     expect(thread()?.messages[0]).toMatchObject({ id: 'u1', status: 'stopped' });
     expect(streamRegistry.isStreaming(CONVERSATION)).toBe(false);
   });
@@ -257,8 +317,28 @@ describe('sendMessage', () => {
   it('stop with nothing in flight still closes a thread the cache believes is streaming', () => {
     queryClient.setQueryData<Thread>(threadKey(CONVERSATION), {
       messages: [
-        { id: 'u', role: 'user', content: 'q', citations: [], answered: null, feedback: null, created_at: 't', latency_ms: null, status: 'pending' },
-        { id: 'a', role: 'assistant', content: 'partial', citations: [], answered: null, feedback: null, created_at: 't', latency_ms: null, status: 'streaming' },
+        {
+          id: 'u',
+          role: 'user',
+          content: 'q',
+          citations: [],
+          answered: null,
+          feedback: null,
+          created_at: 't',
+          latency_ms: null,
+          status: 'pending',
+        },
+        {
+          id: 'a',
+          role: 'assistant',
+          content: 'partial',
+          citations: [],
+          answered: null,
+          feedback: null,
+          created_at: 't',
+          latency_ms: null,
+          status: 'streaming',
+        },
       ],
       active: { userId: 'u', assistantId: 'a' },
     });
@@ -274,7 +354,10 @@ describe('sendMessage', () => {
 
     vi.stubGlobal('fetch', chat.fetch);
 
-    const pending = sendMessage(queryClient, ASSISTANT, { conversationId: CONVERSATION, content: 'Hello?' });
+    const pending = sendMessage(queryClient, ASSISTANT, {
+      conversationId: CONVERSATION,
+      content: 'Hello?',
+    });
 
     chat.push(meta);
     chat.push({ type: 'token', text: 'Part' });
@@ -284,19 +367,28 @@ describe('sendMessage', () => {
     expect(thread()?.messages[1]).toMatchObject({
       status: 'error',
       content: 'Part',
-      error: { code: 'internal', message: 'The connection closed before the answer finished. Try again.' },
+      error: {
+        code: 'internal',
+        message: 'The connection closed before the answer finished. Try again.',
+      },
     });
     expect(thread()?.messages[0]).toMatchObject({ status: 'failed' });
   });
 
   it('turns a network failure into an error bubble without echoing the browser', async () => {
-    vi.stubGlobal('fetch', vi.fn(() => Promise.reject(new TypeError('Failed to fetch'))));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.reject(new TypeError('Failed to fetch'))),
+    );
 
     await sendMessage(queryClient, ASSISTANT, { conversationId: CONVERSATION, content: 'Hello?' });
 
     expect(thread()?.messages[1]).toMatchObject({
       status: 'error',
-      error: { code: 'internal', message: 'The message did not reach the server. Check your connection and try again.' },
+      error: {
+        code: 'internal',
+        message: 'The message did not reach the server. Check your connection and try again.',
+      },
     });
     expect(thread()?.messages[0]).toMatchObject({ status: 'failed' });
     expect(streamRegistry.isStreaming(CONVERSATION)).toBe(false);
@@ -305,14 +397,23 @@ describe('sendMessage', () => {
   it('reports a response that is not an event stream by its status', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () => new Response('<html>Internal Server Error</html>', { status: 500, headers: { 'content-type': 'text/html' } })),
+      vi.fn(
+        async () =>
+          new Response('<html>Internal Server Error</html>', {
+            status: 500,
+            headers: { 'content-type': 'text/html' },
+          }),
+      ),
     );
 
     await sendMessage(queryClient, ASSISTANT, { conversationId: CONVERSATION, content: 'Hello?' });
 
     expect(thread()?.messages[1]).toMatchObject({
       status: 'error',
-      error: { code: 'internal', message: 'The server could not answer (500). Try again in a moment.' },
+      error: {
+        code: 'internal',
+        message: 'The server could not answer (500). Try again in a moment.',
+      },
     });
     expect(thread()?.active).toBeNull();
     expect(streamRegistry.isStreaming(CONVERSATION)).toBe(false);
@@ -324,7 +425,10 @@ describe('sendMessage', () => {
 
     vi.stubGlobal('fetch', chat.fetch);
 
-    const pending = sendMessage(queryClient, ASSISTANT, { conversationId: CONVERSATION, content: 'Hello?' });
+    const pending = sendMessage(queryClient, ASSISTANT, {
+      conversationId: CONVERSATION,
+      content: 'Hello?',
+    });
 
     chat.push(meta);
     expect(invalidate).not.toHaveBeenCalled();

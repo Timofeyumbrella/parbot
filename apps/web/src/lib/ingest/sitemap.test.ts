@@ -23,7 +23,8 @@ const INDEX = `<?xml version="1.0" encoding="UTF-8"?>
 
 const API = `<urlset><url><loc>https://docs.example.com/api/a</loc></url><url><loc>https://docs.example.com/api/b</loc></url></urlset>`;
 
-const xml = (body: string) => new Response(body, { status: 200, headers: { 'content-type': 'application/xml' } });
+const xml = (body: string) =>
+  new Response(body, { status: 200, headers: { 'content-type': 'application/xml' } });
 
 const fetchImpl: FetchImpl = async (input) => {
   const url = String(input);
@@ -73,14 +74,28 @@ describe('parseSitemap', () => {
 
 describe('discoverSitemapUrls', () => {
   it('returns the pages of a flat sitemap up to the limit', async () => {
-    await expect(discoverSitemapUrls({ url: 'https://docs.example.com/flat.xml', fetchImpl, lookup: publicLookup, limit: 2 })).resolves.toEqual([
+    await expect(
+      discoverSitemapUrls({
+        url: 'https://docs.example.com/flat.xml',
+        fetchImpl,
+        lookup: publicLookup,
+        limit: 2,
+      }),
+    ).resolves.toEqual([
       'https://docs.example.com/guide/intro',
       'https://docs.example.com/guide/setup?ref=x&y=1',
     ]);
   });
 
   it('follows a sitemap index one level and skips children that fail', async () => {
-    await expect(discoverSitemapUrls({ url: 'https://docs.example.com/sitemap.xml', fetchImpl, lookup: publicLookup, limit: 10 })).resolves.toEqual([
+    await expect(
+      discoverSitemapUrls({
+        url: 'https://docs.example.com/sitemap.xml',
+        fetchImpl,
+        lookup: publicLookup,
+        limit: 10,
+      }),
+    ).resolves.toEqual([
       'https://docs.example.com/guide/intro',
       'https://docs.example.com/guide/setup?ref=x&y=1',
       'https://docs.example.com/guide/faq',
@@ -97,11 +112,28 @@ describe('discoverSitemapUrls', () => {
       return fetchImpl(input, init);
     };
 
-    await expect(discoverSitemapUrls({ url: 'https://docs.example.com/sitemap.xml', fetchImpl: counting, lookup: publicLookup, limit: 3 })).resolves.toHaveLength(3);
-    expect(seen).toEqual(['https://docs.example.com/sitemap.xml', 'https://docs.example.com/sitemap-guide.xml']);
+    await expect(
+      discoverSitemapUrls({
+        url: 'https://docs.example.com/sitemap.xml',
+        fetchImpl: counting,
+        lookup: publicLookup,
+        limit: 3,
+      }),
+    ).resolves.toHaveLength(3);
+    expect(seen).toEqual([
+      'https://docs.example.com/sitemap.xml',
+      'https://docs.example.com/sitemap-guide.xml',
+    ]);
   });
 
   it('reports a sitemap that cannot be fetched', async () => {
-    await expect(discoverSitemapUrls({ url: 'https://docs.example.com/nope.xml', fetchImpl, lookup: publicLookup, limit: 5 })).rejects.toThrow('HTTP 404');
+    await expect(
+      discoverSitemapUrls({
+        url: 'https://docs.example.com/nope.xml',
+        fetchImpl,
+        lookup: publicLookup,
+        limit: 5,
+      }),
+    ).rejects.toThrow('HTTP 404');
   });
 });

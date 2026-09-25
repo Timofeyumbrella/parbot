@@ -1,7 +1,14 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
 
-import { assertPublicUrl, BlockedHostError, isBlockedAddress, isBlockedHostname, memoizeLookup, publicLookup } from './guard';
+import {
+  assertPublicUrl,
+  BlockedHostError,
+  isBlockedAddress,
+  isBlockedHostname,
+  memoizeLookup,
+  publicLookup,
+} from './guard';
 
 describe('isBlockedAddress', () => {
   it('refuses loopback, private, link-local, carrier NAT and reserved IPv4 ranges', () => {
@@ -29,7 +36,15 @@ describe('isBlockedAddress', () => {
   });
 
   it('allows ordinary public IPv4 addresses', () => {
-    for (const address of ['93.184.216.34', '172.15.0.1', '172.32.0.1', '100.63.0.1', '100.128.0.1', '8.8.8.8', '11.0.0.1']) {
+    for (const address of [
+      '93.184.216.34',
+      '172.15.0.1',
+      '172.32.0.1',
+      '100.63.0.1',
+      '100.128.0.1',
+      '8.8.8.8',
+      '11.0.0.1',
+    ]) {
       expect(isBlockedAddress(address), address).toBe(false);
     }
   });
@@ -55,7 +70,12 @@ describe('isBlockedAddress', () => {
   });
 
   it('allows public IPv6 addresses, including mapped public IPv4', () => {
-    for (const address of ['2606:2800:220:1:248:1893:25c8:1946', '2a00:1450:4001:80e::200e', '::ffff:93.184.216.34', '64:ff9b::8.8.8.8']) {
+    for (const address of [
+      '2606:2800:220:1:248:1893:25c8:1946',
+      '2a00:1450:4001:80e::200e',
+      '::ffff:93.184.216.34',
+      '64:ff9b::8.8.8.8',
+    ]) {
       expect(isBlockedAddress(address), address).toBe(false);
     }
   });
@@ -88,7 +108,13 @@ describe('isBlockedHostname', () => {
   });
 
   it('allows public names and public literal addresses', () => {
-    for (const name of ['docs.example.com', 'localhost.example.com', 'internal-docs.example.com', '93.184.216.34', '[2606:2800:220:1:248:1893:25c8:1946]']) {
+    for (const name of [
+      'docs.example.com',
+      'localhost.example.com',
+      'internal-docs.example.com',
+      '93.184.216.34',
+      '[2606:2800:220:1:248:1893:25c8:1946]',
+    ]) {
       expect(isBlockedHostname(name), name).toBe(false);
     }
   });
@@ -96,11 +122,15 @@ describe('isBlockedHostname', () => {
 
 describe('assertPublicUrl', () => {
   it('resolves the name and refuses when any answer is private', async () => {
-    await expect(assertPublicUrl('https://docs.example.com/guide', publicLookup)).resolves.toBeUndefined();
-    await expect(assertPublicUrl('https://docs.example.com/guide', async () => ['93.184.216.34', '10.0.0.4'])).rejects.toThrow(
-      'the address points at a private or internal network',
-    );
-    await expect(assertPublicUrl('https://docs.example.com/guide', async () => ['fd00::1'])).rejects.toBeInstanceOf(BlockedHostError);
+    await expect(
+      assertPublicUrl('https://docs.example.com/guide', publicLookup),
+    ).resolves.toBeUndefined();
+    await expect(
+      assertPublicUrl('https://docs.example.com/guide', async () => ['93.184.216.34', '10.0.0.4']),
+    ).rejects.toThrow('the address points at a private or internal network');
+    await expect(
+      assertPublicUrl('https://docs.example.com/guide', async () => ['fd00::1']),
+    ).rejects.toBeInstanceOf(BlockedHostError);
   });
 
   it('refuses blocked names before resolving anything', async () => {
@@ -111,10 +141,18 @@ describe('assertPublicUrl', () => {
       return ['93.184.216.34'];
     };
 
-    await expect(assertPublicUrl('http://localhost:3000/', lookup)).rejects.toThrow('private or internal network');
-    await expect(assertPublicUrl('http://169.254.169.254/latest/meta-data/', lookup)).rejects.toThrow('private or internal network');
-    await expect(assertPublicUrl('http://[::1]/', lookup)).rejects.toThrow('private or internal network');
-    await expect(assertPublicUrl('ftp://docs.example.com/', lookup)).rejects.toThrow('private or internal network');
+    await expect(assertPublicUrl('http://localhost:3000/', lookup)).rejects.toThrow(
+      'private or internal network',
+    );
+    await expect(
+      assertPublicUrl('http://169.254.169.254/latest/meta-data/', lookup),
+    ).rejects.toThrow('private or internal network');
+    await expect(assertPublicUrl('http://[::1]/', lookup)).rejects.toThrow(
+      'private or internal network',
+    );
+    await expect(assertPublicUrl('ftp://docs.example.com/', lookup)).rejects.toThrow(
+      'private or internal network',
+    );
     expect(looked).toBe(0);
   });
 
@@ -124,7 +162,9 @@ describe('assertPublicUrl', () => {
         throw new Error('ENOTFOUND');
       }),
     ).rejects.toThrow('the host could not be found');
-    await expect(assertPublicUrl('https://nowhere.example.com/', async () => [])).rejects.toThrow('the host could not be found');
+    await expect(assertPublicUrl('https://nowhere.example.com/', async () => [])).rejects.toThrow(
+      'the host could not be found',
+    );
   });
 });
 

@@ -13,11 +13,22 @@ const auth = (index: number, snippet: string): Citation => ({
   snippet,
 });
 
-const notes: Citation = { index: 3, documentId: 'd-notes', title: 'Pasted notes', url: null, snippet: 'Rotate keys monthly.' };
+const notes: Citation = {
+  index: 3,
+  documentId: 'd-notes',
+  title: 'Pasted notes',
+  url: null,
+  snippet: 'Rotate keys monthly.',
+};
 
 describe('Sources', () => {
   it('lists a page once with every marker that cites it, in the order the answer first cites it', () => {
-    render(<Sources citations={[auth(2, 'Keys live in Settings.'), notes, auth(5, 'Keys carry scopes.')]} id="sources-m1" />);
+    render(
+      <Sources
+        citations={[auth(2, 'Keys live in Settings.'), notes, auth(5, 'Keys carry scopes.')]}
+        id="sources-m1"
+      />,
+    );
 
     const row = screen.getByTestId('sources');
 

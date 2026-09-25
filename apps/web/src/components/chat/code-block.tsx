@@ -39,7 +39,15 @@ export const useCopy = () => {
   return { copied, copy };
 };
 
-export const CopyButton = ({ text, label = 'Copy', className }: { text: string; label?: string; className?: string }) => {
+export const CopyButton = ({
+  text,
+  label = 'Copy',
+  className,
+}: {
+  text: string;
+  label?: string;
+  className?: string;
+}) => {
   const { copied, copy } = useCopy();
 
   return (
@@ -66,8 +74,8 @@ type CodeBlockProps = {
 /** A fenced code block: language label, copy button, and the highlighted `<pre>` underneath. */
 export const CodeBlock = ({ language, code, children }: CodeBlockProps) => (
   <div className="bg-card my-3 overflow-hidden rounded-lg border" data-testid="code-block">
-    <div className="bg-muted/60 flex h-8 items-center justify-between border-b pr-1 pl-3">
-      <span className="text-muted-foreground font-mono text-[11px] tracking-wide uppercase">
+    <div className="bg-muted/60 flex h-8 items-center justify-between border-b pl-3 pr-1">
+      <span className="text-muted-foreground font-mono text-[11px] uppercase tracking-wide">
         {language ?? 'text'}
       </span>
       <CopyButton text={code} />

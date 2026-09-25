@@ -34,7 +34,9 @@ export const Thread = ({ conversationId }: ThreadProps) => {
   const feedback = useFeedback(conversationId);
   const messages = data?.messages ?? [];
   const streaming = isStreaming(data);
-  const { ref, pinned, onScroll, scrollToBottom } = useAutoscroll(`${conversationId}:${messages.length}`);
+  const { ref, pinned, onScroll, scrollToBottom } = useAutoscroll(
+    `${conversationId}:${messages.length}`,
+  );
 
   const handleSend = useCallback(
     (content: string) => {
@@ -72,8 +74,16 @@ export const Thread = ({ conversationId }: ThreadProps) => {
   const empty = Boolean(data) && messages.length === 0;
 
   return (
-    <div className="relative flex h-full min-h-0 flex-col" data-testid="thread" data-conversation={conversationId}>
-      <div ref={ref} onScroll={onScroll} className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+    <div
+      className="relative flex h-full min-h-0 flex-col"
+      data-testid="thread"
+      data-conversation={conversationId}
+    >
+      <div
+        ref={ref}
+        onScroll={onScroll}
+        className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
+      >
         <div
           className={cn(
             'mx-auto flex w-full max-w-3xl flex-col gap-7 px-4 py-6 sm:px-6',
@@ -88,7 +98,13 @@ export const Thread = ({ conversationId }: ThreadProps) => {
               <p className="text-muted-foreground max-w-sm text-sm">
                 {error instanceof Error ? error.message : 'The request failed.'}
               </p>
-              <Button type="button" variant="outline" size="sm" onClick={() => void refetch()} disabled={isFetching}>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => void refetch()}
+                disabled={isFetching}
+              >
                 <RotateCcw data-icon="inline-start" />
                 Try again
               </Button>
@@ -130,7 +146,7 @@ export const Thread = ({ conversationId }: ThreadProps) => {
         </div>
       ) : null}
 
-      <div className="bg-background border-t px-4 pt-3 pb-3 sm:px-6">
+      <div className="bg-background border-t px-4 pb-3 pt-3 sm:px-6">
         <Composer
           key={conversationId}
           className="mx-auto w-full max-w-3xl"

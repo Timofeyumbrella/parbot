@@ -9,7 +9,14 @@ import { signOut } from '@/actions/auth';
 import { FormField, FormMessage } from '@/components/auth/form-field';
 import { PASSWORD_MIN_LENGTH } from '@/components/auth/schema';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { type FormState, idleState } from '@/lib/form';
 
@@ -36,7 +43,10 @@ const FormError = ({ state }: { state: FormState }) =>
   ) : null;
 
 export const ProfileForm = ({ fullName }: { fullName: string }) => {
-  const [state, action, pending] = useActionState(updateProfile, idleState as FormState<ProfileField>);
+  const [state, action, pending] = useActionState(
+    updateProfile,
+    idleState as FormState<ProfileField>,
+  );
 
   useSuccessToast(state);
 
@@ -45,13 +55,20 @@ export const ProfileForm = ({ fullName }: { fullName: string }) => {
       <Card>
         <CardHeader>
           <CardTitle>Name</CardTitle>
-          <CardDescription>Only you see it. It is not shown to visitors of your assistants.</CardDescription>
+          <CardDescription>
+            Only you see it. It is not shown to visitors of your assistants.
+          </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           <FormError state={state} />
           <FormField label="Full name" error={state.fieldErrors?.fullName}>
             {(control) => (
-              <Input {...control} name="fullName" autoComplete="name" defaultValue={state.values?.fullName ?? fullName} />
+              <Input
+                {...control}
+                name="fullName"
+                autoComplete="name"
+                defaultValue={state.values?.fullName ?? fullName}
+              />
             )}
           </FormField>
         </CardContent>
@@ -63,7 +80,13 @@ export const ProfileForm = ({ fullName }: { fullName: string }) => {
   );
 };
 
-export const EmailForm = ({ email, pendingEmail }: { email: string; pendingEmail: string | null }) => {
+export const EmailForm = ({
+  email,
+  pendingEmail,
+}: {
+  email: string;
+  pendingEmail: string | null;
+}) => {
   const [state, action, pending] = useActionState(updateEmail, idleState as FormState<EmailField>);
 
   useSuccessToast(state);
@@ -74,15 +97,19 @@ export const EmailForm = ({ email, pendingEmail }: { email: string; pendingEmail
         <CardHeader>
           <CardTitle>Email</CardTitle>
           <CardDescription>
-            You sign in with it. Changing it sends a confirmation link to both the old and the new address.
+            You sign in with it. Changing it sends a confirmation link to both the old and the new
+            address.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           <FormError state={state} />
-          {state.status === 'success' && state.message ? <FormMessage tone="success">{state.message}</FormMessage> : null}
+          {state.status === 'success' && state.message ? (
+            <FormMessage tone="success">{state.message}</FormMessage>
+          ) : null}
           {pendingEmail && state.status !== 'success' ? (
             <FormMessage tone="success">
-              A change to {pendingEmail} is waiting for confirmation. Open the links we sent to both addresses.
+              A change to {pendingEmail} is waiting for confirmation. Open the links we sent to both
+              addresses.
             </FormMessage>
           ) : null}
           <FormField label="Email address" error={state.fieldErrors?.email}>
@@ -106,7 +133,10 @@ export const EmailForm = ({ email, pendingEmail }: { email: string; pendingEmail
 };
 
 export const PasswordForm = () => {
-  const [state, action, pending] = useActionState(updatePassword, idleState as FormState<PasswordField>);
+  const [state, action, pending] = useActionState(
+    updatePassword,
+    idleState as FormState<PasswordField>,
+  );
 
   useSuccessToast(state);
 
@@ -115,16 +145,27 @@ export const PasswordForm = () => {
       <Card>
         <CardHeader>
           <CardTitle>Password</CardTitle>
-          <CardDescription>At least {PASSWORD_MIN_LENGTH} characters. Other sessions stay signed in.</CardDescription>
+          <CardDescription>
+            At least {PASSWORD_MIN_LENGTH} characters. Other sessions stay signed in.
+          </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           <FormError state={state} />
           <div className="grid gap-4 sm:grid-cols-2">
             <FormField label="New password" error={state.fieldErrors?.password}>
-              {(control) => <Input {...control} name="password" type="password" autoComplete="new-password" />}
+              {(control) => (
+                <Input {...control} name="password" type="password" autoComplete="new-password" />
+              )}
             </FormField>
             <FormField label="Repeat new password" error={state.fieldErrors?.confirmPassword}>
-              {(control) => <Input {...control} name="confirmPassword" type="password" autoComplete="new-password" />}
+              {(control) => (
+                <Input
+                  {...control}
+                  name="confirmPassword"
+                  type="password"
+                  autoComplete="new-password"
+                />
+              )}
             </FormField>
           </div>
         </CardContent>

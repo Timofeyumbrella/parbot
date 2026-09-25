@@ -42,14 +42,22 @@ const required = (name: string) => {
   return value;
 };
 
-const service = createClient<Database>(required('NEXT_PUBLIC_SUPABASE_URL'), required('SUPABASE_SERVICE_ROLE_KEY'), {
-  auth: { persistSession: false, autoRefreshToken: false },
-});
+const service = createClient<Database>(
+  required('NEXT_PUBLIC_SUPABASE_URL'),
+  required('SUPABASE_SERVICE_ROLE_KEY'),
+  {
+    auth: { persistSession: false, autoRefreshToken: false },
+  },
+);
 
 const log = (message: string) => console.info(`  ${message}`);
 
 const ensureDemoUser = async () => {
-  const { data: profile } = await service.from('profiles').select('id').eq('email', DEMO_EMAIL).maybeSingle();
+  const { data: profile } = await service
+    .from('profiles')
+    .select('id')
+    .eq('email', DEMO_EMAIL)
+    .maybeSingle();
 
   if (profile) {
     return profile.id;
@@ -74,19 +82,17 @@ const ensureDemoUser = async () => {
 /** Starter unlocks the palette, theme, lead capture and branding switch the demo shows off. */
 const putOnStarter = async (ownerId: string) => {
   const periodEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-  const { error } = await service
-    .from('subscriptions')
-    .upsert(
-      {
-        account_id: ownerId,
-        plan_id: 'starter',
-        status: 'active',
-        billing_interval: 'monthly',
-        current_period_end: periodEnd,
-        cancel_at_period_end: false,
-      },
-      { onConflict: 'account_id' },
-    );
+  const { error } = await service.from('subscriptions').upsert(
+    {
+      account_id: ownerId,
+      plan_id: 'starter',
+      status: 'active',
+      billing_interval: 'monthly',
+      current_period_end: periodEnd,
+      cancel_at_period_end: false,
+    },
+    { onConflict: 'account_id' },
+  );
 
   if (error) {
     throw new Error(`Could not set the plan: ${error.message}`);
@@ -117,7 +123,8 @@ const ensureAssistant = async (ownerId: string) => {
       name: 'Parbot Docs',
       slug: SLUG,
       description: 'Answers questions about Parbot itself, from the product docs.',
-      instructions: 'The product is Parbot. When a reader asks how to do something, give the steps.',
+      instructions:
+        'The product is Parbot. When a reader asks how to do something, give the steps.',
       welcome_message: 'Ask me anything about Parbot: sources, the widget, plans or privacy.',
       suggested_questions: [
         'How do I install the widget?',
@@ -163,10 +170,14 @@ const indexDocs = async (ownerId: string, assistantId: string) => {
       .eq('title', title)
       .maybeSingle();
 
-    const storagePath = known?.storage_path ?? `${ownerId}/${assistantId}/${crypto.randomUUID()}.md`;
+    const storagePath =
+      known?.storage_path ?? `${ownerId}/${assistantId}/${crypto.randomUUID()}.md`;
     const { error: uploadError } = await service.storage
       .from('sources')
-      .upload(storagePath, Buffer.from(markdown, 'utf8'), { contentType: 'text/markdown', upsert: true });
+      .upload(storagePath, Buffer.from(markdown, 'utf8'), {
+        contentType: 'text/markdown',
+        upsert: true,
+      });
 
     if (uploadError) {
       throw new Error(`Could not store ${file}: ${uploadError.message}`);
@@ -191,7 +202,9 @@ const indexDocs = async (ownerId: string, assistantId: string) => {
         .single();
 
       if (error || !data) {
-        throw new Error(`Could not create the source for ${file}: ${error?.message ?? 'unknown error'}`);
+        throw new Error(
+          `Could not create the source for ${file}: ${error?.message ?? 'unknown error'}`,
+        );
       }
 
       sourceId = data.id;
@@ -205,7 +218,9 @@ const indexDocs = async (ownerId: string, assistantId: string) => {
       .eq('id', sourceId)
       .single();
 
-    log(`${title}: ${source?.status ?? 'unknown'}${source?.chunk_count ? `, ${source.chunk_count} passages` : ''}${source?.error ? `, ${source.error}` : ''}`);
+    log(
+      `${title}: ${source?.status ?? 'unknown'}${source?.chunk_count ? `, ${source.chunk_count} passages` : ''}${source?.error ? `, ${source.error}` : ''}`,
+    );
   }
 };
 
@@ -245,7 +260,8 @@ const EXCHANGES: Exchange[] = [
   },
   {
     question: 'How many pages can I index on the Starter plan?',
-    answer: 'Starter includes 2,000 indexed pages across all of your assistants, with 3,000 answers a month [1].',
+    answer:
+      'Starter includes 2,000 indexed pages across all of your assistants, with 3,000 answers a month [1].',
     doc: 'Plans and billing',
     page: 'https://docs.example.com/pricing',
   },
@@ -284,7 +300,8 @@ const EXCHANGES: Exchange[] = [
   },
   {
     question: 'How do I delete my account?',
-    answer: 'Write to privacy@parbot.dev and the account is deleted along with everything it owns [1].',
+    answer:
+      'Write to privacy@parbot.dev and the account is deleted along with everything it owns [1].',
     doc: 'Privacy and security',
     channel: 'app',
   },
@@ -329,7 +346,9 @@ const seedHistory = async (ownerId: string, assistantId: string) => {
 
   for (const [index, exchange] of EXCHANGES.entries()) {
     const daysAgo = 13 - Math.floor((index / EXCHANGES.length) * 13);
-    const askedAt = new Date(now - daysAgo * 24 * 60 * 60 * 1000 - (index * 37 % 11) * 60 * 60 * 1000);
+    const askedAt = new Date(
+      now - daysAgo * 24 * 60 * 60 * 1000 - ((index * 37) % 11) * 60 * 60 * 1000,
+    );
     const answeredAt = new Date(askedAt.getTime() + 2_200);
     const channel = exchange.channel ?? 'widget';
     const conversationId = crypto.randomUUID();
@@ -437,7 +456,9 @@ const main = async () => {
   if (flag('write-env')) {
     await writeEnv(assistant.public_key);
   } else {
-    console.info(`Set NEXT_PUBLIC_DEMO_ASSISTANT_KEY=${assistant.public_key} to power the landing demo.`);
+    console.info(
+      `Set NEXT_PUBLIC_DEMO_ASSISTANT_KEY=${assistant.public_key} to power the landing demo.`,
+    );
   }
 };
 

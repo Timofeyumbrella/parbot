@@ -43,7 +43,7 @@ export const DemoWindow = ({
         <span className="bg-primary size-2 rounded-full" aria-hidden="true" />
         {title}
       </div>
-      <span className="text-muted-foreground rounded-full border px-2 py-0.5 text-[11px] font-medium tracking-wide uppercase">
+      <span className="text-muted-foreground rounded-full border px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide">
         {label}
       </span>
     </div>
@@ -72,7 +72,12 @@ type AssistantTurnProps = {
   tone?: 'default' | 'error';
 };
 
-export const AssistantTurn = ({ children, streaming = false, citations = [], tone = 'default' }: AssistantTurnProps) => (
+export const AssistantTurn = ({
+  children,
+  streaming = false,
+  citations = [],
+  tone = 'default',
+}: AssistantTurnProps) => (
   <div className="flex gap-3">
     <span
       className="bg-primary text-primary-foreground mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md"
@@ -83,7 +88,7 @@ export const AssistantTurn = ({ children, streaming = false, citations = [], ton
     <div className="flex min-w-0 flex-1 flex-col gap-3">
       <div
         className={cn(
-          'text-sm leading-relaxed [&_p]:m-0 [&_p+p]:mt-2',
+          'text-sm leading-relaxed [&_p+p]:mt-2 [&_p]:m-0',
           streaming && 'streaming-caret',
           tone === 'error' && 'text-destructive',
         )}
@@ -104,7 +109,9 @@ export const CitationList = ({ citations }: { citations: DemoCitation[] }) => (
             {citation.index}
           </span>
           <span className="truncate">{citation.title}</span>
-          {citation.url ? <ExternalLink className="text-muted-foreground size-3 shrink-0" aria-hidden="true" /> : null}
+          {citation.url ? (
+            <ExternalLink className="text-muted-foreground size-3 shrink-0" aria-hidden="true" />
+          ) : null}
         </>
       );
       const className =
@@ -143,7 +150,13 @@ export const CitationMarker = ({ index, citation }: { index: number; citation?: 
     'bg-primary/15 text-primary mx-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-sm px-1 align-text-top font-mono text-[10px] font-semibold no-underline';
 
   return citation?.url ? (
-    <a href={citation.url} target="_blank" rel="noreferrer" className={className} title={citation.title}>
+    <a
+      href={citation.url}
+      target="_blank"
+      rel="noreferrer"
+      className={className}
+      title={citation.title}
+    >
       {index}
     </a>
   ) : (

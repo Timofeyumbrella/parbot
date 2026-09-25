@@ -47,11 +47,17 @@ describe('source actions', () => {
   it('ask a signed-out visitor to sign in and touch nothing', async () => {
     vi.mocked(getSession).mockResolvedValue({ supabase: {}, user: null } as never);
 
-    await expect(addSource({}, form({ kind: 'url', assistantId: ASSISTANT, url: 'https://docs.example.com' }))).resolves.toEqual({
+    await expect(
+      addSource({}, form({ kind: 'url', assistantId: ASSISTANT, url: 'https://docs.example.com' })),
+    ).resolves.toEqual({
       error: 'Sign in to add a source.',
     });
-    await expect(reindexSource(SOURCE_ID)).resolves.toEqual({ error: 'Sign in to re-index a source.' });
-    await expect(deleteSource(SOURCE_ID)).resolves.toEqual({ error: 'Sign in to remove a source.' });
+    await expect(reindexSource(SOURCE_ID)).resolves.toEqual({
+      error: 'Sign in to re-index a source.',
+    });
+    await expect(deleteSource(SOURCE_ID)).resolves.toEqual({
+      error: 'Sign in to remove a source.',
+    });
     expect(createSource).not.toHaveBeenCalled();
     expect(requestReindex).not.toHaveBeenCalled();
     expect(removeSource).not.toHaveBeenCalled();
@@ -60,17 +66,25 @@ describe('source actions', () => {
   it('adds a website and starts indexing it', async () => {
     createSource.mockResolvedValue(SOURCE);
 
-    const result = await addSource({}, form({ kind: 'url', assistantId: ASSISTANT, url: ' https://docs.example.com ' }));
+    const result = await addSource(
+      {},
+      form({ kind: 'url', assistantId: ASSISTANT, url: ' https://docs.example.com ' }),
+    );
 
     expect(result).toEqual({ source: SOURCE });
     expect(createSource).toHaveBeenCalledWith(
-      expect.objectContaining({ user: USER, input: expect.objectContaining({ kind: 'url', url: 'https://docs.example.com' }) }),
+      expect.objectContaining({
+        user: USER,
+        input: expect.objectContaining({ kind: 'url', url: 'https://docs.example.com' }),
+      }),
     );
     expect(scheduleIngestion).toHaveBeenCalledExactlyOnceWith(SOURCE_ID);
   });
 
   it('names the first problem with the form and schedules nothing', async () => {
-    await expect(addSource({}, form({ kind: 'text', assistantId: ASSISTANT, title: 'Notes', text: ' ' }))).resolves.toEqual({
+    await expect(
+      addSource({}, form({ kind: 'text', assistantId: ASSISTANT, title: 'Notes', text: ' ' })),
+    ).resolves.toEqual({
       error: 'Paste some text.',
     });
     expect(createSource).not.toHaveBeenCalled();
@@ -78,17 +92,28 @@ describe('source actions', () => {
   });
 
   it("passes a refusal through in the source rules' words", async () => {
-    createSource.mockRejectedValue(new SourceError(403, "Your plan's page limit is reached. Upgrade on the Billing page or remove a source."));
-    requestReindex.mockRejectedValue(new SourceError(409, 'This source is being indexed right now. Wait for it to finish.'));
+    createSource.mockRejectedValue(
+      new SourceError(
+        403,
+        "Your plan's page limit is reached. Upgrade on the Billing page or remove a source.",
+      ),
+    );
+    requestReindex.mockRejectedValue(
+      new SourceError(409, 'This source is being indexed right now. Wait for it to finish.'),
+    );
     removeSource.mockRejectedValue(new SourceError(404, 'That source does not exist.'));
 
-    await expect(addSource({}, form({ kind: 'url', assistantId: ASSISTANT, url: 'https://docs.example.com' }))).resolves.toEqual({
+    await expect(
+      addSource({}, form({ kind: 'url', assistantId: ASSISTANT, url: 'https://docs.example.com' })),
+    ).resolves.toEqual({
       error: "Your plan's page limit is reached. Upgrade on the Billing page or remove a source.",
     });
     await expect(reindexSource(SOURCE_ID)).resolves.toEqual({
       error: 'This source is being indexed right now. Wait for it to finish.',
     });
-    await expect(deleteSource(SOURCE_ID)).resolves.toEqual({ error: 'That source does not exist.' });
+    await expect(deleteSource(SOURCE_ID)).resolves.toEqual({
+      error: 'That source does not exist.',
+    });
     expect(scheduleIngestion).not.toHaveBeenCalled();
   });
 
@@ -105,8 +130,12 @@ describe('source actions', () => {
   });
 
   it('reads a malformed id as a source that is not there, without asking the database', async () => {
-    await expect(reindexSource('not-a-uuid')).resolves.toEqual({ error: 'That source does not exist.' });
-    await expect(deleteSource('not-a-uuid')).resolves.toEqual({ error: 'That source does not exist.' });
+    await expect(reindexSource('not-a-uuid')).resolves.toEqual({
+      error: 'That source does not exist.',
+    });
+    await expect(deleteSource('not-a-uuid')).resolves.toEqual({
+      error: 'That source does not exist.',
+    });
     expect(requestReindex).not.toHaveBeenCalled();
     expect(removeSource).not.toHaveBeenCalled();
   });

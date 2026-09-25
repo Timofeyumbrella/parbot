@@ -27,7 +27,10 @@ export default function DashboardLoading() {
       </div>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {[0, 1, 2].map((index) => (
-          <div key={index} className="bg-card ring-foreground/10 flex flex-col gap-4 rounded-xl p-4 ring-1">
+          <div
+            key={index}
+            className="bg-card ring-foreground/10 flex flex-col gap-4 rounded-xl p-4 ring-1"
+          >
             <div className="flex items-center gap-3">
               <Skeleton className="size-9 rounded-lg" />
               <div className="flex flex-col gap-1.5">

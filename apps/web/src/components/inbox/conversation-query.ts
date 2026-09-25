@@ -15,7 +15,14 @@ export const CONVERSATION_COLUMNS =
 
 export type ConversationRow = Pick<
   Conversation,
-  'id' | 'title' | 'channel' | 'page_url' | 'message_count' | 'unanswered_count' | 'last_message_at' | 'created_at'
+  | 'id'
+  | 'title'
+  | 'channel'
+  | 'page_url'
+  | 'message_count'
+  | 'unanswered_count'
+  | 'last_message_at'
+  | 'created_at'
 >;
 
 export const PAGE_SIZE = 30;

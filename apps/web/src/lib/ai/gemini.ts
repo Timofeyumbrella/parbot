@@ -57,7 +57,8 @@ const statusOf = (cause: unknown) =>
       : 0;
 
 const isNetworkError = (cause: unknown) =>
-  cause instanceof TypeError || (cause instanceof Error && cause.name === 'AbortError' === false && statusOf(cause) === 0);
+  cause instanceof TypeError ||
+  (cause instanceof Error && (cause.name === 'AbortError') === false && statusOf(cause) === 0);
 
 const thinkingLevelFrom = (value: string | undefined): ThinkingLevel => {
   switch ((value ?? 'LOW').toUpperCase()) {
@@ -82,7 +83,10 @@ export const createGeminiProvider = (options: GeminiOptions): AiProvider => {
   const client = options.clientImpl ?? new GoogleGenAI({ apiKey: options.apiKey });
   const waitFor = options.waitImpl ?? wait;
   const chatModels = [
-    ...new Set([options.chatModel ?? DEFAULT_CHAT_MODEL, ...(options.fallbackModels ?? DEFAULT_FALLBACKS)]),
+    ...new Set([
+      options.chatModel ?? DEFAULT_CHAT_MODEL,
+      ...(options.fallbackModels ?? DEFAULT_FALLBACKS),
+    ]),
   ].filter(Boolean);
   const embeddingModel = options.embeddingModel ?? DEFAULT_EMBEDDING_MODEL;
   const thinkingLevel = thinkingLevelFrom(options.thinkingLevel);
@@ -101,7 +105,10 @@ export const createGeminiProvider = (options: GeminiOptions): AiProvider => {
         const vectors = (response.embeddings ?? []).map((embedding) => embedding.values ?? []);
 
         if (vectors.length !== batch.length) {
-          throw new ProviderError(502, `Expected ${batch.length} embeddings, received ${vectors.length}.`);
+          throw new ProviderError(
+            502,
+            `Expected ${batch.length} embeddings, received ${vectors.length}.`,
+          );
         }
 
         return vectors.map((vector) => {
@@ -121,7 +128,10 @@ export const createGeminiProvider = (options: GeminiOptions): AiProvider => {
         if (!RETRY_STATUSES.has(status) && !isNetworkError(cause)) {
           throw cause instanceof ProviderError
             ? cause
-            : new ProviderError(status || 500, cause instanceof Error ? cause.message : 'Embedding failed.');
+            : new ProviderError(
+                status || 500,
+                cause instanceof Error ? cause.message : 'Embedding failed.',
+              );
         }
 
         if (attempt < EMBED_ATTEMPTS - 1) {
@@ -136,7 +146,10 @@ export const createGeminiProvider = (options: GeminiOptions): AiProvider => {
       throw new ModelBusyError([embeddingModel]);
     }
 
-    throw new ProviderError(status || 500, lastError instanceof Error ? lastError.message : 'Embedding failed.');
+    throw new ProviderError(
+      status || 500,
+      lastError instanceof Error ? lastError.message : 'Embedding failed.',
+    );
   };
 
   const embed = async (inputs: EmbedInput[], kind: EmbeddingKind) => {
@@ -193,7 +206,9 @@ export const createGeminiProvider = (options: GeminiOptions): AiProvider => {
     return { model, promptTokens, completionTokens };
   };
 
-  const stream = async function* (input: GenerateInput): AsyncGenerator<GenerateChunk, GenerateResult> {
+  const stream = async function* (
+    input: GenerateInput,
+  ): AsyncGenerator<GenerateChunk, GenerateResult> {
     const busy: string[] = [];
     let lastError: unknown;
 

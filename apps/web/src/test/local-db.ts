@@ -24,11 +24,18 @@ export type TestAccount = {
   client: SupabaseClient<Database>;
 };
 
-export const createTestAccount = async (service: SupabaseClient<Database>, label: string): Promise<TestAccount> => {
+export const createTestAccount = async (
+  service: SupabaseClient<Database>,
+  label: string,
+): Promise<TestAccount> => {
   const stamp = `${Date.now().toString(36)}-${crypto.randomUUID().slice(0, 6)}`;
   const email = `${label}-${stamp}@test.parbot.dev`;
   const password = `pw-${crypto.randomUUID()}`;
-  const { data: created, error } = await service.auth.admin.createUser({ email, password, email_confirm: true });
+  const { data: created, error } = await service.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+  });
 
   if (error || !created.user) {
     throw new Error(error?.message ?? 'no user');
@@ -55,7 +62,10 @@ export const createTestAccount = async (service: SupabaseClient<Database>, label
 };
 
 /** Removes the account; its assistants, sources, documents and conversations go by cascade. */
-export const deleteTestAccount = async (service: SupabaseClient<Database>, account: TestAccount | null) => {
+export const deleteTestAccount = async (
+  service: SupabaseClient<Database>,
+  account: TestAccount | null,
+) => {
   if (account) {
     await service.auth.admin.deleteUser(account.userId);
   }

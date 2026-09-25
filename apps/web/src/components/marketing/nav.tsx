@@ -86,7 +86,7 @@ export const MarketingNav = () => {
                   </Link>
                 ))}
               </nav>
-              <div className="mt-auto flex flex-col gap-2 border-t px-4 pt-4 pb-4">
+              <div className="mt-auto flex flex-col gap-2 border-t px-4 pb-4 pt-4">
                 <Button asChild variant="outline" size="lg">
                   <Link href="/login" onClick={() => setOpen(false)}>
                     Sign in

@@ -12,7 +12,6 @@ const { createAssistant } = vi.hoisted(() => ({
 
 vi.mock('@/actions/assistants', () => ({ createAssistant }));
 
-
 afterEach(cleanup);
 describe('CreateAssistantForm', () => {
   it('derives the slug from the name until the slug is edited by hand', async () => {
@@ -38,7 +37,8 @@ describe('CreateAssistantForm', () => {
   it('submits name, slug and description and shows the server message', async () => {
     createAssistant.mockResolvedValue({
       status: 'error',
-      error: 'The Hobby plan includes 1 assistant and this account already has 1. Upgrade on the billing page to add another.',
+      error:
+        'The Hobby plan includes 1 assistant and this account already has 1. Upgrade on the billing page to add another.',
       values: { name: 'Acme Docs', slug: 'acme-docs', description: '' },
     });
     const user = userEvent.setup();
@@ -48,7 +48,9 @@ describe('CreateAssistantForm', () => {
     await user.type(screen.getByLabelText('Name'), 'Acme Docs');
     await user.click(screen.getByRole('button', { name: 'Create assistant' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('The Hobby plan includes 1 assistant');
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'The Hobby plan includes 1 assistant',
+    );
 
     const formData = createAssistant.mock.calls[0]?.[1];
 

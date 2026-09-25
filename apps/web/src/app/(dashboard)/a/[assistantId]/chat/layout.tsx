@@ -19,7 +19,10 @@ async function ConversationPane({ assistantId }: { assistantId: string }) {
  * the first byte; the conversation list streams into its pane behind a skeleton. Every screen
  * under it renders from the cache the list seeds.
  */
-export default async function ChatLayout({ children, params }: LayoutProps<'/a/[assistantId]/chat'>) {
+export default async function ChatLayout({
+  children,
+  params,
+}: LayoutProps<'/a/[assistantId]/chat'>) {
   const { assistantId } = await params;
 
   return (

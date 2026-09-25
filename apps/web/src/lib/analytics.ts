@@ -145,7 +145,9 @@ export const CONVERSATION_FILTERS = ['all', 'widget', 'app', 'unanswered'] as co
 
 export type ConversationFilter = (typeof CONVERSATION_FILTERS)[number];
 
-export const parseConversationFilter = (value: string | string[] | undefined): ConversationFilter => {
+export const parseConversationFilter = (
+  value: string | string[] | undefined,
+): ConversationFilter => {
   const raw = Array.isArray(value) ? value[0] : value;
 
   return CONVERSATION_FILTERS.find((filter) => filter === raw) ?? 'all';
@@ -166,7 +168,11 @@ export const parseInboxTab = (value: string | string[] | undefined): InboxTab =>
 };
 
 /** The Inbox URL for a tab and, on the conversations tab, a filter. Defaults are left out. */
-export const inboxHref = (assistantId: string, tab: InboxTab, filter: ConversationFilter = 'all') => {
+export const inboxHref = (
+  assistantId: string,
+  tab: InboxTab,
+  filter: ConversationFilter = 'all',
+) => {
   const params = new URLSearchParams();
 
   if (tab !== 'conversations') {

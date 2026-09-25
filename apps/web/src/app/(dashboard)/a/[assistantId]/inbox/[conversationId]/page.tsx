@@ -16,7 +16,9 @@ export const metadata: Metadata = { title: 'Conversation' };
 
 const idSchema = z.uuid();
 
-export default async function ConversationPage({ params }: PageProps<'/a/[assistantId]/inbox/[conversationId]'>) {
+export default async function ConversationPage({
+  params,
+}: PageProps<'/a/[assistantId]/inbox/[conversationId]'>) {
   const { assistantId, conversationId } = await params;
 
   // Postgres rejects a malformed uuid with an error; to the reader it is simply not there.
@@ -33,7 +35,9 @@ export default async function ConversationPage({ params }: PageProps<'/a/[assist
   const [conversation, messages, leads] = await Promise.all([
     supabase
       .from('conversations')
-      .select('id, assistant_id, channel, visitor_id, title, page_url, created_at, message_count, unanswered_count')
+      .select(
+        'id, assistant_id, channel, visitor_id, title, page_url, created_at, message_count, unanswered_count',
+      )
       .eq('id', conversationId)
       .eq('assistant_id', assistantId)
       .maybeSingle(),
@@ -52,7 +56,9 @@ export default async function ConversationPage({ params }: PageProps<'/a/[assist
   ]);
 
   if (conversation.error) {
-    throw new Error('The conversation could not be loaded because the database did not answer as expected.');
+    throw new Error(
+      'The conversation could not be loaded because the database did not answer as expected.',
+    );
   }
 
   if (!conversation.data) {
@@ -83,7 +89,10 @@ export default async function ConversationPage({ params }: PageProps<'/a/[assist
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
         <section aria-label="Transcript" className="flex flex-col gap-5">
           {failure ? (
-            <div role="alert" className="border-destructive/40 bg-destructive/10 rounded-lg border p-4 text-sm">
+            <div
+              role="alert"
+              className="border-destructive/40 bg-destructive/10 rounded-lg border p-4 text-sm"
+            >
               <p className="font-medium">The transcript could not be loaded.</p>
               <p className="text-muted-foreground mt-1">
                 The database did not answer as expected. Reload the page to try again.
@@ -96,13 +105,13 @@ export default async function ConversationPage({ params }: PageProps<'/a/[assist
                 It was started but nothing was asked. Delete it from the panel if it is just noise.
               </p>
               <Button asChild size="sm" variant="outline" className="mt-2">
-                <Link href={`/a/${assistantId}/inbox`}>
-                  Back to the inbox
-                </Link>
+                <Link href={`/a/${assistantId}/inbox`}>Back to the inbox</Link>
               </Button>
             </div>
           ) : (
-            (messages.data ?? []).map((message) => <TranscriptMessage key={message.id} message={message} now={now} />)
+            (messages.data ?? []).map((message) => (
+              <TranscriptMessage key={message.id} message={message} now={now} />
+            ))
           )}
         </section>
 

@@ -4,7 +4,13 @@ import { useQuery } from '@tanstack/react-query';
 import { ExternalLink } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { Source } from '@/lib/db';
 import { getSupabaseBrowserClient } from '@/lib/supabase/client';
@@ -55,7 +61,9 @@ export const SourcePagesSheet = ({ source, open, onOpenChange }: SourcePagesShee
       <SheetContent side="right" className="sm:max-w-md">
         <SheetHeader className="pr-12">
           <SheetTitle className="truncate">{source.title}</SheetTitle>
-          <SheetDescription>{plural(pages.data?.length ?? source.document_count, 'page')} indexed</SheetDescription>
+          <SheetDescription>
+            {plural(pages.data?.length ?? source.document_count, 'page')} indexed
+          </SheetDescription>
         </SheetHeader>
         <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
           {pages.isPending ? (
@@ -94,7 +102,9 @@ export const SourcePagesSheet = ({ source, open, onOpenChange }: SourcePagesShee
                       <ExternalLink className="size-3 shrink-0" aria-hidden="true" />
                     </a>
                   ) : null}
-                  <span className="text-muted-foreground text-xs tabular-nums">{plural(page.chunkCount, 'passage')}</span>
+                  <span className="text-muted-foreground text-xs tabular-nums">
+                    {plural(page.chunkCount, 'passage')}
+                  </span>
                 </li>
               ))}
             </ul>

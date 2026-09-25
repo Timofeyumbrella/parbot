@@ -5,13 +5,19 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 /** Shown until the assistant has answered its first message: the two ways to get traffic. */
-export const FirstUse = ({ assistantId, assistantName }: { assistantId: string; assistantName: string }) => (
+export const FirstUse = ({
+  assistantId,
+  assistantName,
+}: {
+  assistantId: string;
+  assistantName: string;
+}) => (
   <Card data-testid="first-use">
     <CardHeader>
       <CardTitle>No conversations yet</CardTitle>
       <CardDescription>
-        {assistantName} has not answered anything so far. Stats appear here as soon as someone asks a question, and
-        there are two ways to make that happen.
+        {assistantName} has not answered anything so far. Stats appear here as soon as someone asks
+        a question, and there are two ways to make that happen.
       </CardDescription>
     </CardHeader>
     <CardContent className="grid gap-3 sm:grid-cols-2">
@@ -21,12 +27,11 @@ export const FirstUse = ({ assistantId, assistantName }: { assistantId: string; 
           Test it in Chat
         </div>
         <p className="text-muted-foreground text-sm">
-          Ask the assistant something your docs cover and see how it answers, with the sources it used.
+          Ask the assistant something your docs cover and see how it answers, with the sources it
+          used.
         </p>
         <Button asChild size="sm" className="mt-auto w-fit">
-          <Link href={`/a/${assistantId}/chat`}>
-            Open Chat
-          </Link>
+          <Link href={`/a/${assistantId}/chat`}>Open Chat</Link>
         </Button>
       </div>
       <div className="bg-muted/40 flex flex-col gap-3 rounded-lg border p-4">
@@ -35,12 +40,11 @@ export const FirstUse = ({ assistantId, assistantName }: { assistantId: string; 
           Install the widget
         </div>
         <p className="text-muted-foreground text-sm">
-          Drop one script tag on your docs site and visitors can ask there. Their questions land in the Inbox.
+          Drop one script tag on your docs site and visitors can ask there. Their questions land in
+          the Inbox.
         </p>
         <Button asChild size="sm" variant="outline" className="mt-auto w-fit">
-          <Link href={`/a/${assistantId}/widget`}>
-            Get the embed code
-          </Link>
+          <Link href={`/a/${assistantId}/widget`}>Get the embed code</Link>
         </Button>
       </div>
     </CardContent>

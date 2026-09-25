@@ -227,7 +227,9 @@ test.describe('widget on the demo page', () => {
     await expect(page.getByRole('heading', { name: 'Widget' })).toBeVisible();
     // A production server can stream the snippet in before React swaps it into place, so two
     // copies exist for a moment; either one carries the key.
-    await expect(page.locator('pre code').first()).toContainText(`data-parbot="${seeded!.publicKey}"`);
+    await expect(page.locator('pre code').first()).toContainText(
+      `data-parbot="${seeded!.publicKey}"`,
+    );
 
     await page.getByRole('button', { name: 'Use #16a34a' }).click();
     await page.locator('label', { hasText: 'Light' }).click();

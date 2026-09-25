@@ -188,7 +188,9 @@ export const splitCodeBlock = (
 
   const overhead = block.fence.length * 2 + block.info.length + 2;
   const budget = Math.max(maxChars - overhead, 80);
-  const lines = block.lines.flatMap((line) => (line.length > budget ? hardCut(line, budget) : [line]));
+  const lines = block.lines.flatMap((line) =>
+    line.length > budget ? hardCut(line, budget) : [line],
+  );
   const pieces: string[][] = [];
   let current: string[] = [];
   let length = 0;

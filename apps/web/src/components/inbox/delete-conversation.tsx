@@ -6,7 +6,10 @@ import { useRouter } from 'next/navigation';
 import { useActionState, useState } from 'react';
 import { toast } from 'sonner';
 
-import { deleteConversation, type DeleteConversationState } from '@/app/(dashboard)/a/[assistantId]/inbox/[conversationId]/actions';
+import {
+  deleteConversation,
+  type DeleteConversationState,
+} from '@/app/(dashboard)/a/[assistantId]/inbox/[conversationId]/actions';
 import { inboxKey } from '@/components/inbox/conversation-query';
 import { Button } from '@/components/ui/button';
 import {
@@ -27,7 +30,13 @@ const initialState: DeleteConversationState = {};
  * still hold the row is dropped before going back: the inbox lists, because Realtime cannot
  * deliver a filtered DELETE, and the chat's list and thread, which live in their own namespace.
  */
-export const DeleteConversation = ({ assistantId, conversationId }: { assistantId: string; conversationId: string }) => {
+export const DeleteConversation = ({
+  assistantId,
+  conversationId,
+}: {
+  assistantId: string;
+  conversationId: string;
+}) => {
   const [open, setOpen] = useState(false);
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -38,7 +47,9 @@ export const DeleteConversation = ({ assistantId, conversationId }: { assistantI
       try {
         result = await deleteConversation(previous, formData);
       } catch {
-        return { error: 'The conversation could not be deleted. Check your connection and try again.' };
+        return {
+          error: 'The conversation could not be deleted. Check your connection and try again.',
+        };
       }
 
       if (result.deleted) {
@@ -66,8 +77,8 @@ export const DeleteConversation = ({ assistantId, conversationId }: { assistantI
         <DialogHeader>
           <DialogTitle>Delete this conversation?</DialogTitle>
           <DialogDescription>
-            The transcript and its messages are removed for good. Linked leads stay in the inbox without a
-            conversation.
+            The transcript and its messages are removed for good. Linked leads stay in the inbox
+            without a conversation.
           </DialogDescription>
         </DialogHeader>
         {state.error ? (
@@ -84,7 +95,11 @@ export const DeleteConversation = ({ assistantId, conversationId }: { assistantI
                 Keep it
               </Button>
             </DialogClose>
-            <Button type="submit" variant="destructive" disabled={pending || Boolean(state.deleted)}>
+            <Button
+              type="submit"
+              variant="destructive"
+              disabled={pending || Boolean(state.deleted)}
+            >
               {pending || state.deleted ? 'Deleting' : 'Delete'}
             </Button>
           </DialogFooter>

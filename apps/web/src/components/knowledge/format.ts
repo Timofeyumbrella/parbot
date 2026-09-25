@@ -19,15 +19,19 @@ export const isActiveStatus = (status: SourceStatus) =>
   status === 'queued' || status === 'crawling' || status === 'indexing';
 
 /** The second line of a row: the address for web sources, the file's type and size otherwise. */
-export const describeSource = (source: Pick<Source, 'kind' | 'uri' | 'storage_path' | 'mime_type' | 'byte_size'>) => {
+export const describeSource = (
+  source: Pick<Source, 'kind' | 'uri' | 'storage_path' | 'mime_type' | 'byte_size'>,
+) => {
   if (source.kind === 'url' || source.kind === 'sitemap') {
     return source.uri ?? '';
   }
 
   const type = uploadTypeFor(source.storage_path ?? '', source.mime_type);
-  const label = source.kind === 'text' ? 'Pasted text' : type ? `${UPLOAD_TYPES[type].label} file` : 'File';
+  const label =
+    source.kind === 'text' ? 'Pasted text' : type ? `${UPLOAD_TYPES[type].label} file` : 'File';
 
   return source.byte_size ? `${label} · ${formatBytes(source.byte_size)}` : label;
 };
 
-export const plural = (count: number, noun: string) => `${formatCount(count)} ${count === 1 ? noun : `${noun}s`}`;
+export const plural = (count: number, noun: string) =>
+  `${formatCount(count)} ${count === 1 ? noun : `${noun}s`}`;

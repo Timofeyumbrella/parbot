@@ -120,23 +120,51 @@ describe('activityStamp and keys', () => {
 
 describe('compareActivity', () => {
   it('sorts like the query: last message first, rows without one last, then id descending', () => {
-    const later = row({ id: 'b0000000-0000-4000-8000-000000000000', last_message_at: '2026-09-23T11:00:00.5+00:00' });
-    const earlier = row({ id: 'a0000000-0000-4000-8000-000000000000', last_message_at: '2026-09-23T11:00:00+00:00' });
-    const tieLow = row({ id: 'e0000000-0000-4000-8000-000000000000', last_message_at: '2026-09-22T11:00:00+00:00' });
-    const tieHigh = row({ id: 'f0000000-0000-4000-8000-000000000000', last_message_at: '2026-09-22T11:00:00+00:00' });
+    const later = row({
+      id: 'b0000000-0000-4000-8000-000000000000',
+      last_message_at: '2026-09-23T11:00:00.5+00:00',
+    });
+    const earlier = row({
+      id: 'a0000000-0000-4000-8000-000000000000',
+      last_message_at: '2026-09-23T11:00:00+00:00',
+    });
+    const tieLow = row({
+      id: 'e0000000-0000-4000-8000-000000000000',
+      last_message_at: '2026-09-22T11:00:00+00:00',
+    });
+    const tieHigh = row({
+      id: 'f0000000-0000-4000-8000-000000000000',
+      last_message_at: '2026-09-22T11:00:00+00:00',
+    });
     // Started after every message above but never had one, so the server pages it last.
-    const startedOnly = row({ id: 'c0000000-0000-4000-8000-000000000000', last_message_at: null, created_at: '2026-09-23T11:59:00+00:00' });
-    const startedEarlier = row({ id: 'd0000000-0000-4000-8000-000000000000', last_message_at: null, created_at: '2026-09-20T11:59:00+00:00' });
+    const startedOnly = row({
+      id: 'c0000000-0000-4000-8000-000000000000',
+      last_message_at: null,
+      created_at: '2026-09-23T11:59:00+00:00',
+    });
+    const startedEarlier = row({
+      id: 'd0000000-0000-4000-8000-000000000000',
+      last_message_at: null,
+      created_at: '2026-09-20T11:59:00+00:00',
+    });
 
-    const sorted = [startedOnly, tieLow, startedEarlier, earlier, tieHigh, later].sort(compareActivity);
+    const sorted = [startedOnly, tieLow, startedEarlier, earlier, tieHigh, later].sort(
+      compareActivity,
+    );
 
     expect(sorted.map((item) => item.id[0])).toEqual(['b', 'a', 'f', 'e', 'd', 'c']);
     expect(compareActivity(later, later)).toBe(0);
   });
 
   it('orders messages in the same millisecond by their microseconds, as Postgres does', () => {
-    const first = row({ id: 'f0000000-0000-4000-8000-000000000000', last_message_at: '2026-09-23T11:00:00.123401+00:00' });
-    const second = row({ id: 'a0000000-0000-4000-8000-000000000000', last_message_at: '2026-09-23T11:00:00.12345+00:00' });
+    const first = row({
+      id: 'f0000000-0000-4000-8000-000000000000',
+      last_message_at: '2026-09-23T11:00:00.123401+00:00',
+    });
+    const second = row({
+      id: 'a0000000-0000-4000-8000-000000000000',
+      last_message_at: '2026-09-23T11:00:00.12345+00:00',
+    });
 
     expect([first, second].sort(compareActivity).map((item) => item.id[0])).toEqual(['a', 'f']);
   });
@@ -150,7 +178,10 @@ describe('conversationPage', () => {
 
     expect(calls).toEqual([
       ['from', 'conversations'],
-      ['select', 'id, title, channel, page_url, message_count, unanswered_count, last_message_at, created_at'],
+      [
+        'select',
+        'id, title, channel, page_url, message_count, unanswered_count, last_message_at, created_at',
+      ],
       ['eq', 'assistant_id', 'assistant-1'],
       ['order', 'last_message_at', { ascending: false, nullsFirst: false }],
       ['order', 'id', { ascending: false }],
@@ -160,7 +191,10 @@ describe('conversationPage', () => {
 
   it('adds the channel, unanswered and keyset clauses when asked', () => {
     const widget = recordingClient();
-    conversationPage(widget.client, 'assistant-1', 'widget', { at: '2026-09-20T00:00:00Z', id: 'c1' });
+    conversationPage(widget.client, 'assistant-1', 'widget', {
+      at: '2026-09-20T00:00:00Z',
+      id: 'c1',
+    });
     expect(widget.calls).toContainEqual(['eq', 'channel', 'widget']);
     expect(widget.calls).toContainEqual([
       'or',
@@ -172,6 +206,8 @@ describe('conversationPage', () => {
     conversationPage(unanswered.client, 'assistant-1', 'unanswered');
     expect(unanswered.calls).toContainEqual(['gt', 'unanswered_count', 0]);
     expect(unanswered.calls.find((call) => call[0] === 'or')).toBeUndefined();
-    expect(unanswered.calls.find((call) => call[0] === 'eq' && call[1] === 'channel')).toBeUndefined();
+    expect(
+      unanswered.calls.find((call) => call[0] === 'eq' && call[1] === 'channel'),
+    ).toBeUndefined();
   });
 });

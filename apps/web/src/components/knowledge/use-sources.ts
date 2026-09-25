@@ -13,13 +13,16 @@ import { isActiveStatus } from './format';
 
 export type SourcesSnapshot = { sources: Source[]; pagesUsed: number };
 
-export const sourcesQueryKey = (assistantId: string) => ['knowledge', assistantId, 'sources'] as const;
+export const sourcesQueryKey = (assistantId: string) =>
+  ['knowledge', assistantId, 'sources'] as const;
 
 /** How often the list is refreshed while a source is being indexed, on top of realtime updates. */
 export const ACTIVE_POLL_MS = 4000;
 
 const sortNewestFirst = (sources: Source[]) =>
-  [...sources].sort((a, b) => (a.created_at < b.created_at ? 1 : a.created_at > b.created_at ? -1 : 0));
+  [...sources].sort((a, b) =>
+    a.created_at < b.created_at ? 1 : a.created_at > b.created_at ? -1 : 0,
+  );
 
 const upsert = (sources: Source[], source: Source) =>
   sortNewestFirst([...sources.filter((existing) => existing.id !== source.id), source]);
@@ -29,7 +32,11 @@ const without = (sources: Source[], id: string) => sources.filter((source) => so
 const loadSnapshot = async (assistantId: string): Promise<SourcesSnapshot> => {
   const supabase = getSupabaseBrowserClient();
   const [sources, pages] = await Promise.all([
-    supabase.from('sources').select('*').eq('assistant_id', assistantId).order('created_at', { ascending: false }),
+    supabase
+      .from('sources')
+      .select('*')
+      .eq('assistant_id', assistantId)
+      .order('created_at', { ascending: false }),
     supabase.from('documents').select('id', { count: 'exact', head: true }),
   ]);
 
@@ -53,7 +60,11 @@ type UseSourcesOptions = {
  * queued re-index, a removed row) survive a poll until the server has answered or realtime has
  * delivered the real row.
  */
-export const useSources = ({ assistantId, initialSources, initialPagesUsed }: UseSourcesOptions) => {
+export const useSources = ({
+  assistantId,
+  initialSources,
+  initialPagesUsed,
+}: UseSourcesOptions) => {
   const queryClient = useQueryClient();
   const queryKey = useMemo(() => sourcesQueryKey(assistantId), [assistantId]);
   // id -> the row to show in place of the server's, or null while a delete is in flight.
@@ -84,17 +95,22 @@ export const useSources = ({ assistantId, initialSources, initialPagesUsed }: Us
     },
     initialData: { sources: initialSources, pagesUsed: initialPagesUsed },
     refetchInterval: (current) =>
-      current.state.data?.sources.some((source) => isActiveStatus(source.status)) ? ACTIVE_POLL_MS : false,
+      current.state.data?.sources.some((source) => isActiveStatus(source.status))
+        ? ACTIVE_POLL_MS
+        : false,
   });
 
   const patch = useCallback(
     (updater: (snapshot: SourcesSnapshot) => SourcesSnapshot) =>
-      queryClient.setQueryData<SourcesSnapshot>(queryKey, (current) => (current ? updater(current) : current)),
+      queryClient.setQueryData<SourcesSnapshot>(queryKey, (current) =>
+        current ? updater(current) : current,
+      ),
     [queryClient, queryKey],
   );
 
   const setSources = useCallback(
-    (updater: (sources: Source[]) => Source[]) => patch((snapshot) => ({ ...snapshot, sources: updater(snapshot.sources) })),
+    (updater: (sources: Source[]) => Source[]) =>
+      patch((snapshot) => ({ ...snapshot, sources: updater(snapshot.sources) })),
     [patch],
   );
 
@@ -133,7 +149,12 @@ export const useSources = ({ assistantId, initialSources, initialPagesUsed }: Us
         .channel(`knowledge:sources:${assistantId}`)
         .on<Source>(
           'postgres_changes',
-          { event: '*', schema: 'public', table: 'sources', filter: `assistant_id=eq.${assistantId}` },
+          {
+            event: '*',
+            schema: 'public',
+            table: 'sources',
+            filter: `assistant_id=eq.${assistantId}`,
+          },
           (payload) => {
             if (payload.eventType === 'DELETE') {
               const id = payload.old.id;
@@ -185,7 +206,13 @@ export const useSources = ({ assistantId, initialSources, initialPagesUsed }: Us
       return result.source;
     },
     onMutate: (source) => {
-      override(source.id, { ...source, status: 'queued', error: null, pages_found: 0, pages_done: 0 });
+      override(source.id, {
+        ...source,
+        status: 'queued',
+        error: null,
+        pages_found: 0,
+        pages_done: 0,
+      });
 
       return { previous: source };
     },
@@ -208,7 +235,10 @@ export const useSources = ({ assistantId, initialSources, initialPagesUsed }: Us
     },
     onMutate: (source) => {
       override(source.id, null);
-      patch((snapshot) => ({ ...snapshot, pagesUsed: Math.max(snapshot.pagesUsed - source.document_count, 0) }));
+      patch((snapshot) => ({
+        ...snapshot,
+        pagesUsed: Math.max(snapshot.pagesUsed - source.document_count, 0),
+      }));
 
       return { previous: source };
     },

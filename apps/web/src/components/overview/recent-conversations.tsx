@@ -3,7 +3,14 @@ import Link from 'next/link';
 
 import { ChannelBadge, UnansweredDot } from '@/components/inbox/channel-badge';
 import { LocalTime } from '@/components/inbox/local-time';
-import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import type { Conversation } from '@/lib/db';
 
 export type RecentConversation = Pick<
@@ -21,7 +28,7 @@ export const RecentConversations = ({
   assistantId: string;
 }) => (
   <Card className="gap-0" data-testid="recent-conversations">
-    <CardHeader className="border-b pb-(--card-spacing)">
+    <CardHeader className="pb-(--card-spacing) border-b">
       <CardTitle>Recent conversations</CardTitle>
       <CardDescription>From the widget and from Chat, newest first.</CardDescription>
       <CardAction>
@@ -36,14 +43,16 @@ export const RecentConversations = ({
     </CardHeader>
     <CardContent className="p-0">
       {rows.length === 0 ? (
-        <p className="text-muted-foreground px-(--card-spacing) py-8 text-center text-sm">No conversations yet.</p>
+        <p className="text-muted-foreground px-(--card-spacing) py-8 text-center text-sm">
+          No conversations yet.
+        </p>
       ) : (
         <ul>
           {rows.map((row) => (
             <li key={row.id} className="border-b last:border-0">
               <Link
                 href={`/a/${assistantId}/inbox/${row.id}`}
-                className="hover:bg-muted/60 flex items-center gap-3 px-(--card-spacing) py-2 text-sm transition-colors"
+                className="hover:bg-muted/60 px-(--card-spacing) flex items-center gap-3 py-2 text-sm transition-colors"
               >
                 {row.unanswered_count > 0 ? (
                   <UnansweredDot />
@@ -57,7 +66,7 @@ export const RecentConversations = ({
                 <LocalTime
                   value={row.last_message_at ?? row.created_at}
                   now={now}
-                  className="text-muted-foreground min-w-16 shrink-0 text-right text-xs whitespace-nowrap"
+                  className="text-muted-foreground min-w-16 shrink-0 whitespace-nowrap text-right text-xs"
                 />
               </Link>
             </li>

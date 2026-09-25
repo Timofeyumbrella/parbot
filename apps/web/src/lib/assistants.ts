@@ -29,7 +29,11 @@ export const getAssistant = cache(async (assistantId: string): Promise<Assistant
     return null;
   }
 
-  const { data } = await supabase.from('assistants').select('*').eq('id', assistantId).maybeSingle();
+  const { data } = await supabase
+    .from('assistants')
+    .select('*')
+    .eq('id', assistantId)
+    .maybeSingle();
 
   return data ?? null;
 });

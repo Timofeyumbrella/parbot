@@ -17,7 +17,10 @@ export const metadata: Metadata = { title: 'Overview' };
 
 const LIST_ROWS = 8;
 
-export default async function OverviewPage({ params, searchParams }: PageProps<'/a/[assistantId]'>) {
+export default async function OverviewPage({
+  params,
+  searchParams,
+}: PageProps<'/a/[assistantId]'>) {
   const [{ assistantId }, query] = await Promise.all([params, searchParams]);
   const [{ supabase }, assistant] = await Promise.all([requireUser(), getAssistant(assistantId)]);
 
@@ -34,7 +37,11 @@ export default async function OverviewPage({ params, searchParams }: PageProps<'
     supabase.rpc('assistant_stats', { assistant: assistantId, since: sinceIso }),
     supabase.rpc('assistant_daily', { assistant: assistantId, since: sinceIso }),
     supabase.rpc('top_questions', { assistant: assistantId, since: sinceIso, max_rows: LIST_ROWS }),
-    supabase.rpc('unanswered_questions', { assistant: assistantId, since: sinceIso, max_rows: LIST_ROWS }),
+    supabase.rpc('unanswered_questions', {
+      assistant: assistantId,
+      since: sinceIso,
+      max_rows: LIST_ROWS,
+    }),
     // Same order as the Inbox, so the two screens agree on what "recent" means.
     supabase
       .from('conversations')
@@ -43,10 +50,15 @@ export default async function OverviewPage({ params, searchParams }: PageProps<'
       .order('last_message_at', { ascending: false, nullsFirst: false })
       .order('id', { ascending: false })
       .limit(LIST_ROWS),
-    supabase.from('messages').select('id', { count: 'exact', head: true }).eq('assistant_id', assistantId),
+    supabase
+      .from('messages')
+      .select('id', { count: 'exact', head: true })
+      .eq('assistant_id', assistantId),
   ]);
 
-  const failure = [stats, daily, top, unanswered, recent, messages].find((result) => result.error)?.error;
+  const failure = [stats, daily, top, unanswered, recent, messages].find(
+    (result) => result.error,
+  )?.error;
   const firstUse = !failure && (messages.count ?? 0) === 0;
   const totals = stats.data?.[0];
 
@@ -60,11 +72,14 @@ export default async function OverviewPage({ params, searchParams }: PageProps<'
         />
 
         {failure ? (
-          <div role="alert" className="border-destructive/40 bg-destructive/10 rounded-lg border p-4 text-sm">
+          <div
+            role="alert"
+            className="border-destructive/40 bg-destructive/10 rounded-lg border p-4 text-sm"
+          >
             <p className="font-medium">The stats could not be loaded.</p>
             <p className="text-muted-foreground mt-1">
-              The database did not answer as expected. Reload the page to try again; if it keeps happening, the
-              assistant may have been deleted.
+              The database did not answer as expected. Reload the page to try again; if it keeps
+              happening, the assistant may have been deleted.
             </p>
           </div>
         ) : firstUse ? (
@@ -82,9 +97,17 @@ export default async function OverviewPage({ params, searchParams }: PageProps<'
             <DailyChart rows={bucketDaily(daily.data ?? [], since, days)} days={days} />
             <div className="grid gap-4 lg:grid-cols-2">
               <TopQuestions rows={top.data ?? []} now={now.getTime()} />
-              <UnansweredQuestions rows={unanswered.data ?? []} now={now.getTime()} assistantId={assistantId} />
+              <UnansweredQuestions
+                rows={unanswered.data ?? []}
+                now={now.getTime()}
+                assistantId={assistantId}
+              />
             </div>
-            <RecentConversations rows={recent.data ?? []} now={now.getTime()} assistantId={assistantId} />
+            <RecentConversations
+              rows={recent.data ?? []}
+              now={now.getTime()}
+              assistantId={assistantId}
+            />
           </PendingRegion>
         )}
       </PendingNav>

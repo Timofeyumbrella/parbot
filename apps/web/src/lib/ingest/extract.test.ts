@@ -25,7 +25,10 @@ describe('markdownTitle', () => {
 
 describe('extractUpload', () => {
   it('keeps Markdown as it is, normalised, and names it after the first heading', async () => {
-    const result = await extractUpload(bytes('﻿# Handbook\r\n\r\nLine one.\r\n\r\n\r\n\r\nLine two.   \r\n'), 'md');
+    const result = await extractUpload(
+      bytes('﻿# Handbook\r\n\r\nLine one.\r\n\r\n\r\n\r\nLine two.   \r\n'),
+      'md',
+    );
 
     expect(result).toEqual({ title: 'Handbook', markdown: '# Handbook\n\nLine one.\n\nLine two.' });
   });
@@ -38,7 +41,8 @@ describe('extractUpload', () => {
   });
 
   it('runs HTML through the HTML pipeline', async () => {
-    const html = '<html><head><title>Page</title></head><body><nav>skip</nav><main><h2>Section</h2><p>Body text here.</p></main></body></html>';
+    const html =
+      '<html><head><title>Page</title></head><body><nav>skip</nav><main><h2>Section</h2><p>Body text here.</p></main></body></html>';
     const result = await extractUpload(bytes(html), 'html');
 
     expect(result.title).toBe('Page');
@@ -72,7 +76,10 @@ describe('extractUpload', () => {
 
 describe('extractText', () => {
   it('reads pasted Markdown back with its heading as the title', () => {
-    expect(extractText(bytes('# Refunds\n\nWithin 30 days.'))).toEqual({ title: 'Refunds', markdown: '# Refunds\n\nWithin 30 days.' });
+    expect(extractText(bytes('# Refunds\n\nWithin 30 days.'))).toEqual({
+      title: 'Refunds',
+      markdown: '# Refunds\n\nWithin 30 days.',
+    });
   });
 });
 
@@ -90,7 +97,9 @@ describe('extractUpload with damaged files', () => {
   it('explains a PDF that cannot be parsed', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
 
-    await expect(extractUpload(bytes('%PDF-1.4 garbage'), 'pdf')).rejects.toThrow('This PDF could not be read.');
+    await expect(extractUpload(bytes('%PDF-1.4 garbage'), 'pdf')).rejects.toThrow(
+      'This PDF could not be read.',
+    );
     warn.mockRestore();
   });
 });

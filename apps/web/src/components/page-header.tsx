@@ -19,7 +19,13 @@ export const PageHeader = ({ title, description, actions, className }: PageHeade
 );
 
 /** Standard content width and padding for dashboard screens that are not the chat. */
-export const PageContainer = ({ children, className }: { children: React.ReactNode; className?: string }) => (
+export const PageContainer = ({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) => (
   <div className={cn('mx-auto flex w-full max-w-5xl flex-col gap-6 p-4 sm:p-6 lg:p-8', className)}>
     {children}
   </div>

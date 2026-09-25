@@ -18,7 +18,10 @@ const deleteSchema = z.object({ id: z.uuid() });
  * Both actions go through the visitor's own client, so row level security decides what they
  * may touch. They never revalidate a chat path: the caller has already updated the cache.
  */
-export const renameConversation = async (input: { id: string; title: string }): Promise<ConversationActionResult> => {
+export const renameConversation = async (input: {
+  id: string;
+  title: string;
+}): Promise<ConversationActionResult> => {
   const parsed = renameSchema.safeParse(input);
 
   if (!parsed.success) {
@@ -48,7 +51,9 @@ export const renameConversation = async (input: { id: string; title: string }): 
   return { ok: true };
 };
 
-export const deleteConversation = async (input: { id: string }): Promise<ConversationActionResult> => {
+export const deleteConversation = async (input: {
+  id: string;
+}): Promise<ConversationActionResult> => {
   const parsed = deleteSchema.safeParse(input);
 
   if (!parsed.success) {

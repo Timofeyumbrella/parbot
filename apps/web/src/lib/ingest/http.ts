@@ -69,7 +69,10 @@ const assertAllowed = async (url: string, requested: string, lookup: HostLookup)
   } catch (cause) {
     const reason = cause instanceof BlockedHostError ? cause.message : 'the address is not valid';
 
-    throw new FetchPageError(url, requested === url ? reason : `it redirects to ${requested}, and ${reason}`);
+    throw new FetchPageError(
+      url,
+      requested === url ? reason : `it redirects to ${requested}, and ${reason}`,
+    );
   }
 };
 
@@ -77,7 +80,10 @@ const assertAllowed = async (url: string, requested: string, lookup: HostLookup)
  * Fetches one URL with the crawler's identity and limits. Redirects are followed by hand so each
  * hop goes through the same private-network check as the address the user typed.
  */
-export const fetchResource = async (url: string, options: FetchOptions = {}): Promise<FetchedResource> => {
+export const fetchResource = async (
+  url: string,
+  options: FetchOptions = {},
+): Promise<FetchedResource> => {
   const { fetchImpl = fetch, accept = HTML_ACCEPT, lookup = defaultLookup } = options;
   let current = url;
   let response: Response;

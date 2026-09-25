@@ -41,7 +41,10 @@ export const StatusBadge = ({ source, className }: StatusBadgeProps) => {
       );
     case 'ready':
       return (
-        <Badge variant="outline" className={cn('border-success/30 bg-success/10 text-success', className)}>
+        <Badge
+          variant="outline"
+          className={cn('border-success/30 bg-success/10 text-success', className)}
+        >
           <CircleCheck aria-hidden="true" />
           Ready
         </Badge>

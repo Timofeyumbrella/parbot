@@ -3,7 +3,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 /** Shaped like the Overview: header with the period switch, four tiles, the chart, two lists. */
 export default function OverviewLoading() {
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-4 sm:p-6 lg:p-8" aria-busy="true">
+    <div
+      className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-4 sm:p-6 lg:p-8"
+      aria-busy="true"
+    >
       <div className="flex items-start justify-between gap-4">
         <div className="flex flex-col gap-2">
           <Skeleton className="h-6 w-28" />

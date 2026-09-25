@@ -46,12 +46,23 @@ describe('LeadsTable', () => {
     render(<LeadsTable rows={[lead]} assistantId="a1" now={NOW} />);
 
     const table = screen.getByTestId('leads-table');
-    expect(within(table).getByRole('link', { name: 'ada@example.com' })).toHaveAttribute('href', 'mailto:ada@example.com');
-    expect(within(table).getByRole('link', { name: 'docs.example.com' })).toHaveAttribute('href', lead.page_url);
+    expect(within(table).getByRole('link', { name: 'ada@example.com' })).toHaveAttribute(
+      'href',
+      'mailto:ada@example.com',
+    );
+    expect(within(table).getByRole('link', { name: 'docs.example.com' })).toHaveAttribute(
+      'href',
+      lead.page_url,
+    );
     expect(within(table).getByText('Does it support SSO?')).toBeInTheDocument();
     expect(within(table).getByText('30 min ago')).toBeInTheDocument();
-    expect(within(table).getByRole('link', { name: 'Open' })).toHaveAttribute('href', '/a/a1/inbox/c1');
-    expect(screen.getByRole('combobox', { name: 'Status of ada@example.com' })).toHaveTextContent('New');
+    expect(within(table).getByRole('link', { name: 'Open' })).toHaveAttribute(
+      'href',
+      '/a/a1/inbox/c1',
+    );
+    expect(screen.getByRole('combobox', { name: 'Status of ada@example.com' })).toHaveTextContent(
+      'New',
+    );
   });
 
   it('saves a new status through the action and keeps it', async () => {
@@ -71,7 +82,9 @@ describe('LeadsTable', () => {
 
     const trigger = await pick('Closed');
 
-    await waitFor(() => expect(mocks.toastError).toHaveBeenCalledWith('That lead no longer exists.'));
+    await waitFor(() =>
+      expect(mocks.toastError).toHaveBeenCalledWith('That lead no longer exists.'),
+    );
     await waitFor(() => expect(trigger).toHaveTextContent('New'));
   });
 
@@ -89,7 +102,10 @@ describe('LeadsTable', () => {
     render(<LeadsTable rows={[]} assistantId="a1" now={NOW} />);
 
     expect(screen.getByText('No leads yet')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Widget screen' })).toHaveAttribute('href', '/a/a1/widget');
+    expect(screen.getByRole('link', { name: 'Widget screen' })).toHaveAttribute(
+      'href',
+      '/a/a1/widget',
+    );
     expect(screen.getByText(/Starter and Growth/)).toBeInTheDocument();
   });
 });

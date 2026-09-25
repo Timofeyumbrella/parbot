@@ -39,7 +39,12 @@ const renderBubble = (props: Partial<React.ComponentProps<typeof MessageBubble>>
 describe('MessageBubble for the reader', () => {
   it('sits on the right, keeps line breaks and reports a failed send', () => {
     const { container } = renderBubble({
-      message: message({ id: 'u1', role: 'user', content: 'first line\nsecond line', status: 'failed' }),
+      message: message({
+        id: 'u1',
+        role: 'user',
+        content: 'first line\nsecond line',
+        status: 'failed',
+      }),
     });
 
     const bubble = container.querySelector('[data-role="user"]');
@@ -142,13 +147,16 @@ describe('MessageBubble for the assistant', () => {
   });
 
   it('mutes an unanswered message and points at Knowledge', () => {
-    renderBubble({ message: message({ answered: false, citations: [], content: 'I could not find that.' }) });
+    renderBubble({
+      message: message({ answered: false, citations: [], content: 'I could not find that.' }),
+    });
 
-    expect(screen.getByText('I could not find that.').closest('.answer-prose')).toHaveClass('text-muted-foreground');
-    expect(screen.getByRole('link', { name: /Add docs that cover this in Knowledge/ })).toHaveAttribute(
-      'href',
-      '/a/asst/knowledge',
+    expect(screen.getByText('I could not find that.').closest('.answer-prose')).toHaveClass(
+      'text-muted-foreground',
     );
+    expect(
+      screen.getByRole('link', { name: /Add docs that cover this in Knowledge/ }),
+    ).toHaveAttribute('href', '/a/asst/knowledge');
   });
 
   it('shows a thinking indicator, then the caret on the last text while streaming', () => {
@@ -160,7 +168,12 @@ describe('MessageBubble for the assistant', () => {
 
     rerender(
       <MessageBubble
-        message={message({ content: 'Half an answer', citations: [], status: 'streaming', latency_ms: null })}
+        message={message({
+          content: 'Half an answer',
+          citations: [],
+          status: 'streaming',
+          latency_ms: null,
+        })}
         assistantId="asst"
         assistantName="Acme Docs"
       />,
@@ -198,11 +211,17 @@ describe('MessageBubble for the assistant', () => {
         content: '',
         citations: [],
         status: 'error',
-        error: { code: 'quota_exceeded', message: 'This account has used its 200 answers for the month.' },
+        error: {
+          code: 'quota_exceeded',
+          message: 'This account has used its 200 answers for the month.',
+        },
       }),
     });
 
-    expect(screen.getByRole('link', { name: 'Upgrade in Billing' })).toHaveAttribute('href', '/billing');
+    expect(screen.getByRole('link', { name: 'Upgrade in Billing' })).toHaveAttribute(
+      'href',
+      '/billing',
+    );
     expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
 
     renderBubble({
@@ -224,11 +243,15 @@ describe('MessageBubble for the assistant', () => {
   it('keeps the footer reachable on a touch screen', () => {
     const { container } = renderBubble();
 
-    expect(container.querySelector('[data-role="assistant"] .pointer-coarse\\:opacity-100')).not.toBeNull();
+    expect(
+      container.querySelector('[data-role="assistant"] .pointer-coarse\\:opacity-100'),
+    ).not.toBeNull();
   });
 
   it('labels a stopped answer and keeps its partial text', () => {
-    renderBubble({ message: message({ content: 'Partial', citations: [], status: 'stopped', latency_ms: null }) });
+    renderBubble({
+      message: message({ content: 'Partial', citations: [], status: 'stopped', latency_ms: null }),
+    });
 
     expect(screen.getByText('Partial')).toBeInTheDocument();
     expect(screen.getByText('Stopped')).toBeInTheDocument();

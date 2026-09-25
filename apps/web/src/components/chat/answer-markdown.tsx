@@ -29,7 +29,15 @@ type AnswerMarkdownProps = {
 
 const remarkPlugins = [remarkGfm];
 
-const CitationChip = ({ index, citation, sourcesId }: { index: number; citation?: Citation; sourcesId: string }) => {
+const CitationChip = ({
+  index,
+  citation,
+  sourcesId,
+}: {
+  index: number;
+  citation?: Citation;
+  sourcesId: string;
+}) => {
   const href = citation?.url ?? `#${sourcesId}`;
   const external = Boolean(citation?.url);
 
@@ -60,10 +68,14 @@ const domProps = <T extends { node?: unknown }>(props: T): Omit<T, 'node'> => {
 const buildComponents = (citations: Citation[], sourcesId: string): Components => ({
   pre: ({ node, children }) => {
     const element = node as unknown as HastElement | undefined;
-    const code = element?.children.find((child) => child.type === 'element') as HastElement | undefined;
+    const code = element?.children.find((child) => child.type === 'element') as
+      HastElement | undefined;
 
     return (
-      <CodeBlock language={codeLanguage(code?.properties?.className)} code={hastText(code).replace(/\n$/, '')}>
+      <CodeBlock
+        language={codeLanguage(code?.properties?.className)}
+        code={hastText(code).replace(/\n$/, '')}
+      >
         {children}
       </CodeBlock>
     );
@@ -79,14 +91,23 @@ const buildComponents = (citations: Citation[], sourcesId: string): Components =
     const index = Number(marker);
 
     return (
-      <CitationChip index={index} citation={citations.find((citation) => citation.index === index)} sourcesId={sourcesId} />
+      <CitationChip
+        index={index}
+        citation={citations.find((citation) => citation.index === index)}
+        sourcesId={sourcesId}
+      />
     );
   },
   a: ({ href, children, ...rest }) => {
     const external = typeof href === 'string' && /^https?:\/\//i.test(href);
 
     return (
-      <a href={href} target={external ? '_blank' : undefined} rel={external ? 'noreferrer' : undefined} {...domProps(rest)}>
+      <a
+        href={href}
+        target={external ? '_blank' : undefined}
+        rel={external ? 'noreferrer' : undefined}
+        {...domProps(rest)}
+      >
         {children}
       </a>
     );
@@ -130,7 +151,11 @@ export const AnswerMarkdown = memo(function AnswerMarkdown({
 
   return (
     <div className={cn('answer-prose', className)}>
-      <ReactMarkdown remarkPlugins={remarkPlugins} rehypePlugins={rehypePlugins} components={components}>
+      <ReactMarkdown
+        remarkPlugins={remarkPlugins}
+        rehypePlugins={rehypePlugins}
+        components={components}
+      >
         {content}
       </ReactMarkdown>
     </div>

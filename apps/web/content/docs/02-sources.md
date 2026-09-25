@@ -4,12 +4,12 @@ Everything the assistant knows comes from the sources you add under Knowledge. P
 
 ## Kinds of sources
 
-| Kind | What Parbot does |
-| --- | --- |
-| Website | Fetches the page you give it and follows links under the same path. A start page of `https://docs.example.com/guide/intro` indexes everything under `/guide/`. Up to three levels deep. |
-| Sitemap | Reads every `<loc>` in the sitemap, including one level of sitemap indexes, and indexes those pages. The most reliable option for a docs site. |
-| Upload | PDF, Word (.docx), Markdown, HTML or plain text files up to 25 MB each. |
-| Paste text | A title and any text. Handy for release notes, an FAQ or an internal note you do not publish. |
+| Kind       | What Parbot does                                                                                                                                                                        |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Website    | Fetches the page you give it and follows links under the same path. A start page of `https://docs.example.com/guide/intro` indexes everything under `/guide/`. Up to three levels deep. |
+| Sitemap    | Reads every `<loc>` in the sitemap, including one level of sitemap indexes, and indexes those pages. The most reliable option for a docs site.                                          |
+| Upload     | PDF, Word (.docx), Markdown, HTML or plain text files up to 25 MB each.                                                                                                                 |
+| Paste text | A title and any text. Handy for release notes, an FAQ or an internal note you do not publish.                                                                                           |
 
 ## How pages are processed
 

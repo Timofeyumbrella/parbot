@@ -39,7 +39,12 @@ const fakeClient = ({ ownsAssistant = true, insertError }: FakeOptions = {}): Fa
       if (table === 'assistants') {
         return {
           select: () => ({
-            eq: () => ({ maybeSingle: async () => ({ data: ownsAssistant ? { id: ASSISTANT } : null, error: null }) }),
+            eq: () => ({
+              maybeSingle: async () => ({
+                data: ownsAssistant ? { id: ASSISTANT } : null,
+                error: null,
+              }),
+            }),
           }),
         };
       }
@@ -54,7 +59,10 @@ const fakeClient = ({ ownsAssistant = true, insertError }: FakeOptions = {}): Fa
                 single: async () =>
                   insertError
                     ? { data: null, error: insertError }
-                    : { data: { id: 'src-1', created_at: '2026-09-23T00:00:00Z', ...row }, error: null },
+                    : {
+                        data: { id: 'src-1', created_at: '2026-09-23T00:00:00Z', ...row },
+                        error: null,
+                      },
               }),
             };
           },
@@ -112,7 +120,9 @@ describe('POST /api/sources', () => {
   it('refuses anonymous callers', async () => {
     vi.mocked(getSession).mockResolvedValue({ supabase: {}, user: null } as never);
 
-    const response = await POST(json({ kind: 'url', assistantId: ASSISTANT, url: 'https://docs.example.com' }));
+    const response = await POST(
+      json({ kind: 'url', assistantId: ASSISTANT, url: 'https://docs.example.com' }),
+    );
 
     expect(response.status).toBe(401);
     await expect(response.json()).resolves.toEqual({ error: 'Sign in to add a source.' });
@@ -125,17 +135,27 @@ describe('POST /api/sources', () => {
     expect(missing.status).toBe(400);
     await expect(missing.json()).resolves.toEqual({ error: 'Enter a web address.' });
 
-    const scheme = await POST(json({ kind: 'sitemap', assistantId: ASSISTANT, url: 'ftp://docs.example.com/sitemap.xml' }));
+    const scheme = await POST(
+      json({ kind: 'sitemap', assistantId: ASSISTANT, url: 'ftp://docs.example.com/sitemap.xml' }),
+    );
     expect(scheme.status).toBe(400);
-    await expect(scheme.json()).resolves.toEqual({ error: 'Enter a full address that starts with http:// or https://.' });
+    await expect(scheme.json()).resolves.toEqual({
+      error: 'Enter a full address that starts with http:// or https://.',
+    });
 
-    const kind = await POST(json({ kind: 'rss', assistantId: ASSISTANT, url: 'https://docs.example.com' }));
+    const kind = await POST(
+      json({ kind: 'rss', assistantId: ASSISTANT, url: 'https://docs.example.com' }),
+    );
     expect(kind.status).toBe(400);
 
-    const notJson = await POST(new Request('http://localhost/api/sources', { method: 'POST', body: '{' }));
+    const notJson = await POST(
+      new Request('http://localhost/api/sources', { method: 'POST', body: '{' }),
+    );
     expect(notJson.status).toBe(400);
 
-    const emptyText = await POST(json({ kind: 'text', assistantId: ASSISTANT, title: 'Notes', text: '   ' }));
+    const emptyText = await POST(
+      json({ kind: 'text', assistantId: ASSISTANT, title: 'Notes', text: '   ' }),
+    );
     expect(emptyText.status).toBe(400);
     await expect(emptyText.json()).resolves.toEqual({ error: 'Paste some text.' });
   });
@@ -145,7 +165,9 @@ describe('POST /api/sources', () => {
 
     signIn(fake);
 
-    const response = await POST(json({ kind: 'url', assistantId: ASSISTANT, url: 'https://docs.example.com/guide/' }));
+    const response = await POST(
+      json({ kind: 'url', assistantId: ASSISTANT, url: 'https://docs.example.com/guide/' }),
+    );
 
     expect(response.status).toBe(404);
     await expect(response.json()).resolves.toEqual({ error: 'That assistant does not exist.' });
@@ -156,9 +178,15 @@ describe('POST /api/sources', () => {
     const fake = fakeClient();
 
     signIn(fake);
-    vi.mocked(getAccountUsage).mockResolvedValue({ assistants: 1, pages: PLANS.hobby.pages, messagesThisMonth: 0 });
+    vi.mocked(getAccountUsage).mockResolvedValue({
+      assistants: 1,
+      pages: PLANS.hobby.pages,
+      messagesThisMonth: 0,
+    });
 
-    const response = await POST(json({ kind: 'url', assistantId: ASSISTANT, url: 'https://docs.example.com/guide/' }));
+    const response = await POST(
+      json({ kind: 'url', assistantId: ASSISTANT, url: 'https://docs.example.com/guide/' }),
+    );
 
     expect(response.status).toBe(403);
     await expect(response.json()).resolves.toEqual({
@@ -173,13 +201,24 @@ describe('POST /api/sources', () => {
 
     signIn(fake);
 
-    const response = await POST(json({ kind: 'url', assistantId: ASSISTANT, url: 'https://docs.example.com/guide/intro' }));
+    const response = await POST(
+      json({ kind: 'url', assistantId: ASSISTANT, url: 'https://docs.example.com/guide/intro' }),
+    );
 
     expect(response.status).toBe(201);
     await expect(response.json()).resolves.toMatchObject({
-      source: { id: 'src-1', kind: 'url', uri: 'https://docs.example.com/guide/intro', title: 'docs.example.com/guide/intro' },
+      source: {
+        id: 'src-1',
+        kind: 'url',
+        uri: 'https://docs.example.com/guide/intro',
+        title: 'docs.example.com/guide/intro',
+      },
     });
-    expect(fake.inserted[0]).toMatchObject({ assistant_id: ASSISTANT, owner_id: USER.id, status: 'queued' });
+    expect(fake.inserted[0]).toMatchObject({
+      assistant_id: ASSISTANT,
+      owner_id: USER.id,
+      status: 'queued',
+    });
     expect(after).toHaveBeenCalledTimes(1);
   });
 
@@ -188,13 +227,27 @@ describe('POST /api/sources', () => {
 
     signIn(fake);
 
-    const response = await POST(json({ kind: 'text', assistantId: ASSISTANT, title: 'Refunds', text: '# Refunds\n\n30 days.' }));
+    const response = await POST(
+      json({
+        kind: 'text',
+        assistantId: ASSISTANT,
+        title: 'Refunds',
+        text: '# Refunds\n\n30 days.',
+      }),
+    );
 
     expect(response.status).toBe(201);
     expect(fake.uploads).toHaveLength(1);
-    expect(fake.uploads[0]?.path).toMatch(new RegExp(`^${USER.id}/${ASSISTANT}/[0-9a-f-]{36}\\.md$`));
+    expect(fake.uploads[0]?.path).toMatch(
+      new RegExp(`^${USER.id}/${ASSISTANT}/[0-9a-f-]{36}\\.md$`),
+    );
     expect(fake.uploads[0]?.contentType).toBe('text/markdown');
-    expect(fake.inserted[0]).toMatchObject({ kind: 'text', title: 'Refunds', mime_type: 'text/markdown', storage_path: fake.uploads[0]?.path });
+    expect(fake.inserted[0]).toMatchObject({
+      kind: 'text',
+      title: 'Refunds',
+      mime_type: 'text/markdown',
+      storage_path: fake.uploads[0]?.path,
+    });
   });
 
   it('accepts a multipart upload of a supported file', async () => {
@@ -206,8 +259,15 @@ describe('POST /api/sources', () => {
     const response = await POST(multipart({ assistantId: ASSISTANT, file }));
 
     expect(response.status).toBe(201);
-    expect(fake.uploads[0]?.path).toMatch(new RegExp(`^${USER.id}/${ASSISTANT}/[0-9a-f-]{36}\\.md$`));
-    expect(fake.inserted[0]).toMatchObject({ kind: 'upload', title: 'manual.md', byte_size: file.size, mime_type: 'text/markdown' });
+    expect(fake.uploads[0]?.path).toMatch(
+      new RegExp(`^${USER.id}/${ASSISTANT}/[0-9a-f-]{36}\\.md$`),
+    );
+    expect(fake.inserted[0]).toMatchObject({
+      kind: 'upload',
+      title: 'manual.md',
+      byte_size: file.size,
+      mime_type: 'text/markdown',
+    });
   });
 
   it('stores a file under the type it resolved, whatever the browser said', async () => {
@@ -218,15 +278,27 @@ describe('POST /api/sources', () => {
     signIn(fake);
 
     const markdown = await POST(
-      multipart({ assistantId: ASSISTANT, file: new File(['# Notes'], 'notes.mdx', { type: 'application/octet-stream' }) }),
+      multipart({
+        assistantId: ASSISTANT,
+        file: new File(['# Notes'], 'notes.mdx', { type: 'application/octet-stream' }),
+      }),
     );
 
     expect(markdown.status).toBe(201);
-    expect(fake.uploads[0]).toMatchObject({ contentType: 'text/markdown', blobType: 'text/markdown' });
+    expect(fake.uploads[0]).toMatchObject({
+      contentType: 'text/markdown',
+      blobType: 'text/markdown',
+    });
     expect(fake.uploads[0]?.path).toMatch(/\.md$/);
-    expect(fake.inserted[0]).toMatchObject({ kind: 'upload', title: 'notes.mdx', mime_type: 'text/markdown' });
+    expect(fake.inserted[0]).toMatchObject({
+      kind: 'upload',
+      title: 'notes.mdx',
+      mime_type: 'text/markdown',
+    });
 
-    const word = await POST(multipart({ assistantId: ASSISTANT, file: new File(['PK'], 'handbook.docx', { type: '' }) }));
+    const word = await POST(
+      multipart({ assistantId: ASSISTANT, file: new File(['PK'], 'handbook.docx', { type: '' }) }),
+    );
 
     expect(word.status).toBe(201);
     expect(fake.uploads[1]).toMatchObject({
@@ -241,45 +313,81 @@ describe('POST /api/sources', () => {
 
     signIn(fake);
 
-    const created = await POST(json({ kind: 'url', id, assistantId: ASSISTANT, url: 'https://docs.example.com/guide/' }));
+    const created = await POST(
+      json({ kind: 'url', id, assistantId: ASSISTANT, url: 'https://docs.example.com/guide/' }),
+    );
 
     expect(created.status).toBe(201);
     expect(fake.inserted[0]).toMatchObject({ id });
 
-    const upload = await POST(multipart({ assistantId: ASSISTANT, id, file: new File(['x'], 'a.txt', { type: 'text/plain' }) }));
+    const upload = await POST(
+      multipart({
+        assistantId: ASSISTANT,
+        id,
+        file: new File(['x'], 'a.txt', { type: 'text/plain' }),
+      }),
+    );
 
     expect(upload.status).toBe(201);
     expect(fake.inserted[1]).toMatchObject({ id, kind: 'upload' });
 
-    const malformed = await POST(json({ kind: 'url', id: 'nope', assistantId: ASSISTANT, url: 'https://docs.example.com/guide/' }));
+    const malformed = await POST(
+      json({
+        kind: 'url',
+        id: 'nope',
+        assistantId: ASSISTANT,
+        url: 'https://docs.example.com/guide/',
+      }),
+    );
 
     expect(malformed.status).toBe(400);
     await expect(malformed.json()).resolves.toEqual({ error: 'The source id is not valid.' });
 
-    const taken = fakeClient({ insertError: { code: '23505', message: 'duplicate key value violates unique constraint "sources_pkey"' } });
+    const taken = fakeClient({
+      insertError: {
+        code: '23505',
+        message: 'duplicate key value violates unique constraint "sources_pkey"',
+      },
+    });
 
     signIn(taken);
 
-    const duplicate = await POST(json({ kind: 'url', id, assistantId: ASSISTANT, url: 'https://docs.example.com/guide/' }));
+    const duplicate = await POST(
+      json({ kind: 'url', id, assistantId: ASSISTANT, url: 'https://docs.example.com/guide/' }),
+    );
 
     expect(duplicate.status).toBe(409);
-    await expect(duplicate.json()).resolves.toEqual({ error: 'That source was already added. Refresh the page to see it.' });
+    await expect(duplicate.json()).resolves.toEqual({
+      error: 'That source was already added. Refresh the page to see it.',
+    });
   });
 
   it('rejects uploads of other file types and empty files', async () => {
     signIn(fakeClient());
 
-    const exe = await POST(multipart({ assistantId: ASSISTANT, file: new File(['x'], 'tool.exe', { type: 'application/octet-stream' }) }));
+    const exe = await POST(
+      multipart({
+        assistantId: ASSISTANT,
+        file: new File(['x'], 'tool.exe', { type: 'application/octet-stream' }),
+      }),
+    );
     expect(exe.status).toBe(400);
     await expect(exe.json()).resolves.toEqual({
       error: 'That file type is not supported. Upload PDF, Word, HTML, Markdown or plain text.',
     });
 
-    const empty = await POST(multipart({ assistantId: ASSISTANT, file: new File([], 'empty.txt', { type: 'text/plain' }) }));
+    const empty = await POST(
+      multipart({
+        assistantId: ASSISTANT,
+        file: new File([], 'empty.txt', { type: 'text/plain' }),
+      }),
+    );
     expect(empty.status).toBe(400);
     await expect(empty.json()).resolves.toEqual({ error: 'Choose a file to upload.' });
 
-    const noAssistant = await POST(multipart({ file: new File(['x'], 'a.txt', { type: 'text/plain' }) }));
+    const noAssistant = await POST(
+      multipart({ file: new File(['x'], 'a.txt', { type: 'text/plain' }) }),
+    );
     expect(noAssistant.status).toBe(400);
   });
 });

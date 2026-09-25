@@ -45,13 +45,17 @@ const Row = ({
         {question}
       </span>
       <span
-        className="text-muted-foreground text-right text-xs whitespace-nowrap tabular-nums"
+        className="text-muted-foreground whitespace-nowrap text-right text-xs tabular-nums"
         title={`Asked ${formatCount(asks)} ${asks === 1 ? 'time' : 'times'}`}
       >
         {formatCount(asks)}
         {asks === 1 ? ' time' : ' times'}
       </span>
-      <LocalTime value={lastAskedAt} now={now} className="text-muted-foreground text-right text-xs whitespace-nowrap" />
+      <LocalTime
+        value={lastAskedAt}
+        now={now}
+        className="text-muted-foreground whitespace-nowrap text-right text-xs"
+      />
     </>
   );
 
@@ -71,7 +75,7 @@ const Row = ({
 
 export const TopQuestions = ({ rows, now }: { rows: TopQuestion[]; now: number }) => (
   <Card className="gap-0" data-testid="top-questions">
-    <CardHeader className="border-b pb-(--card-spacing)">
+    <CardHeader className="pb-(--card-spacing) border-b">
       <CardTitle>Top questions</CardTitle>
       <CardDescription>What people ask most often.</CardDescription>
     </CardHeader>
@@ -81,7 +85,13 @@ export const TopQuestions = ({ rows, now }: { rows: TopQuestion[]; now: number }
       ) : (
         <ul className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-x-3">
           {rows.map((row) => (
-            <Row key={row.question} question={row.question} asks={row.asks} lastAskedAt={row.last_asked_at} now={now} />
+            <Row
+              key={row.question}
+              question={row.question}
+              asks={row.asks}
+              lastAskedAt={row.last_asked_at}
+              now={now}
+            />
           ))}
         </ul>
       )}
@@ -99,7 +109,7 @@ export const UnansweredQuestions = ({
   assistantId: string;
 }) => (
   <Card className="gap-0" data-testid="unanswered-questions">
-    <CardHeader className="border-b pb-(--card-spacing)">
+    <CardHeader className="pb-(--card-spacing) border-b">
       <CardTitle>Unanswered questions</CardTitle>
       <CardDescription>Questions the documentation could not answer.</CardDescription>
     </CardHeader>
@@ -121,7 +131,7 @@ export const UnansweredQuestions = ({
               />
             ))}
           </ul>
-          <div className="bg-muted/50 border-t px-(--card-spacing) py-2.5">
+          <div className="bg-muted/50 px-(--card-spacing) border-t py-2.5">
             <Link
               href={`/a/${assistantId}/knowledge`}
               className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-xs transition-colors"

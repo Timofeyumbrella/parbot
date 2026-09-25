@@ -28,7 +28,12 @@ export const saveWidgetSettings = async (
   formData: FormData,
 ): Promise<WidgetFormState> => {
   const values = widgetFormValues(formData);
-  const failure = (error: string): WidgetFormState => ({ status: 'error', at: Date.now(), error, values });
+  const failure = (error: string): WidgetFormState => ({
+    status: 'error',
+    at: Date.now(),
+    error,
+    values,
+  });
 
   const { supabase, user } = await requireUser();
   const assistantId = formData.get('assistantId');

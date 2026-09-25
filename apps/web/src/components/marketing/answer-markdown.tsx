@@ -33,11 +33,21 @@ const buildComponents = (citations: DemoCitation[]): Components => ({
     if (href?.startsWith(CITE_PREFIX)) {
       const index = Number(href.slice(CITE_PREFIX.length));
 
-      return <CitationMarker index={index} citation={citations.find((citation) => citation.index === index)} />;
+      return (
+        <CitationMarker
+          index={index}
+          citation={citations.find((citation) => citation.index === index)}
+        />
+      );
     }
 
     return (
-      <a href={href} target="_blank" rel="noreferrer" className="text-primary underline underline-offset-2">
+      <a
+        href={href}
+        target="_blank"
+        rel="noreferrer"
+        className="text-primary underline underline-offset-2"
+      >
         {children}
       </a>
     );
@@ -50,10 +60,17 @@ const buildComponents = (citations: DemoCitation[]): Components => ({
   h2: ({ children }) => <p className="my-2 font-semibold">{children}</p>,
   h3: ({ children }) => <p className="my-2 font-semibold">{children}</p>,
   pre: ({ children }) => (
-    <pre className="bg-muted my-2 overflow-x-auto rounded-md p-3 font-mono text-xs leading-relaxed">{children}</pre>
+    <pre className="bg-muted my-2 overflow-x-auto rounded-md p-3 font-mono text-xs leading-relaxed">
+      {children}
+    </pre>
   ),
   code: ({ children, className }) => (
-    <code className={cn('bg-muted rounded px-1 py-0.5 font-mono text-[0.85em] [pre_&]:bg-transparent [pre_&]:p-0', className)}>
+    <code
+      className={cn(
+        'bg-muted rounded px-1 py-0.5 font-mono text-[0.85em] [pre_&]:bg-transparent [pre_&]:p-0',
+        className,
+      )}
+    >
       {children}
     </code>
   ),
@@ -67,7 +84,13 @@ const buildComponents = (citations: DemoCitation[]): Components => ({
 });
 
 /** Renders an answer's Markdown with its [n] markers as citation chips. */
-export const AnswerMarkdown = ({ content, citations }: { content: string; citations: DemoCitation[] }) => {
+export const AnswerMarkdown = ({
+  content,
+  citations,
+}: {
+  content: string;
+  citations: DemoCitation[];
+}) => {
   const components = useMemo(() => buildComponents(citations), [citations]);
 
   return (

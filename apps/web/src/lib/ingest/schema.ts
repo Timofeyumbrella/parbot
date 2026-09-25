@@ -7,7 +7,11 @@ import { z } from 'zod';
 /** Pasted text larger than this is really a file; the upload path handles those. */
 export const MAX_TEXT_CHARS = 500_000;
 
-const title = z.string().trim().min(1, 'Give the source a title.').max(200, 'Keep the title under 200 characters.');
+const title = z
+  .string()
+  .trim()
+  .min(1, 'Give the source a title.')
+  .max(200, 'Keep the title under 200 characters.');
 const optionalTitle = z
   .string()
   .trim()
@@ -34,8 +38,20 @@ const clientId = z.uuid({ error: 'The source id is not valid.' }).optional();
 export const sourceInputSchema = z.discriminatedUnion(
   'kind',
   [
-    z.object({ kind: z.literal('url'), assistantId, id: clientId, url: httpUrl, title: optionalTitle }),
-    z.object({ kind: z.literal('sitemap'), assistantId, id: clientId, url: httpUrl, title: optionalTitle }),
+    z.object({
+      kind: z.literal('url'),
+      assistantId,
+      id: clientId,
+      url: httpUrl,
+      title: optionalTitle,
+    }),
+    z.object({
+      kind: z.literal('sitemap'),
+      assistantId,
+      id: clientId,
+      url: httpUrl,
+      title: optionalTitle,
+    }),
     z.object({
       kind: z.literal('text'),
       assistantId,
@@ -57,7 +73,8 @@ export type SourceInput = z.infer<typeof sourceInputSchema>;
 export const uploadFieldsSchema = z.object({ assistantId, id: clientId, title: optionalTitle });
 
 /** The first problem zod found, phrased for people. */
-export const firstIssue = (error: z.ZodError) => error.issues[0]?.message ?? 'Check the form and try again.';
+export const firstIssue = (error: z.ZodError) =>
+  error.issues[0]?.message ?? 'Check the form and try again.';
 
 /** The strings of a FormData, with everything else left out. */
 export const formFields = (form: FormData, names: string[]) =>

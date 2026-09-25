@@ -15,8 +15,12 @@ const navigation = vi.hoisted(() => ({
 }));
 
 const actions = vi.hoisted(() => ({
-  renameConversation: vi.fn(async () => ({ ok: true }) as { ok: true } | { ok: false; error: string }),
-  deleteConversation: vi.fn(async () => ({ ok: true }) as { ok: true } | { ok: false; error: string }),
+  renameConversation: vi.fn(
+    async () => ({ ok: true }) as { ok: true } | { ok: false; error: string },
+  ),
+  deleteConversation: vi.fn(
+    async () => ({ ok: true }) as { ok: true } | { ok: false; error: string },
+  ),
 }));
 
 vi.mock('next/navigation', () => ({
@@ -34,15 +38,35 @@ vi.mock('sonner', () => ({ toast: { error: vi.fn() } }));
 const NOW = Date.parse('2026-09-23T12:00:00.000Z');
 
 const rows: ConversationRow[] = [
-  { id: 'c1', title: 'Rotate an API key', last_message_at: '2026-09-23T11:55:00.000Z', message_count: 4, unanswered_count: 0 },
-  { id: 'c2', title: null, last_message_at: '2026-09-23T09:00:00.000Z', message_count: 2, unanswered_count: 1 },
-  { id: 'c3', title: 'Webhook signatures', last_message_at: '2026-09-21T09:00:00.000Z', message_count: 2, unanswered_count: 0 },
+  {
+    id: 'c1',
+    title: 'Rotate an API key',
+    last_message_at: '2026-09-23T11:55:00.000Z',
+    message_count: 4,
+    unanswered_count: 0,
+  },
+  {
+    id: 'c2',
+    title: null,
+    last_message_at: '2026-09-23T09:00:00.000Z',
+    message_count: 2,
+    unanswered_count: 1,
+  },
+  {
+    id: 'c3',
+    title: 'Webhook signatures',
+    last_message_at: '2026-09-21T09:00:00.000Z',
+    message_count: 2,
+    unanswered_count: 0,
+  },
 ];
 
 let queryClient: QueryClient;
 
 const renderList = (initial = rows) => {
-  queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
+  queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false, staleTime: Infinity } },
+  });
 
   return render(
     <QueryClientProvider client={queryClient}>
@@ -64,7 +88,9 @@ describe('ConversationList', () => {
     navigation.params.conversationId = 'c2';
     renderList();
 
-    const items = within(screen.getByRole('navigation', { name: 'Conversations' })).getAllByRole('listitem');
+    const items = within(screen.getByRole('navigation', { name: 'Conversations' })).getAllByRole(
+      'listitem',
+    );
 
     expect(items.map((item) => within(item).getByRole('link').textContent)).toEqual([
       'Rotate an API key5 min ago',
@@ -158,7 +184,9 @@ describe('ConversationList', () => {
     expect(actions.deleteConversation).toHaveBeenCalledWith({ id: 'c1' });
     expect(navigation.push).toHaveBeenCalledWith('/a/asst/chat');
     // The action is dispatched before the navigation, so the router lets the navigation take priority.
-    expect(actions.deleteConversation.mock.invocationCallOrder[0]).toBeLessThan(navigation.push.mock.invocationCallOrder[0]!);
+    expect(actions.deleteConversation.mock.invocationCallOrder[0]).toBeLessThan(
+      navigation.push.mock.invocationCallOrder[0]!,
+    );
   });
 
   it('does not leave a conversation that is not the open one when it is deleted', async () => {
@@ -169,7 +197,9 @@ describe('ConversationList', () => {
 
     await user.click(screen.getByRole('button', { name: 'Actions for Webhook signatures' }));
     await user.click(await screen.findByRole('menuitem', { name: 'Delete' }));
-    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Delete' }));
+    await user.click(
+      within(await screen.findByRole('dialog')).getByRole('button', { name: 'Delete' }),
+    );
 
     expect(cached()?.map((row) => row.id)).toEqual(['c1', 'c2']);
     expect(navigation.push).not.toHaveBeenCalled();

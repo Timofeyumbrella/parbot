@@ -8,11 +8,11 @@ readers leave when they could not.
 
 ## Stack
 
-| Package           | What it is                                                         |
-| ----------------- | ------------------------------------------------------------------ |
-| `apps/web`        | Next.js 16 (App Router, Turbopack): landing, dashboard, API routes |
-| `packages/widget` | The embeddable script: vanilla TypeScript, Shadow DOM, Vite build  |
-| `packages/shared` | The chat protocol and widget types shared by app and widget        |
+| Package           | What it is                                                          |
+| ----------------- | ------------------------------------------------------------------- |
+| `apps/web`        | Next.js 16 (App Router, Turbopack): landing, dashboard, API routes  |
+| `packages/widget` | The embeddable script: vanilla TypeScript, Shadow DOM, Vite build   |
+| `packages/shared` | The chat protocol and widget types shared by app and widget         |
 | `supabase/`       | Schema, row level security, pgvector retrieval, analytics functions |
 
 Answers come from the Gemini API free tier (`gemini-3.8-flash` with fallbacks, `gemini-embedding-2`
@@ -40,15 +40,15 @@ pnpm dev                 # builds the widget, then http://localhost:3000
 Add `GEMINI_API_KEY` from https://aistudio.google.com/apikey for real answers; the free tier needs no
 card. Everything else in `.env.example` is optional.
 
-| Command              | Description                                          |
-| -------------------- | ---------------------------------------------------- |
-| `pnpm dev`           | Widget build, then the app in development mode       |
-| `pnpm build`         | Production build of the widget and the app           |
-| `pnpm typecheck`     | TypeScript across the workspace                      |
-| `pnpm lint`          | ESLint                                               |
-| `pnpm test`          | Vitest across the workspace                          |
-| `pnpm db:reset`      | Replays every migration and the seed                 |
-| `pnpm db:types`      | Regenerates `apps/web/src/lib/db/types.ts`           |
+| Command          | Description                                    |
+| ---------------- | ---------------------------------------------- |
+| `pnpm dev`       | Widget build, then the app in development mode |
+| `pnpm build`     | Production build of the widget and the app     |
+| `pnpm typecheck` | TypeScript across the workspace                |
+| `pnpm lint`      | ESLint                                         |
+| `pnpm test`      | Vitest across the workspace                    |
+| `pnpm db:reset`  | Replays every migration and the seed           |
+| `pnpm db:types`  | Regenerates `apps/web/src/lib/db/types.ts`     |
 
 ## How an answer is made
 
@@ -80,11 +80,11 @@ re-indexes the docs and leaves the history alone; `--reset` starts over.
 
 ## Tests
 
-| Command                                   | What it covers                                                  |
-| ----------------------------------------- | --------------------------------------------------------------- |
-| `pnpm test`                               | Unit tests, plus integration tests when the local stack is up   |
+| Command                                                                  | What it covers                                                    |
+| ------------------------------------------------------------------------ | ----------------------------------------------------------------- |
+| `pnpm test`                                                              | Unit tests, plus integration tests when the local stack is up     |
 | `GEMINI_LIVE=1 pnpm --filter web exec vitest run src/lib/ai/gemini.live` | One embedding and one streamed answer against the real Gemini API |
-| `pnpm --filter web test:e2e`              | Playwright: sign up and onboarding, landing, billing in test mode |
+| `pnpm --filter web test:e2e`                                             | Playwright: sign up and onboarding, landing, billing in test mode |
 
 ## Deploying
 

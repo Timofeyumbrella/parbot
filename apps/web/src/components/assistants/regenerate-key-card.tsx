@@ -18,7 +18,13 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 
-export const RegenerateKeyCard = ({ assistantId, publicKey }: { assistantId: string; publicKey: string }) => {
+export const RegenerateKeyCard = ({
+  assistantId,
+  publicKey,
+}: {
+  assistantId: string;
+  publicKey: string;
+}) => {
   const [key, setKey] = useState(publicKey);
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -30,7 +36,9 @@ export const RegenerateKeyCard = ({ assistantId, publicKey }: { assistantId: str
       if (result.ok) {
         setKey(result.publicKey);
         setOpen(false);
-        toast.success('New public key generated. Update the snippet wherever the widget is installed.');
+        toast.success(
+          'New public key generated. Update the snippet wherever the widget is installed.',
+        );
       } else {
         toast.error(result.error);
       }
@@ -45,7 +53,10 @@ export const RegenerateKeyCard = ({ assistantId, publicKey }: { assistantId: str
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-wrap items-center justify-between gap-3">
-        <code className="bg-muted rounded-md px-2 py-1 font-mono text-xs break-all" data-testid="public-key">
+        <code
+          className="bg-muted break-all rounded-md px-2 py-1 font-mono text-xs"
+          data-testid="public-key"
+        >
           {key}
         </code>
         <Dialog open={open} onOpenChange={setOpen}>
@@ -59,8 +70,8 @@ export const RegenerateKeyCard = ({ assistantId, publicKey }: { assistantId: str
             <DialogHeader>
               <DialogTitle>Regenerate the public key?</DialogTitle>
               <DialogDescription>
-                Every installed widget uses the current key. They stop answering until you update the snippet
-                with the new one. The demo page link changes too.
+                Every installed widget uses the current key. They stop answering until you update
+                the snippet with the new one. The demo page link changes too.
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>

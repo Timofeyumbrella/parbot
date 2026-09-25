@@ -25,10 +25,12 @@ export type MessageBubbleProps = {
 
 const UserBubble = ({ message }: { message: ThreadMessage }) => (
   <div className="flex flex-col items-end gap-1" data-role="user" data-status={message.status}>
-    <div className="bg-muted text-foreground max-w-[85%] rounded-2xl rounded-br-md px-3.5 py-2 text-sm leading-relaxed break-words whitespace-pre-wrap">
+    <div className="bg-muted text-foreground max-w-[85%] whitespace-pre-wrap break-words rounded-2xl rounded-br-md px-3.5 py-2 text-sm leading-relaxed">
       {message.content}
     </div>
-    {message.status === 'failed' ? <span className="text-destructive text-xs">Not sent</span> : null}
+    {message.status === 'failed' ? (
+      <span className="text-destructive text-xs">Not sent</span>
+    ) : null}
   </div>
 );
 
@@ -43,7 +45,10 @@ const ErrorNotice = ({ error, onRetry }: ErrorNoticeProps) => {
   const retry = onRetry && canRetry(error);
 
   return (
-    <div className="border-destructive/30 bg-destructive/10 flex flex-col gap-2 rounded-lg border px-3 py-2.5 text-sm" role="alert">
+    <div
+      className="border-destructive/30 bg-destructive/10 flex flex-col gap-2 rounded-lg border px-3 py-2.5 text-sm"
+      role="alert"
+    >
       <div className="flex items-start gap-2">
         <AlertCircle className="text-destructive mt-0.5 size-4 shrink-0" />
         <span>{error.message}</span>
@@ -68,14 +73,25 @@ const ErrorNotice = ({ error, onRetry }: ErrorNoticeProps) => {
 };
 
 const Thinking = () => (
-  <div className="text-muted-foreground flex h-6 items-center gap-1" aria-label="Thinking" role="status">
+  <div
+    className="text-muted-foreground flex h-6 items-center gap-1"
+    aria-label="Thinking"
+    role="status"
+  >
     <span className="bg-muted-foreground/70 size-1.5 animate-pulse rounded-full [animation-delay:-0.4s]" />
     <span className="bg-muted-foreground/70 size-1.5 animate-pulse rounded-full [animation-delay:-0.2s]" />
     <span className="bg-muted-foreground/70 size-1.5 animate-pulse rounded-full" />
   </div>
 );
 
-const AssistantBubble = ({ message, assistantId, assistantName, onFeedback, onRetry, questionId }: MessageBubbleProps) => {
+const AssistantBubble = ({
+  message,
+  assistantId,
+  assistantName,
+  onFeedback,
+  onRetry,
+  questionId,
+}: MessageBubbleProps) => {
   const sourcesId = `sources-${message.id}`;
   const streaming = message.status === 'streaming';
   const settled = message.status === 'complete' || message.status === 'stopped';
@@ -90,7 +106,9 @@ const AssistantBubble = ({ message, assistantId, assistantName, onFeedback, onRe
 
         {message.status === 'error' ? (
           <ErrorNotice
-            error={message.error ?? { code: 'internal', message: 'The answer could not be produced.' }}
+            error={
+              message.error ?? { code: 'internal', message: 'The answer could not be produced.' }
+            }
             onRetry={onRetry && questionId ? () => onRetry(questionId) : undefined}
           />
         ) : streaming && !message.content ? (
@@ -115,14 +133,16 @@ const AssistantBubble = ({ message, assistantId, assistantName, onFeedback, onRe
           </Link>
         ) : null}
 
-        {message.citations.length > 0 ? <Sources citations={message.citations} id={sourcesId} /> : null}
+        {message.citations.length > 0 ? (
+          <Sources citations={message.citations} id={sourcesId} />
+        ) : null}
 
         {settled ? (
           <div
             className={cn(
               'text-muted-foreground -ml-1.5 flex h-6 items-center gap-0.5 text-xs transition-opacity',
               // Hover reveals it on a pointer device; a touch screen has no hover, so it stays visible there.
-              'pointer-coarse:opacity-100 opacity-0 group-hover:opacity-100 focus-within:opacity-100',
+              'pointer-coarse:opacity-100 opacity-0 focus-within:opacity-100 group-hover:opacity-100',
               (message.feedback !== null || message.status === 'stopped') && 'opacity-100',
             )}
           >
@@ -167,5 +187,9 @@ const AssistantBubble = ({ message, assistantId, assistantName, onFeedback, onRe
 };
 
 export const MessageBubble = memo(function MessageBubble(props: MessageBubbleProps) {
-  return props.message.role === 'user' ? <UserBubble message={props.message} /> : <AssistantBubble {...props} />;
+  return props.message.role === 'user' ? (
+    <UserBubble message={props.message} />
+  ) : (
+    <AssistantBubble {...props} />
+  );
 });

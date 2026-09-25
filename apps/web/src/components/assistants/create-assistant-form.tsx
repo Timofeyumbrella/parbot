@@ -18,7 +18,10 @@ import { type CreateField, DESCRIPTION_MAX_LENGTH, NAME_MAX_LENGTH, SLUG_HELP } 
  * The server derives the slug again when the field is left empty and suffixes it on a clash.
  */
 export const CreateAssistantForm = () => {
-  const [state, action, pending] = useActionState(createAssistant, idleState as FormState<CreateField>);
+  const [state, action, pending] = useActionState(
+    createAssistant,
+    idleState as FormState<CreateField>,
+  );
   const [name, setName] = useState(state.values?.name ?? '');
   const [slug, setSlug] = useState(state.values?.slug ?? '');
   const [slugTouched, setSlugTouched] = useState(Boolean(state.values?.slug));
@@ -64,7 +67,11 @@ export const CreateAssistantForm = () => {
           />
         )}
       </FormField>
-      <FormField label="Description" hint="Optional. A note for you, not shown to visitors." error={state.fieldErrors?.description}>
+      <FormField
+        label="Description"
+        hint="Optional. A note for you, not shown to visitors."
+        error={state.fieldErrors?.description}
+      >
         {(control) => (
           <Textarea
             {...control}

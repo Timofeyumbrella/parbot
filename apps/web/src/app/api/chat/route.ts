@@ -34,7 +34,8 @@ const validationMessage = (error: z.ZodError) => {
 };
 
 /** Early failures still arrive as a stream, so the client has one code path. */
-const fail = (status: number, event: ChatStreamEvent) => streamResponse(errorStream(event), { status });
+const fail = (status: number, event: ChatStreamEvent) =>
+  streamResponse(errorStream(event), { status });
 
 export async function POST(request: NextRequest) {
   let body: unknown;
@@ -42,19 +43,31 @@ export async function POST(request: NextRequest) {
   try {
     body = await request.json();
   } catch {
-    return fail(400, { type: 'error', code: 'bad_request', message: 'The request body was not JSON.' });
+    return fail(400, {
+      type: 'error',
+      code: 'bad_request',
+      message: 'The request body was not JSON.',
+    });
   }
 
   const parsed = requestSchema.safeParse(body);
 
   if (!parsed.success) {
-    return fail(400, { type: 'error', code: 'bad_request', message: validationMessage(parsed.error) });
+    return fail(400, {
+      type: 'error',
+      code: 'bad_request',
+      message: validationMessage(parsed.error),
+    });
   }
 
   const { supabase, user } = await getSession();
 
   if (!user) {
-    return fail(401, { type: 'error', code: 'unauthorized', message: 'Sign in to chat with your assistant.' });
+    return fail(401, {
+      type: 'error',
+      code: 'unauthorized',
+      message: 'Sign in to chat with your assistant.',
+    });
   }
 
   const { data: assistant } = await supabase
@@ -64,7 +77,11 @@ export async function POST(request: NextRequest) {
     .maybeSingle();
 
   if (!assistant) {
-    return fail(404, { type: 'error', code: 'not_found', message: 'That assistant does not exist.' });
+    return fail(404, {
+      type: 'error',
+      code: 'not_found',
+      message: 'That assistant does not exist.',
+    });
   }
 
   const verdict = rateLimit(`chat:${user.id}`, CHAT_LIMIT);

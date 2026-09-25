@@ -92,7 +92,9 @@ export const SourceRow = ({ source, onReindex, onDelete }: SourceRowProps) => {
             >
               {detailsOpen ? 'Hide details' : 'Show what happened'}
             </button>
-            {detailsOpen ? <p className="text-destructive text-xs break-words">{source.error}</p> : null}
+            {detailsOpen ? (
+              <p className="text-destructive break-words text-xs">{source.error}</p>
+            ) : null}
           </div>
         ) : null}
       </div>

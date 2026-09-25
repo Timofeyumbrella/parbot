@@ -46,7 +46,8 @@ const getServerTick = () => 0;
  * The reference time for "5 min ago": the request's clock, moved forward in half-minute steps
  * once the page is open so it does not freeze in time. It never runs behind the request.
  */
-export const useNow = (initial: number) => Math.max(useSyncExternalStore(subscribeClock, getTick, getServerTick), initial);
+export const useNow = (initial: number) =>
+  Math.max(useSyncExternalStore(subscribeClock, getTick, getServerTick), initial);
 
 type LocalTimeProps = {
   value: string;
@@ -65,7 +66,11 @@ export const LocalTime = ({ value, now: initial, className }: LocalTimeProps) =>
   const now = useNow(initial);
 
   return (
-    <time dateTime={value} title={hydrated ? formatDateTime(value) : undefined} className={className}>
+    <time
+      dateTime={value}
+      title={hydrated ? formatDateTime(value) : undefined}
+      className={className}
+    >
       {relativeTime(value, new Date(now))}
     </time>
   );

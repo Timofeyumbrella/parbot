@@ -83,14 +83,17 @@ const RenameInput = ({ initial, onSubmit, onCancel }: RenameInputProps) => {
           finish(false);
         }
       }}
-      className="bg-background focus-visible:border-ring focus-visible:ring-ring/50 h-10 w-full rounded-md border px-2.5 text-sm outline-none focus-visible:ring-3"
+      className="bg-background focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-3 h-10 w-full rounded-md border px-2.5 text-sm outline-none"
     />
   );
 };
 
 /** Relative times depend on the clock, so the server's text is replaced after hydration. */
 const RowTime = ({ at }: { at: string | null }) => (
-  <span className="text-muted-foreground ml-auto shrink-0 text-[11px] tabular-nums" suppressHydrationWarning>
+  <span
+    className="text-muted-foreground ml-auto shrink-0 text-[11px] tabular-nums"
+    suppressHydrationWarning
+  >
     {at ? relativeTime(at) : ''}
   </span>
 );
@@ -107,7 +110,17 @@ type RowProps = {
   onDelete: () => void;
 };
 
-const Row = ({ row, href, active, renaming, onNavigate, onRename, onRenameSubmit, onRenameCancel, onDelete }: RowProps) => {
+const Row = ({
+  row,
+  href,
+  active,
+  renaming,
+  onNavigate,
+  onRename,
+  onRenameSubmit,
+  onRenameCancel,
+  onDelete,
+}: RowProps) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const label = conversationLabel(row);
 
@@ -128,7 +141,7 @@ const Row = ({ row, href, active, renaming, onNavigate, onRename, onRenameSubmit
         href={href}
         onClick={onNavigate}
         aria-current={active ? 'page' : undefined}
-        className="flex min-w-0 flex-1 items-center gap-2 self-stretch pr-1 pl-2.5 text-sm outline-none focus-visible:underline"
+        className="flex min-w-0 flex-1 items-center gap-2 self-stretch pl-2.5 pr-1 text-sm outline-none focus-visible:underline"
       >
         {row.unanswered_count > 0 ? (
           <span
@@ -137,7 +150,9 @@ const Row = ({ row, href, active, renaming, onNavigate, onRename, onRenameSubmit
             aria-label={`${row.unanswered_count} unanswered`}
           />
         ) : null}
-        <span className={cn('truncate', active ? 'font-medium' : 'text-foreground/90')}>{label}</span>
+        <span className={cn('truncate', active ? 'font-medium' : 'text-foreground/90')}>
+          {label}
+        </span>
         <RowTime at={row.last_message_at} />
       </Link>
       <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
@@ -186,7 +201,12 @@ export const ConversationList = ({ assistantId, snapshot }: ConversationListProp
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k' && !event.altKey && !event.shiftKey) {
+      if (
+        (event.metaKey || event.ctrlKey) &&
+        event.key.toLowerCase() === 'k' &&
+        !event.altKey &&
+        !event.shiftKey
+      ) {
         event.preventDefault();
         inputRef.current?.focus();
         inputRef.current?.select();
@@ -225,7 +245,7 @@ export const ConversationList = ({ assistantId, snapshot }: ConversationListProp
           </Link>
         </Button>
         <div className="relative">
-          <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2" />
+          <Search className="text-muted-foreground pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2" />
           <Input
             ref={inputRef}
             type="search"
@@ -240,7 +260,7 @@ export const ConversationList = ({ assistantId, snapshot }: ConversationListProp
             }}
             placeholder="Filter conversations"
             aria-label="Filter conversations"
-            className="bg-background h-8 pr-8 pl-8 [&::-webkit-search-cancel-button]:hidden"
+            className="bg-background h-8 pl-8 pr-8 [&::-webkit-search-cancel-button]:hidden"
           />
           {query ? (
             <button
@@ -250,12 +270,12 @@ export const ConversationList = ({ assistantId, snapshot }: ConversationListProp
                 setQuery('');
                 inputRef.current?.focus();
               }}
-              className="text-muted-foreground hover:text-foreground absolute top-1/2 right-2 -translate-y-1/2 rounded-sm"
+              className="text-muted-foreground hover:text-foreground absolute right-2 top-1/2 -translate-y-1/2 rounded-sm"
             >
               <X className="size-3.5" />
             </button>
           ) : (
-            <kbd className="text-muted-foreground pointer-events-none absolute top-1/2 right-2 hidden -translate-y-1/2 font-sans text-[10px] sm:inline">
+            <kbd className="text-muted-foreground pointer-events-none absolute right-2 top-1/2 hidden -translate-y-1/2 font-sans text-[10px] sm:inline">
               ⌘K
             </kbd>
           )}
@@ -265,8 +285,16 @@ export const ConversationList = ({ assistantId, snapshot }: ConversationListProp
       <nav className="min-h-0 flex-1 overflow-y-auto px-2 pb-2" aria-label="Conversations">
         {isError && !data ? (
           <div className="text-muted-foreground flex flex-col gap-2 px-2 py-6 text-sm" role="alert">
-            <p>The conversations could not be loaded. {error instanceof Error ? error.message : ''}</p>
-            <Button type="button" variant="outline" size="sm" className="w-fit" onClick={() => void refetch()}>
+            <p>
+              The conversations could not be loaded. {error instanceof Error ? error.message : ''}
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="w-fit"
+              onClick={() => void refetch()}
+            >
               Try again
             </Button>
           </div>
@@ -275,7 +303,9 @@ export const ConversationList = ({ assistantId, snapshot }: ConversationListProp
             No conversations yet. Ask the assistant something and it will appear here.
           </p>
         ) : rows.length === 0 ? (
-          <p className="text-muted-foreground px-2 py-6 text-sm">Nothing matches “{query.trim()}”.</p>
+          <p className="text-muted-foreground px-2 py-6 text-sm">
+            Nothing matches “{query.trim()}”.
+          </p>
         ) : (
           <ul className="flex flex-col gap-0.5">
             {rows.map((row) => (
@@ -300,13 +330,16 @@ export const ConversationList = ({ assistantId, snapshot }: ConversationListProp
         )}
       </nav>
 
-      <Dialog open={Boolean(pendingDelete)} onOpenChange={(open) => (open ? null : setPendingDelete(null))}>
+      <Dialog
+        open={Boolean(pendingDelete)}
+        onOpenChange={(open) => (open ? null : setPendingDelete(null))}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Delete conversation</DialogTitle>
             <DialogDescription>
-              “{pendingDelete ? conversationLabel(pendingDelete) : ''}” and its messages are removed. This cannot be
-              undone.
+              “{pendingDelete ? conversationLabel(pendingDelete) : ''}” and its messages are
+              removed. This cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

@@ -43,7 +43,7 @@ export const NewChat = () => {
           <Welcome assistant={assistant} onPick={start} />
         </div>
       </div>
-      <div className="bg-background border-t px-4 pt-3 pb-3 sm:px-6">
+      <div className="bg-background border-t px-4 pb-3 pt-3 sm:px-6">
         <Composer className="mx-auto w-full max-w-3xl" draftKey={NEW_CHAT_DRAFT} onSend={start} />
       </div>
     </div>

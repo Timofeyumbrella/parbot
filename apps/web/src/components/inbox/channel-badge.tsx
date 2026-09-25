@@ -21,7 +21,13 @@ export const ChannelBadge = ({ channel, className }: { channel: Channel; classNa
 );
 
 /** A small amber mark for conversations the docs could not answer. */
-export const UnansweredDot = ({ className, label = 'Has unanswered questions' }: { className?: string; label?: string }) => (
+export const UnansweredDot = ({
+  className,
+  label = 'Has unanswered questions',
+}: {
+  className?: string;
+  label?: string;
+}) => (
   <span
     role="img"
     aria-label={label}

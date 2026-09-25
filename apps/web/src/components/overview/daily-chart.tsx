@@ -1,4 +1,11 @@
-import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { type DailyRow, dayLabel, labelIndexes, niceTicks } from '@/lib/analytics';
 import { formatCount } from '@/lib/format';
 
@@ -114,7 +121,9 @@ const Plot = ({ rows, days, max, ticks, variant }: PlotProps) => {
         const hasUnanswered = row.unanswered > 0;
         const answeredTop = baseline - answeredHeight;
         const unansweredTop = answeredTop - (hasAnswered ? GAP : 0) - unansweredHeight;
-        const unansweredVisible = hasUnanswered ? Math.max(unansweredHeight - (hasAnswered ? GAP : 0), 1) : 0;
+        const unansweredVisible = hasUnanswered
+          ? Math.max(unansweredHeight - (hasAnswered ? GAP : 0), 1)
+          : 0;
 
         return (
           <g
@@ -126,16 +135,34 @@ const Plot = ({ rows, days, max, ticks, variant }: PlotProps) => {
           >
             <title>{describeDay(row)}</title>
             {/* Hit target: the whole slot, not only the painted bar. */}
-            <rect x={MARGIN.left + slot * index} y={MARGIN.top} width={slot} height={plotHeight} fill="transparent" />
+            <rect
+              x={MARGIN.left + slot * index}
+              y={MARGIN.top}
+              width={slot}
+              height={plotHeight}
+              fill="transparent"
+            />
             {hasAnswered ? (
               hasUnanswered ? (
-                <rect x={x} y={answeredTop} width={barWidth} height={answeredHeight} className="fill-chart-2" />
+                <rect
+                  x={x}
+                  y={answeredTop}
+                  width={barWidth}
+                  height={answeredHeight}
+                  className="fill-chart-2"
+                />
               ) : (
-                <path d={roundedTop(x, answeredTop, barWidth, answeredHeight)} className="fill-chart-2" />
+                <path
+                  d={roundedTop(x, answeredTop, barWidth, answeredHeight)}
+                  className="fill-chart-2"
+                />
               )
             ) : null}
             {hasUnanswered ? (
-              <path d={roundedTop(x, unansweredTop, barWidth, unansweredVisible)} className="fill-chart-1" />
+              <path
+                d={roundedTop(x, unansweredTop, barWidth, unansweredVisible)}
+                className="fill-chart-1"
+              />
             ) : null}
             {labelled.has(index) ? (
               <text
@@ -183,7 +210,9 @@ export const DailyChart = ({ rows, days }: DailyChartProps) => {
     <Card data-testid="daily-chart">
       <CardHeader className="border-b">
         <CardTitle>Questions per day</CardTitle>
-        <CardDescription>Answered and unanswered over the last {days} days, in UTC days.</CardDescription>
+        <CardDescription>
+          Answered and unanswered over the last {days} days, in UTC days.
+        </CardDescription>
         <CardAction>
           <Legend />
         </CardAction>
@@ -198,7 +227,9 @@ export const DailyChart = ({ rows, days }: DailyChartProps) => {
             <Plot rows={rows} days={days} max={max} ticks={ticks} variant="wide" />
             <Plot rows={rows} days={days} max={max} ticks={ticks} variant="narrow" />
             <details className="text-muted-foreground mt-3 text-xs">
-              <summary className="hover:text-foreground cursor-pointer select-none">Show as a table</summary>
+              <summary className="hover:text-foreground cursor-pointer select-none">
+                Show as a table
+              </summary>
               <table className="mt-2 w-full text-left tabular-nums">
                 <thead>
                   <tr className="border-b">

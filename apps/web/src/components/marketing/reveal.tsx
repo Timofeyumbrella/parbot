@@ -57,7 +57,10 @@ export const Reveal = ({ children, className, delay = 0, as: Tag = 'div' }: Reve
   return (
     <Tag
       ref={ref as React.Ref<HTMLDivElement & HTMLLIElement>}
-      className={cn('transition-[opacity,transform] duration-700 ease-out motion-reduce:transition-none', className)}
+      className={cn(
+        'transition-[opacity,transform] duration-700 ease-out motion-reduce:transition-none',
+        className,
+      )}
       style={delay ? { transitionDelay: `${delay}ms` } : undefined}
     >
       {children}

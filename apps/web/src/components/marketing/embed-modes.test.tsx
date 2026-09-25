@@ -12,7 +12,9 @@ describe('embedSnippet', () => {
     expect(embedSnippet('https://app.parbot.dev/')).toBe(
       '<script src="https://app.parbot.dev/widget.js" data-parbot="pb_your_public_key" async></script>',
     );
-    expect(embedSnippet('http://localhost:3000')).toContain('src="http://localhost:3000/widget.js"');
+    expect(embedSnippet('http://localhost:3000')).toContain(
+      'src="http://localhost:3000/widget.js"',
+    );
   });
 });
 
@@ -26,6 +28,8 @@ describe('EmbedModes', () => {
       '<script src="https://app.parbot.dev/widget.js" data-parbot="pb_your_public_key" async></script>',
     );
     expect(screen.getAllByRole('img')).toHaveLength(2);
-    expect(screen.getByText(new RegExp(`On ${PLANS.starter.name} and ${PLANS.growth.name}`))).toBeInTheDocument();
+    expect(
+      screen.getByText(new RegExp(`On ${PLANS.starter.name} and ${PLANS.growth.name}`)),
+    ).toBeInTheDocument();
   });
 });

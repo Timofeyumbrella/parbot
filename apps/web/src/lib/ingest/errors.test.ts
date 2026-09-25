@@ -8,8 +8,12 @@ import { FetchPageError } from './http';
 
 describe('humanizeIngestError', () => {
   it('passes our own sentences through', () => {
-    expect(humanizeIngestError(new IngestError('The sitemap lists no pages.'))).toBe('The sitemap lists no pages.');
-    expect(humanizeIngestError(new FetchPageError('https://x.test/', 'HTTP 404'))).toBe('Could not fetch https://x.test/: HTTP 404.');
+    expect(humanizeIngestError(new IngestError('The sitemap lists no pages.'))).toBe(
+      'The sitemap lists no pages.',
+    );
+    expect(humanizeIngestError(new FetchPageError('https://x.test/', 'HTTP 404'))).toBe(
+      'Could not fetch https://x.test/: HTTP 404.',
+    );
   });
 
   it('maps provider failures to what happened and what to try', () => {
@@ -23,18 +27,27 @@ describe('humanizeIngestError', () => {
 
   it('keeps the key setting out of the row and in the server log', () => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    const message = humanizeIngestError(new ProviderError(403, 'API key not valid. Please pass a valid API key.'));
+    const message = humanizeIngestError(
+      new ProviderError(403, 'API key not valid. Please pass a valid API key.'),
+    );
 
-    expect(message).toBe('The embedding provider turned the request down, so nothing new was indexed. Re-index later.');
+    expect(message).toBe(
+      'The embedding provider turned the request down, so nothing new was indexed. Re-index later.',
+    );
     expect(message).not.toMatch(/[A-Z]+_[A-Z_]+|API key/);
-    expect(error).toHaveBeenCalledWith(expect.stringContaining('GEMINI_API_KEY'), expect.any(ProviderError));
+    expect(error).toHaveBeenCalledWith(
+      expect.stringContaining('GEMINI_API_KEY'),
+      expect.any(ProviderError),
+    );
 
     error.mockRestore();
   });
 
   it('never shows library text and logs it instead', () => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    const zip = new Error("Can't find end of central directory : is this a zip file ? If it is, see https://stuk.github.io/jszip/");
+    const zip = new Error(
+      "Can't find end of central directory : is this a zip file ? If it is, see https://stuk.github.io/jszip/",
+    );
 
     expect(humanizeIngestError(zip)).toBe(GENERIC_FAILURE);
     expect(humanizeIngestError('a string')).toBe(GENERIC_FAILURE);

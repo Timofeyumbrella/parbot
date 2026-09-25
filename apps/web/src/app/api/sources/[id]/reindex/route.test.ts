@@ -5,7 +5,13 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 import type { Database } from '@/lib/db';
 import { STALE_RUN_MS } from '@/lib/ingest';
 import { getSession } from '@/lib/session';
-import { createServiceClient, createTestAccount, deleteTestAccount, hasLocalDb, type TestAccount } from '@/test/local-db';
+import {
+  createServiceClient,
+  createTestAccount,
+  deleteTestAccount,
+  hasLocalDb,
+  type TestAccount,
+} from '@/test/local-db';
 
 import { POST } from './route';
 
@@ -17,7 +23,8 @@ vi.mock('@/lib/session', () => ({ getSession: vi.fn() }));
 
 type SourceRow = Database['public']['Tables']['sources']['Insert'];
 
-const request = (id: string) => new Request(`http://localhost/api/sources/${id}/reindex`, { method: 'POST' });
+const request = (id: string) =>
+  new Request(`http://localhost/api/sources/${id}/reindex`, { method: 'POST' });
 const context = (id: string) => ({ params: Promise.resolve({ id }) });
 
 // The conditional update and row level security are the behaviour here, so these run against the local stack.
@@ -27,9 +34,13 @@ describe.skipIf(!hasLocalDb)('POST /api/sources/[id]/reindex', () => {
   let stranger: TestAccount | null = null;
 
   const signInAs = (account: TestAccount | null) =>
-    vi.mocked(getSession).mockResolvedValue(
-      (account ? { supabase: account.client, user: { id: account.userId } } : { supabase: {}, user: null }) as never,
-    );
+    vi
+      .mocked(getSession)
+      .mockResolvedValue(
+        (account
+          ? { supabase: account.client, user: { id: account.userId } }
+          : { supabase: {}, user: null }) as never,
+      );
 
   const addSource = async (row: Partial<SourceRow> = {}) => {
     const { data, error } = await service
@@ -41,7 +52,8 @@ describe.skipIf(!hasLocalDb)('POST /api/sources/[id]/reindex', () => {
         title: 'Docs',
         uri: 'https://docs.example.com/',
         status: 'ready',
-        error: 'Stopped after 300 pages, the most one run indexes. Re-index to continue with the rest.',
+        error:
+          'Stopped after 300 pages, the most one run indexes. Re-index to continue with the rest.',
         pages_found: 300,
         pages_done: 300,
         ...row,
@@ -57,13 +69,20 @@ describe.skipIf(!hasLocalDb)('POST /api/sources/[id]/reindex', () => {
   };
 
   const loadSource = async (id: string) => {
-    const { data } = await service.from('sources').select('status, error, pages_found, pages_done').eq('id', id).single();
+    const { data } = await service
+      .from('sources')
+      .select('status, error, pages_found, pages_done')
+      .eq('id', id)
+      .single();
 
     return data;
   };
 
   beforeAll(async () => {
-    [owner, stranger] = await Promise.all([createTestAccount(service, 'reindex-owner'), createTestAccount(service, 'reindex-other')]);
+    [owner, stranger] = await Promise.all([
+      createTestAccount(service, 'reindex-owner'),
+      createTestAccount(service, 'reindex-other'),
+    ]);
   });
 
   afterAll(async () => {
@@ -115,30 +134,50 @@ describe.skipIf(!hasLocalDb)('POST /api/sources/[id]/reindex', () => {
     signInAs(owner);
 
     const response = await POST(request(id), context(id));
-    const body = (await response.json()) as { source: { id: string; status: string; error: string | null } };
+    const body = (await response.json()) as {
+      source: { id: string; status: string; error: string | null };
+    };
 
     expect(response.status).toBe(202);
     expect(body.source).toMatchObject({ id, status: 'queued', error: null });
-    expect(await loadSource(id)).toEqual({ status: 'queued', error: null, pages_found: 0, pages_done: 0 });
+    expect(await loadSource(id)).toEqual({
+      status: 'queued',
+      error: null,
+      pages_found: 0,
+      pages_done: 0,
+    });
     expect(after).toHaveBeenCalledTimes(1);
   });
 
   it('refuses a second run while one is under way', async () => {
-    const id = await addSource({ status: 'indexing', error: null, pages_found: 40, pages_done: 12 });
+    const id = await addSource({
+      status: 'indexing',
+      error: null,
+      pages_found: 40,
+      pages_done: 12,
+    });
 
     signInAs(owner);
 
     const response = await POST(request(id), context(id));
 
     expect(response.status).toBe(409);
-    await expect(response.json()).resolves.toEqual({ error: 'This source is being indexed right now. Wait for it to finish.' });
+    await expect(response.json()).resolves.toEqual({
+      error: 'This source is being indexed right now. Wait for it to finish.',
+    });
     expect(await loadSource(id)).toMatchObject({ status: 'indexing', pages_done: 12 });
     expect(after).not.toHaveBeenCalled();
   });
 
   it('starts over a run that stopped moving', async () => {
     const stale = new Date(Date.now() - STALE_RUN_MS - 60_000).toISOString();
-    const id = await addSource({ status: 'crawling', error: null, pages_found: 5, pages_done: 0, updated_at: stale });
+    const id = await addSource({
+      status: 'crawling',
+      error: null,
+      pages_found: 5,
+      pages_done: 0,
+      updated_at: stale,
+    });
 
     signInAs(owner);
 
@@ -154,7 +193,10 @@ describe.skipIf(!hasLocalDb)('POST /api/sources/[id]/reindex', () => {
 
     signInAs(owner);
 
-    const responses = await Promise.all([POST(request(id), context(id)), POST(request(id), context(id))]);
+    const responses = await Promise.all([
+      POST(request(id), context(id)),
+      POST(request(id), context(id)),
+    ]);
 
     expect(responses.map((response) => response.status).sort()).toEqual([202, 409]);
     expect(after).toHaveBeenCalledTimes(1);

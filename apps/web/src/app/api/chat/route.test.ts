@@ -4,7 +4,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const session = vi.hoisted(() => ({
   user: null as { id: string } | null,
-  assistant: null as { id: string; owner_id: string; name: string; instructions: string | null } | null,
+  assistant: null as {
+    id: string;
+    owner_id: string;
+    name: string;
+    instructions: string | null;
+  } | null,
 }));
 
 const engine = vi.hoisted(() => ({
@@ -25,7 +30,9 @@ vi.mock('@/lib/session', () => ({
   })),
 }));
 
-vi.mock('@/lib/supabase/service', () => ({ createSupabaseServiceClient: () => ({ service: true }) }));
+vi.mock('@/lib/supabase/service', () => ({
+  createSupabaseServiceClient: () => ({ service: true }),
+}));
 vi.mock('@/lib/ai', () => ({ getAiProvider: () => ({ name: 'stub' }) }));
 
 vi.mock('@/lib/engine', async (importOriginal) => {
@@ -63,7 +70,12 @@ describe('POST /api/chat', () => {
     session.user = { id: 'user-1' };
     session.assistant = { id: ASSISTANT, owner_id: 'user-1', name: 'Docs', instructions: null };
     engine.streamAnswer.mockImplementation(async function* () {
-      yield { type: 'meta', conversationId: CONVERSATION, userMessageId: 'u', assistantMessageId: 'a' };
+      yield {
+        type: 'meta',
+        conversationId: CONVERSATION,
+        userMessageId: 'u',
+        assistantMessageId: 'a',
+      };
       yield { type: 'token', text: 'Hello' };
       yield { type: 'done', answered: true, latencyMs: 5 };
     });
@@ -75,53 +87,109 @@ describe('POST /api/chat', () => {
 
     expect(response.status).toBe(400);
     expect(response.headers.get('content-type')).toContain('text/event-stream');
-    expect(await events(response)).toEqual([{ type: 'error', code: 'bad_request', message: expect.any(String) }]);
+    expect(await events(response)).toEqual([
+      { type: 'error', code: 'bad_request', message: expect.any(String) },
+    ]);
   });
 
   it('validates ids and the message length, naming what was wrong', async () => {
-    const badAssistant = await post({ assistantId: 'x', conversationId: CONVERSATION, message: 'hi' });
-    const badConversation = await post({ assistantId: ASSISTANT, conversationId: 'nope', message: 'hi' });
-    const empty = await post({ assistantId: ASSISTANT, conversationId: CONVERSATION, message: '   ' });
-    const long = await post({ assistantId: ASSISTANT, conversationId: CONVERSATION, message: 'x'.repeat(2001) });
+    const badAssistant = await post({
+      assistantId: 'x',
+      conversationId: CONVERSATION,
+      message: 'hi',
+    });
+    const badConversation = await post({
+      assistantId: ASSISTANT,
+      conversationId: 'nope',
+      message: 'hi',
+    });
+    const empty = await post({
+      assistantId: ASSISTANT,
+      conversationId: CONVERSATION,
+      message: '   ',
+    });
+    const long = await post({
+      assistantId: ASSISTANT,
+      conversationId: CONVERSATION,
+      message: 'x'.repeat(2001),
+    });
 
-    expect([badAssistant.status, badConversation.status, empty.status, long.status]).toEqual([400, 400, 400, 400]);
-    expect((await events(badAssistant))[0]).toMatchObject({ code: 'bad_request', message: expect.stringMatching(/assistant link/) });
-    expect((await events(badConversation))[0]).toMatchObject({ code: 'bad_request', message: 'That conversation link is not valid. Start a new chat.' });
-    expect((await events(empty))[0]).toMatchObject({ message: 'Ask something between 1 and 2,000 characters.' });
-    expect((await events(long))[0]).toMatchObject({ message: 'Ask something between 1 and 2,000 characters.' });
+    expect([badAssistant.status, badConversation.status, empty.status, long.status]).toEqual([
+      400, 400, 400, 400,
+    ]);
+    expect((await events(badAssistant))[0]).toMatchObject({
+      code: 'bad_request',
+      message: expect.stringMatching(/assistant link/),
+    });
+    expect((await events(badConversation))[0]).toMatchObject({
+      code: 'bad_request',
+      message: 'That conversation link is not valid. Start a new chat.',
+    });
+    expect((await events(empty))[0]).toMatchObject({
+      message: 'Ask something between 1 and 2,000 characters.',
+    });
+    expect((await events(long))[0]).toMatchObject({
+      message: 'Ask something between 1 and 2,000 characters.',
+    });
     expect(engine.streamAnswer).not.toHaveBeenCalled();
   });
 
   it('answers 401 as an event when signed out', async () => {
     session.user = null;
 
-    const response = await post({ assistantId: ASSISTANT, conversationId: CONVERSATION, message: 'hi' });
+    const response = await post({
+      assistantId: ASSISTANT,
+      conversationId: CONVERSATION,
+      message: 'hi',
+    });
 
     expect(response.status).toBe(401);
-    expect(await events(response)).toEqual([{ type: 'error', code: 'unauthorized', message: expect.any(String) }]);
+    expect(await events(response)).toEqual([
+      { type: 'error', code: 'unauthorized', message: expect.any(String) },
+    ]);
   });
 
-  it('answers 404 when the assistant is not the visitor\'s', async () => {
+  it("answers 404 when the assistant is not the visitor's", async () => {
     session.assistant = null;
 
-    const response = await post({ assistantId: ASSISTANT, conversationId: CONVERSATION, message: 'hi' });
+    const response = await post({
+      assistantId: ASSISTANT,
+      conversationId: CONVERSATION,
+      message: 'hi',
+    });
 
     expect(response.status).toBe(404);
-    expect(await events(response)).toEqual([{ type: 'error', code: 'not_found', message: expect.any(String) }]);
+    expect(await events(response)).toEqual([
+      { type: 'error', code: 'not_found', message: expect.any(String) },
+    ]);
   });
 
   it('rate limits per user', async () => {
     engine.rateLimit.mockReturnValue({ allowed: false, remaining: 0, retryAfterMs: 4200 });
 
-    const response = await post({ assistantId: ASSISTANT, conversationId: CONVERSATION, message: 'hi' });
+    const response = await post({
+      assistantId: ASSISTANT,
+      conversationId: CONVERSATION,
+      message: 'hi',
+    });
 
     expect(response.status).toBe(429);
     expect(engine.rateLimit).toHaveBeenCalledWith('chat:user-1', { limit: 30, windowMs: 60_000 });
-    expect(await events(response)).toEqual([{ type: 'error', code: 'rate_limited', message: 'You are sending messages quickly. Try again in 5 seconds.' }]);
+    expect(await events(response)).toEqual([
+      {
+        type: 'error',
+        code: 'rate_limited',
+        message: 'You are sending messages quickly. Try again in 5 seconds.',
+      },
+    ]);
   });
 
-  it('streams the engine\'s events for a valid request', async () => {
-    const response = await post({ assistantId: ASSISTANT, conversationId: CONVERSATION, message: '  How do I rotate a key?  ' });
+  it("streams the engine's events for a valid request", async () => {
+    const response = await post({
+      assistantId: ASSISTANT,
+      conversationId: CONVERSATION,
+      message: '  How do I rotate a key?  ',
+    });
 
     expect(response.status).toBe(200);
     expect(await events(response)).toEqual([

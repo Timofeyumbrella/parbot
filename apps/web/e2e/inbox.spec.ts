@@ -20,13 +20,21 @@ const admin = (): SupabaseClient => {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!url || !key) {
-    throw new Error('NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are needed to seed the inbox spec.');
+    throw new Error(
+      'NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are needed to seed the inbox spec.',
+    );
   }
 
   return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
 };
 
-const must = <T>({ data, error }: { data: T; error: { message: string } | null }): NonNullable<T> => {
+const must = <T>({
+  data,
+  error,
+}: {
+  data: T;
+  error: { message: string } | null;
+}): NonNullable<T> => {
   if (error || data === null || data === undefined) {
     throw new Error(error?.message ?? 'The seed query returned nothing.');
   }
@@ -34,7 +42,11 @@ const must = <T>({ data, error }: { data: T; error: { message: string } | null }
   return data;
 };
 
-const QUESTIONS = ['How do I rotate an API key?', 'How are webhooks signed?', 'Which plan includes the palette mode?'];
+const QUESTIONS = [
+  'How do I rotate an API key?',
+  'How are webhooks signed?',
+  'Which plan includes the palette mode?',
+];
 const OLD_QUESTION = 'Do you support JavaScript-rendered docs sites?';
 
 const AUTH_DOC = crypto.randomUUID();
@@ -42,19 +54,48 @@ const NOTES_DOC = crypto.randomUUID();
 
 /** Passages 2 and 5 come from the same page; 1 and 4 were retrieved but not cited. */
 const CITED_ANSWER = {
-  content: 'Create the key under Settings [2]. Rotate it every month [3]. A key only reaches what its scopes allow [5].',
+  content:
+    'Create the key under Settings [2]. Rotate it every month [3]. A key only reaches what its scopes allow [5].',
   citations: [
-    { index: 2, documentId: AUTH_DOC, title: 'Authentication', url: 'https://docs.acme.test/auth', snippet: 'API keys are created in Settings.' },
-    { index: 3, documentId: NOTES_DOC, title: 'Pasted notes', url: null, snippet: 'Rotate keys monthly.' },
-    { index: 5, documentId: AUTH_DOC, title: 'Authentication', url: 'https://docs.acme.test/auth', snippet: 'Each key carries scopes.' },
+    {
+      index: 2,
+      documentId: AUTH_DOC,
+      title: 'Authentication',
+      url: 'https://docs.acme.test/auth',
+      snippet: 'API keys are created in Settings.',
+    },
+    {
+      index: 3,
+      documentId: NOTES_DOC,
+      title: 'Pasted notes',
+      url: null,
+      snippet: 'Rotate keys monthly.',
+    },
+    {
+      index: 5,
+      documentId: AUTH_DOC,
+      title: 'Authentication',
+      url: 'https://docs.acme.test/auth',
+      snippet: 'Each key carries scopes.',
+    },
   ],
 };
 
-type Seed = { userId: string; email: string; assistantId: string; citedConversationId: string; citedMessageId: string };
+type Seed = {
+  userId: string;
+  email: string;
+  assistantId: string;
+  citedConversationId: string;
+  citedMessageId: string;
+};
 
 const seed = async (service: SupabaseClient): Promise<Seed> => {
   const email = `inbox-e2e-${unique()}@parbot.test`;
-  const { data: created, error } = await service.auth.admin.createUser({ email, password: PASSWORD, email_confirm: true });
+  const { data: created, error } = await service.auth.admin.createUser({
+    email,
+    password: PASSWORD,
+    email_confirm: true,
+  });
 
   if (error || !created.user) {
     throw new Error(error?.message ?? 'The throwaway account could not be created.');
@@ -75,13 +116,21 @@ const seed = async (service: SupabaseClient): Promise<Seed> => {
   const asked = must(
     await service
       .from('conversations')
-      .insert(Array.from({ length: 33 }, (_, index) => ({ assistant_id: assistantId, owner_id: userId, title: `Asked ${index}` })))
+      .insert(
+        Array.from({ length: 33 }, (_, index) => ({
+          assistant_id: assistantId,
+          owner_id: userId,
+          title: `Asked ${index}`,
+        })),
+      )
       .select('id'),
   );
 
   // One question well over a week old, so its row in Top questions shows a date instead of "3 days ago".
   const questionAt = (index: number) =>
-    new Date(index === asked.length - 1 ? now - 10 * DAY : now - (index + 5) * MINUTE).toISOString();
+    new Date(
+      index === asked.length - 1 ? now - 10 * DAY : now - (index + 5) * MINUTE,
+    ).toISOString();
 
   must(
     await service
@@ -121,14 +170,25 @@ const seed = async (service: SupabaseClient): Promise<Seed> => {
   must(
     await service
       .from('conversations')
-      .insert(Array.from({ length: 3 }, (_, index) => ({ assistant_id: assistantId, owner_id: userId, title: `Started only ${index}` })))
+      .insert(
+        Array.from({ length: 3 }, (_, index) => ({
+          assistant_id: assistantId,
+          owner_id: userId,
+          title: `Started only ${index}`,
+        })),
+      )
       .select('id'),
   );
 
   const cited = must(
     await service
       .from('conversations')
-      .insert({ assistant_id: assistantId, owner_id: userId, title: 'Rotating keys', created_at: new Date(now - 3 * DAY).toISOString() })
+      .insert({
+        assistant_id: assistantId,
+        owner_id: userId,
+        title: 'Rotating keys',
+        created_at: new Date(now - 3 * DAY).toISOString(),
+      })
       .select('id')
       .single(),
   );
@@ -142,7 +202,13 @@ const seed = async (service: SupabaseClient): Promise<Seed> => {
   must(
     await service
       .from('messages')
-      .insert(message({ role: 'user', content: 'How do I rotate a key?', created_at: new Date(now - 3 * DAY).toISOString() }))
+      .insert(
+        message({
+          role: 'user',
+          content: 'How do I rotate a key?',
+          created_at: new Date(now - 3 * DAY).toISOString(),
+        }),
+      )
       .select('id')
       .single(),
   );
@@ -163,7 +229,13 @@ const seed = async (service: SupabaseClient): Promise<Seed> => {
       .single(),
   );
 
-  return { userId, email, assistantId, citedConversationId: cited.id as string, citedMessageId: answer.id as string };
+  return {
+    userId,
+    email,
+    assistantId,
+    citedConversationId: cited.id as string,
+    citedMessageId: answer.id as string,
+  };
 };
 
 const signIn = async (page: Page, email: string, next: string) => {
@@ -212,7 +284,8 @@ test.describe('the inbox and the overview', () => {
     await page.goto(`/a/${seeded.assistantId}/inbox`);
 
     const rows = page.getByTestId('conversation-list').locator('li[data-conversation-id]');
-    const shown = () => rows.evaluateAll((items) => items.map((item) => item.getAttribute('data-conversation-id')));
+    const shown = () =>
+      rows.evaluateAll((items) => items.map((item) => item.getAttribute('data-conversation-id')));
 
     await expect(rows).toHaveCount(30);
     expect(await shown()).toEqual(expected.slice(0, 30));
@@ -230,8 +303,14 @@ test.describe('the inbox and the overview', () => {
 
     // Every marker becomes a chip, including 5 although only three passages were cited.
     await expect(answer.locator('sup[data-citation]')).toHaveText(['2', '3', '5']);
-    await expect(answer.locator('sup[data-citation="5"] a')).toHaveAttribute('href', 'https://docs.acme.test/auth');
-    await expect(answer.locator('sup[data-citation="3"] a')).toHaveAttribute('href', `#sources-${seeded.citedMessageId}`);
+    await expect(answer.locator('sup[data-citation="5"] a')).toHaveAttribute(
+      'href',
+      'https://docs.acme.test/auth',
+    );
+    await expect(answer.locator('sup[data-citation="3"] a')).toHaveAttribute(
+      'href',
+      `#sources-${seeded.citedMessageId}`,
+    );
 
     const sources = answer.getByTestId('sources');
 
@@ -267,7 +346,10 @@ test.describe('the inbox and the overview', () => {
 
               range.selectNodeContents(element);
 
-              return { rect: range.getBoundingClientRect(), fits: element.scrollWidth <= element.clientWidth };
+              return {
+                rect: range.getBoundingClientRect(),
+                fits: element.scrollWidth <= element.clientWidth,
+              };
             };
             const count = text(item.querySelector('[title^="Asked"]')!);
             const time = text(item.querySelector('time')!);

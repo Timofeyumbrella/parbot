@@ -22,8 +22,14 @@ describe.skipIf(!live)('Gemini provider against the live API', () => {
   it('embeds documents and a query into the same space at the configured size', async () => {
     const [keys, webhooks] = await provider.embed(
       [
-        { title: 'Authentication', text: 'API keys are created in Settings. Rotate a key from the same screen.' },
-        { title: 'Webhooks', text: 'Webhooks deliver events as JSON with a signature header you must verify.' },
+        {
+          title: 'Authentication',
+          text: 'API keys are created in Settings. Rotate a key from the same screen.',
+        },
+        {
+          title: 'Webhooks',
+          text: 'Webhooks deliver events as JSON with a signature header you must verify.',
+        },
       ],
       'document',
     );
@@ -32,7 +38,8 @@ describe.skipIf(!live)('Gemini provider against the live API', () => {
     expect(keys).toHaveLength(EMBEDDING_DIMENSIONS);
     expect(query).toHaveLength(EMBEDDING_DIMENSIONS);
 
-    const dot = (a: number[], b: number[]) => a.reduce((sum, value, index) => sum + value * b[index]!, 0);
+    const dot = (a: number[], b: number[]) =>
+      a.reduce((sum, value, index) => sum + value * b[index]!, 0);
     const norm = Math.sqrt(dot(keys!, keys!));
 
     expect(norm).toBeCloseTo(1, 2);
@@ -70,7 +77,9 @@ describe.skipIf(!live)('Gemini provider against the live API', () => {
 
     const text = chunks.join('');
 
-    console.info(`model=${result.model} prompt=${result.promptTokens} completion=${result.completionTokens} chunks=${chunks.length}\n${text}`);
+    console.info(
+      `model=${result.model} prompt=${result.promptTokens} completion=${result.completionTokens} chunks=${chunks.length}\n${text}`,
+    );
 
     expect(chunks.length).toBeGreaterThan(0);
     expect(text).toMatch(/\[1\]/);

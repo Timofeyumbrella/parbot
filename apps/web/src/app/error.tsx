@@ -17,7 +17,9 @@ export default function RootError({
 
   return (
     <main className="flex flex-1 flex-col items-center justify-center gap-4 p-8 text-center">
-      <p className="text-muted-foreground font-mono text-xs uppercase tracking-widest">Something broke</p>
+      <p className="text-muted-foreground font-mono text-xs uppercase tracking-widest">
+        Something broke
+      </p>
       <h1 className="text-2xl font-semibold tracking-tight">This screen could not be shown</h1>
       <p className="text-muted-foreground max-w-sm text-sm">
         {error.message || 'An unexpected error happened.'}

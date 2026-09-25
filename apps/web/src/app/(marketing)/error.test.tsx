@@ -17,7 +17,9 @@ describe('marketing error boundary', () => {
 
     render(<MarketingError error={error} retry={retry} reset={reset} />);
 
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('This page could not be loaded.');
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
+      'This page could not be loaded.',
+    );
     expect(screen.getByText(/reference abc123/)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Sign in' })).toHaveAttribute('href', '/login');
 

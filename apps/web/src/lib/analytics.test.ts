@@ -80,7 +80,14 @@ describe('bucketDaily', () => {
 
   it('ignores rows outside the range and tolerates timestamps as keys', () => {
     const rows = bucketDaily(
-      [{ day: '2026-09-23T00:00:00+00:00', questions: '4' as unknown as number, answered: 4, unanswered: 0 }],
+      [
+        {
+          day: '2026-09-23T00:00:00+00:00',
+          questions: '4' as unknown as number,
+          answered: 4,
+          unanswered: 0,
+        },
+      ],
       periodStart(2, NOW),
       2,
     );

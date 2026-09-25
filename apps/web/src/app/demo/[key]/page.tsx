@@ -122,7 +122,7 @@ export default async function DemoPage({ params, searchParams }: PageProps<'/dem
 
         <main className="flex max-w-2xl flex-col gap-8">
           <div className="flex flex-col gap-3">
-            <p className="text-primary text-xs font-medium tracking-widest uppercase">
+            <p className="text-primary text-xs font-medium uppercase tracking-widest">
               Parbot demo
             </p>
             <h1 className="text-3xl font-semibold tracking-tight">

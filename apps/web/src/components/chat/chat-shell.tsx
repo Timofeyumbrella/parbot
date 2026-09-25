@@ -44,8 +44,13 @@ export const ChatShell = ({ assistantId, list, children }: ChatShellProps) => {
   const sheetPane = useMemo<ChatPane>(() => ({ onNavigate: () => setOpenedOn(false) }), []);
 
   return (
-    <div className="flex h-[calc(100svh-3rem)] w-full overflow-hidden md:h-svh" data-testid="chat-shell">
-      <aside className="bg-sidebar/40 hidden w-70 shrink-0 border-r md:flex md:flex-col">{list}</aside>
+    <div
+      className="flex h-[calc(100svh-3rem)] w-full overflow-hidden md:h-svh"
+      data-testid="chat-shell"
+    >
+      <aside className="bg-sidebar/40 w-70 hidden shrink-0 border-r md:flex md:flex-col">
+        {list}
+      </aside>
 
       <section className="flex min-w-0 flex-1 flex-col">
         <div className="flex h-11 shrink-0 items-center gap-1 border-b px-2 md:hidden">

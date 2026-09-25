@@ -12,7 +12,8 @@ export type ExtractedDocument = {
 };
 
 /** Content identity for re-indexing: the same Markdown always maps to the same checksum. */
-export const checksumOf = (markdown: string) => createHash('sha256').update(markdown, 'utf8').digest('hex');
+export const checksumOf = (markdown: string) =>
+  createHash('sha256').update(markdown, 'utf8').digest('hex');
 
 const decode = (bytes: Uint8Array) => new TextDecoder('utf-8').decode(bytes).replace(/^﻿/, '');
 
@@ -31,8 +32,10 @@ export const markdownTitle = (markdown: string) => {
   return match?.[1]?.trim() || null;
 };
 
-const PDF_UNREADABLE = 'This PDF could not be read. It may be damaged or password protected; export it again and upload it once more.';
-const DOCX_UNREADABLE = 'This Word file could not be read. Open it in Word, save it as .docx and upload it once more.';
+const PDF_UNREADABLE =
+  'This PDF could not be read. It may be damaged or password protected; export it again and upload it once more.';
+const DOCX_UNREADABLE =
+  'This Word file could not be read. Open it in Word, save it as .docx and upload it once more.';
 
 const extractPdf = async (bytes: Uint8Array): Promise<ExtractedDocument> => {
   const { extractText, getDocumentProxy, getMeta } = await import('unpdf');
@@ -84,7 +87,10 @@ const extractDocx = async (bytes: Uint8Array): Promise<ExtractedDocument> => {
  * Turns an uploaded file into Markdown. PDF text comes out flat; DOCX and HTML go through the
  * HTML pipeline so their headings survive; Markdown and plain text are taken as they are.
  */
-export const extractUpload = async (bytes: Uint8Array, type: UploadType): Promise<ExtractedDocument> => {
+export const extractUpload = async (
+  bytes: Uint8Array,
+  type: UploadType,
+): Promise<ExtractedDocument> => {
   switch (type) {
     case 'pdf':
       return extractPdf(bytes);

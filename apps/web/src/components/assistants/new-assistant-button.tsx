@@ -7,7 +7,13 @@ import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import type { CapacityVerdict } from '@/lib/plans';
 
-export const NewAssistantButton = ({ capacity, planName }: { capacity: CapacityVerdict; planName: string }) => {
+export const NewAssistantButton = ({
+  capacity,
+  planName,
+}: {
+  capacity: CapacityVerdict;
+  planName: string;
+}) => {
   if (capacity.allowed) {
     return (
       <Button asChild>
@@ -32,8 +38,8 @@ export const NewAssistantButton = ({ capacity, planName }: { capacity: CapacityV
           </span>
         </TooltipTrigger>
         <TooltipContent side="bottom">
-          The {planName} plan includes {capacity.limit} {capacity.limit === 1 ? 'assistant' : 'assistants'}. Upgrade
-          to add more.
+          The {planName} plan includes {capacity.limit}{' '}
+          {capacity.limit === 1 ? 'assistant' : 'assistants'}. Upgrade to add more.
         </TooltipContent>
       </Tooltip>
       <Button asChild variant="outline">

@@ -26,7 +26,9 @@ describe('AnswerMarkdown', () => {
     render(
       <AnswerMarkdown
         content={'Open **Settings** [1].\n\n```bash\nacme keys rotate\n```'}
-        citations={[{ index: 1, title: 'Authentication › API keys', url: 'https://docs.acme.dev/auth' }]}
+        citations={[
+          { index: 1, title: 'Authentication › API keys', url: 'https://docs.acme.dev/auth' },
+        ]}
       />,
     );
 
@@ -39,14 +41,21 @@ describe('AnswerMarkdown', () => {
   });
 
   it('renders a plain chip when the citation has no url', () => {
-    render(<AnswerMarkdown content="See [2]." citations={[{ index: 2, title: 'Pasted notes', url: null }]} />);
+    render(
+      <AnswerMarkdown
+        content="See [2]."
+        citations={[{ index: 2, title: 'Pasted notes', url: null }]}
+      />,
+    );
 
     expect(screen.queryByRole('link')).not.toBeInTheDocument();
     expect(screen.getByText('2')).toBeInTheDocument();
   });
 
   it('opens ordinary links in a new tab', () => {
-    render(<AnswerMarkdown content="Read the [guide](https://docs.acme.dev/guide)." citations={[]} />);
+    render(
+      <AnswerMarkdown content="Read the [guide](https://docs.acme.dev/guide)." citations={[]} />,
+    );
 
     const link = screen.getByRole('link', { name: 'guide' });
 

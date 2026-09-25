@@ -7,7 +7,13 @@ import { useId, useRef, useState } from 'react';
 import { addSource } from '@/actions/sources';
 import { FormField, FormMessage } from '@/components/auth/form-field';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
@@ -15,7 +21,14 @@ import type { Source } from '@/lib/db';
 import { fieldErrorsOf } from '@/lib/form';
 import { labelForUrl } from '@/lib/ingest/label';
 import { firstIssue, sourceInputSchema } from '@/lib/ingest/schema';
-import { formatBytes, MAX_UPLOAD_BYTES, UPLOAD_ACCEPT, UPLOAD_TYPES, UPLOAD_TYPES_LABEL, uploadTypeFor } from '@/lib/uploads';
+import {
+  formatBytes,
+  MAX_UPLOAD_BYTES,
+  UPLOAD_ACCEPT,
+  UPLOAD_TYPES,
+  UPLOAD_TYPES_LABEL,
+  uploadTypeFor,
+} from '@/lib/uploads';
 
 import { optimisticSource } from './optimistic';
 
@@ -23,11 +36,21 @@ export type AddSourceTab = 'url' | 'sitemap' | 'upload' | 'text';
 
 type RemoteOrTextKind = Exclude<AddSourceTab, 'upload'>;
 
-export const ADD_SOURCE_TABS: { id: AddSourceTab; label: string; icon: LucideIcon; blurb: string }[] = [
+export const ADD_SOURCE_TABS: {
+  id: AddSourceTab;
+  label: string;
+  icon: LucideIcon;
+  blurb: string;
+}[] = [
   { id: 'url', label: 'Website', icon: Globe, blurb: 'Crawl a docs site from a start page.' },
   { id: 'sitemap', label: 'Sitemap', icon: Map, blurb: 'Index every page a sitemap lists.' },
   { id: 'upload', label: 'Upload', icon: FileText, blurb: `${UPLOAD_TYPES_LABEL}.` },
-  { id: 'text', label: 'Paste text', icon: TextAlignStart, blurb: 'Notes, FAQs, anything in plain text.' },
+  {
+    id: 'text',
+    label: 'Paste text',
+    icon: TextAlignStart,
+    blurb: 'Notes, FAQs, anything in plain text.',
+  },
 ];
 
 export type AddSourceDialogProps = {
@@ -44,7 +67,14 @@ export type AddSourceDialogProps = {
 };
 
 /** What has been typed on each tab. Kept while the dialog is closed so nothing is lost. */
-type Drafts = { url: string; sitemap: string; textTitle: string; text: string; uploadTitle: string; file: File | null };
+type Drafts = {
+  url: string;
+  sitemap: string;
+  textTitle: string;
+  text: string;
+  uploadTitle: string;
+  file: File | null;
+};
 
 type Field = 'url' | 'title' | 'text' | 'file';
 
@@ -56,11 +86,23 @@ type TabErrors = { form?: string; fields?: Partial<Record<Field, string>> };
 
 type Errors = Partial<Record<AddSourceTab, TabErrors>>;
 
-const EMPTY_DRAFTS: Drafts = { url: '', sitemap: '', textTitle: '', text: '', uploadTitle: '', file: null };
+const EMPTY_DRAFTS: Drafts = {
+  url: '',
+  sitemap: '',
+  textTitle: '',
+  text: '',
+  uploadTitle: '',
+  file: null,
+};
 
-export const UPLOAD_FAILED_OFFLINE = 'The upload did not go through. Check your connection and try again.';
+export const UPLOAD_FAILED_OFFLINE =
+  'The upload did not go through. Check your connection and try again.';
 
-const submitLabel: Record<RemoteOrTextKind, string> = { url: 'Add website', sitemap: 'Add sitemap', text: 'Add text' };
+const submitLabel: Record<RemoteOrTextKind, string> = {
+  url: 'Add website',
+  sitemap: 'Add sitemap',
+  text: 'Add text',
+};
 
 type RemoteOrTextFormProps = {
   kind: RemoteOrTextKind;
@@ -131,7 +173,11 @@ const RemoteOrTextForm = ({ kind, drafts, errors, onDraft, onSubmit }: RemoteOrT
             value={drafts[kind]}
             onChange={(event) => onDraft({ [kind]: event.target.value })}
             autoFocus
-            placeholder={kind === 'url' ? 'https://docs.example.com/guide/' : 'https://docs.example.com/sitemap.xml'}
+            placeholder={
+              kind === 'url'
+                ? 'https://docs.example.com/guide/'
+                : 'https://docs.example.com/sitemap.xml'
+            }
           />
         )}
       </FormField>
@@ -208,7 +254,11 @@ const UploadForm = ({ drafts, errors, onDraft, onFileError, onSubmit }: UploadFo
         }}
         className={cn(
           'flex flex-col items-center gap-2 rounded-lg border border-dashed px-4 py-6 text-center transition-colors',
-          dragging ? 'border-primary bg-primary/5' : fileError ? 'border-destructive' : 'border-border',
+          dragging
+            ? 'border-primary bg-primary/5'
+            : fileError
+              ? 'border-destructive'
+              : 'border-border',
         )}
       >
         <Upload className="text-muted-foreground size-5" aria-hidden="true" />
@@ -284,7 +334,8 @@ export const AddSourceDialog = ({
   const [drafts, setDrafts] = useState<Drafts>(EMPTY_DRAFTS);
   const [errors, setErrors] = useState<Errors>({});
 
-  const patchDrafts = (patch: Partial<Drafts>) => setDrafts((current) => ({ ...current, ...patch }));
+  const patchDrafts = (patch: Partial<Drafts>) =>
+    setDrafts((current) => ({ ...current, ...patch }));
   const setError = (kind: AddSourceTab, error: TabErrors | undefined) =>
     setErrors((current) => ({ ...current, [kind]: error }));
 
@@ -307,7 +358,12 @@ export const AddSourceDialog = ({
     if (!parsed.success) {
       const { url, title, text } = fieldErrorsOf<string>(parsed.error);
 
-      setError(kind, url || title || text ? { fields: { url, title, text } } : { form: firstIssue(parsed.error) });
+      setError(
+        kind,
+        url || title || text
+          ? { fields: { url, title, text } }
+          : { form: firstIssue(parsed.error) },
+      );
 
       return;
     }
@@ -401,10 +457,17 @@ export const AddSourceDialog = ({
 
     try {
       const response = await fetch('/api/sources', { method: 'POST', body });
-      const payload = (await response.json().catch(() => null)) as { source?: Source; error?: string } | null;
+      const payload = (await response.json().catch(() => null)) as {
+        source?: Source;
+        error?: string;
+      } | null;
 
       if (!response.ok || !payload?.source) {
-        refuse('upload', id, payload?.error ?? `The upload failed (HTTP ${response.status}). Try again.`);
+        refuse(
+          'upload',
+          id,
+          payload?.error ?? `The upload failed (HTTP ${response.status}). Try again.`,
+        );
 
         return;
       }
@@ -421,7 +484,9 @@ export const AddSourceDialog = ({
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Add source</DialogTitle>
-          <DialogDescription>Parbot reads it, splits it into passages and answers from them with citations.</DialogDescription>
+          <DialogDescription>
+            Parbot reads it, splits it into passages and answers from them with citations.
+          </DialogDescription>
         </DialogHeader>
 
         <Tabs value={tab} onValueChange={(value) => onTabChange(value as AddSourceTab)}>
@@ -450,7 +515,9 @@ export const AddSourceDialog = ({
               drafts={drafts}
               errors={errors.upload}
               onDraft={patchDrafts}
-              onFileError={(message) => setError('upload', message ? { fields: { file: message } } : undefined)}
+              onFileError={(message) =>
+                setError('upload', message ? { fields: { file: message } } : undefined)
+              }
               onSubmit={() => void submitUpload()}
             />
           </TabsContent>

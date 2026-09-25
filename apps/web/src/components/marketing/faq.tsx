@@ -64,7 +64,9 @@ export const Faq = ({ demoKey }: { demoKey: string | null }) => (
                   aria-hidden="true"
                 />
               </summary>
-              <p className="text-muted-foreground mt-3 max-w-2xl text-sm leading-relaxed">{item.answer}</p>
+              <p className="text-muted-foreground mt-3 max-w-2xl text-sm leading-relaxed">
+                {item.answer}
+              </p>
             </details>
           ))}
         </div>

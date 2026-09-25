@@ -5,7 +5,10 @@
 
 export type UploadType = 'pdf' | 'txt' | 'md' | 'html' | 'docx';
 
-export const UPLOAD_TYPES: Record<UploadType, { mime: string; extensions: string[]; label: string }> = {
+export const UPLOAD_TYPES: Record<
+  UploadType,
+  { mime: string; extensions: string[]; label: string }
+> = {
   pdf: { mime: 'application/pdf', extensions: ['pdf'], label: 'PDF' },
   txt: { mime: 'text/plain', extensions: ['txt', 'text'], label: 'Text' },
   md: { mime: 'text/markdown', extensions: ['md', 'markdown', 'mdx'], label: 'Markdown' },
@@ -48,7 +51,10 @@ export const extensionOf = (fileName: string) => {
 export const uploadTypeFor = (fileName: string, mimeType?: string | null): UploadType | null => {
   const extension = extensionOf(fileName);
 
-  for (const [type, spec] of Object.entries(UPLOAD_TYPES) as [UploadType, (typeof UPLOAD_TYPES)[UploadType]][]) {
+  for (const [type, spec] of Object.entries(UPLOAD_TYPES) as [
+    UploadType,
+    (typeof UPLOAD_TYPES)[UploadType],
+  ][]) {
     if (spec.extensions.includes(extension)) {
       return type;
     }
@@ -60,7 +66,10 @@ export const uploadTypeFor = (fileName: string, mimeType?: string | null): Uploa
     return MIME_ALIASES[mime]!;
   }
 
-  for (const [type, spec] of Object.entries(UPLOAD_TYPES) as [UploadType, (typeof UPLOAD_TYPES)[UploadType]][]) {
+  for (const [type, spec] of Object.entries(UPLOAD_TYPES) as [
+    UploadType,
+    (typeof UPLOAD_TYPES)[UploadType],
+  ][]) {
     if (spec.mime === mime) {
       return type;
     }
@@ -85,4 +94,5 @@ export const formatBytes = (bytes: number) => {
 export const storagePathFor = (ownerId: string, assistantId: string, extension: string) =>
   `${ownerId}/${assistantId}/${crypto.randomUUID()}.${extension}`;
 
-export const fileNameFromPath = (storagePath: string) => storagePath.split('/').pop() ?? storagePath;
+export const fileNameFromPath = (storagePath: string) =>
+  storagePath.split('/').pop() ?? storagePath;

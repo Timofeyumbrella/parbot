@@ -39,7 +39,9 @@ export const PagesMeter = ({ used, plan, className }: PagesMeterProps) => {
       />
       {nearLimit ? (
         <Link href="/billing" className="text-foreground underline-offset-4 hover:underline">
-          {atLimit ? 'Page limit reached. Upgrade on Billing' : 'Close to the limit. See plans on Billing'}
+          {atLimit
+            ? 'Page limit reached. Upgrade on Billing'
+            : 'Close to the limit. See plans on Billing'}
         </Link>
       ) : null}
     </div>

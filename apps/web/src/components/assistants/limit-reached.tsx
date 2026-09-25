@@ -15,11 +15,12 @@ export const LimitReached = ({ plan, capacity }: { plan: Plan; capacity: Capacit
         </span>
         <div className="flex flex-col gap-1">
           <CardTitle>
-            The {plan.name} plan includes {capacity.limit} {capacity.limit === 1 ? 'assistant' : 'assistants'}
+            The {plan.name} plan includes {capacity.limit}{' '}
+            {capacity.limit === 1 ? 'assistant' : 'assistants'}
           </CardTitle>
           <CardDescription>
-            This account already has {capacity.used}. Move to a bigger plan to add another, or delete one you no
-            longer need from its settings.
+            This account already has {capacity.used}. Move to a bigger plan to add another, or
+            delete one you no longer need from its settings.
           </CardDescription>
         </div>
       </div>

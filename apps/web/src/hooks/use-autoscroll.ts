@@ -25,7 +25,8 @@ export const useAutoscroll = (signal: unknown) => {
       return;
     }
 
-    const atBottom = element.scrollHeight - element.scrollTop - element.clientHeight < PIN_THRESHOLD;
+    const atBottom =
+      element.scrollHeight - element.scrollTop - element.clientHeight < PIN_THRESHOLD;
 
     if (atBottom) {
       settlingUntil.current = 0;

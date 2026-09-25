@@ -35,7 +35,10 @@ describe('ScriptedDemo', () => {
 
     expect(screen.getByText('First?')).toBeInTheDocument();
     expect(screen.getByText('First answer', { exact: false })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '1' })).toHaveAttribute('href', 'https://docs.example.com/one');
+    expect(screen.getByRole('link', { name: '1' })).toHaveAttribute(
+      'href',
+      'https://docs.example.com/one',
+    );
     expect(screen.getByText('Demo')).toBeInTheDocument();
   });
 
@@ -69,7 +72,10 @@ describe('ScriptedDemo', () => {
 
     await advanceTo(done + 5);
     expect(screen.getByText('Second answer', { exact: false })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '1' })).toHaveAttribute('href', 'https://docs.example.com/two');
+    expect(screen.getByRole('link', { name: '1' })).toHaveAttribute(
+      'href',
+      'https://docs.example.com/two',
+    );
 
     // After the hold the loop wraps around to the first scene and types it again.
     await advanceTo(done + holdMs + keystrokeMs * 2.5);

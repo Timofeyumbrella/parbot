@@ -15,7 +15,11 @@ export default async function KnowledgePage({ params }: PageProps<'/a/[assistant
   const { supabase, user } = await requireUser();
   const [assistant, sources, { plan }, usage] = await Promise.all([
     getAssistant(assistantId),
-    supabase.from('sources').select('*').eq('assistant_id', assistantId).order('created_at', { ascending: false }),
+    supabase
+      .from('sources')
+      .select('*')
+      .eq('assistant_id', assistantId)
+      .order('created_at', { ascending: false }),
     getAccountPlan(),
     getAccountUsage(),
   ]);

@@ -1,15 +1,15 @@
 # Plans and billing
 
-| | Hobby | Starter | Growth |
-| --- | --- | --- | --- |
-| Price | Free | $29 a month | $99 a month |
-| Assistants | 1 | 3 | 10 |
-| Indexed pages | 100 | 2,000 | 20,000 |
-| Answers a month | 200 | 3,000 | 20,000 |
-| Palette mode | No | Yes | Yes |
-| Custom accent colour | No | Yes | Yes |
-| Lead capture | No | Yes | Yes |
-| Remove "Powered by Parbot" | No | Yes | Yes |
+|                            | Hobby | Starter     | Growth      |
+| -------------------------- | ----- | ----------- | ----------- |
+| Price                      | Free  | $29 a month | $99 a month |
+| Assistants                 | 1     | 3           | 10          |
+| Indexed pages              | 100   | 2,000       | 20,000      |
+| Answers a month            | 200   | 3,000       | 20,000      |
+| Palette mode               | No    | Yes         | Yes         |
+| Custom accent colour       | No    | Yes         | Yes         |
+| Lead capture               | No    | Yes         | Yes         |
+| Remove "Powered by Parbot" | No    | Yes         | Yes         |
 
 Yearly billing costs ten months instead of twelve.
 

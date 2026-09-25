@@ -46,7 +46,10 @@ export const deleteConversation = async (
   if (error) {
     console.error('deleteConversation', error);
 
-    return { error: 'The conversation could not be deleted because the database refused the change. Try again.' };
+    return {
+      error:
+        'The conversation could not be deleted because the database refused the change. Try again.',
+    };
   }
 
   if (!data || data.length === 0) {

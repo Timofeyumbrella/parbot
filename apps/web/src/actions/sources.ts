@@ -40,14 +40,19 @@ const parseSourceId = (sourceId: string) => {
  * The Add source dialog's website, sitemap and pasted-text forms. Uploads post to the API route
  * instead: server actions cap their body at a size a document easily exceeds.
  */
-export const addSource = async (_previous: AddSourceState, form: FormData): Promise<AddSourceState> => {
+export const addSource = async (
+  _previous: AddSourceState,
+  form: FormData,
+): Promise<AddSourceState> => {
   const { supabase, user } = await getSession();
 
   if (!user) {
     return { error: 'Sign in to add a source.' };
   }
 
-  const parsed = sourceInputSchema.safeParse(formFields(form, ['kind', 'assistantId', 'id', 'url', 'title', 'text']));
+  const parsed = sourceInputSchema.safeParse(
+    formFields(form, ['kind', 'assistantId', 'id', 'url', 'title', 'text']),
+  );
 
   if (!parsed.success) {
     return { error: firstIssue(parsed.error) };

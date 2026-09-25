@@ -5,7 +5,13 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { STORAGE_BUCKET } from '@/lib/ingest';
 import { getSession } from '@/lib/session';
 import { storagePathFor } from '@/lib/uploads';
-import { createServiceClient, createTestAccount, deleteTestAccount, hasLocalDb, type TestAccount } from '@/test/local-db';
+import {
+  createServiceClient,
+  createTestAccount,
+  deleteTestAccount,
+  hasLocalDb,
+  type TestAccount,
+} from '@/test/local-db';
 
 import { DELETE } from './route';
 
@@ -15,7 +21,8 @@ vi.mock('next/server', async (importOriginal) => ({
 }));
 vi.mock('@/lib/session', () => ({ getSession: vi.fn() }));
 
-const request = (id: string) => new Request(`http://localhost/api/sources/${id}`, { method: 'DELETE' });
+const request = (id: string) =>
+  new Request(`http://localhost/api/sources/${id}`, { method: 'DELETE' });
 const context = (id: string) => ({ params: Promise.resolve({ id }) });
 
 describe('DELETE /api/sources/[id] when the database fails', () => {
@@ -25,7 +32,12 @@ describe('DELETE /api/sources/[id] when the database fails', () => {
       from: () => ({
         delete: () => ({
           eq: () => ({
-            select: () => ({ maybeSingle: async () => ({ data: null, error: { code: '57014', message: 'canceling statement' } }) }),
+            select: () => ({
+              maybeSingle: async () => ({
+                data: null,
+                error: { code: '57014', message: 'canceling statement' },
+              }),
+            }),
           }),
         }),
       }),
@@ -33,13 +45,18 @@ describe('DELETE /api/sources/[id] when the database fails', () => {
     };
     const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
 
-    vi.mocked(getSession).mockResolvedValue({ supabase: failing, user: { id: crypto.randomUUID() } } as never);
+    vi.mocked(getSession).mockResolvedValue({
+      supabase: failing,
+      user: { id: crypto.randomUUID() },
+    } as never);
 
     const id = crypto.randomUUID();
     const response = await DELETE(request(id), context(id));
 
     expect(response.status).toBe(500);
-    await expect(response.json()).resolves.toEqual({ error: 'The source could not be deleted. Try again in a moment.' });
+    await expect(response.json()).resolves.toEqual({
+      error: 'The source could not be deleted. Try again in a moment.',
+    });
     expect(remove).not.toHaveBeenCalled();
     error.mockRestore();
   });
@@ -53,9 +70,13 @@ describe.skipIf(!hasLocalDb)('DELETE /api/sources/[id]', () => {
   const storagePaths: string[] = [];
 
   const signInAs = (account: TestAccount | null) =>
-    vi.mocked(getSession).mockResolvedValue(
-      (account ? { supabase: account.client, user: { id: account.userId } } : { supabase: {}, user: null }) as never,
-    );
+    vi
+      .mocked(getSession)
+      .mockResolvedValue(
+        (account
+          ? { supabase: account.client, user: { id: account.userId } }
+          : { supabase: {}, user: null }) as never,
+      );
 
   /** An uploaded Markdown file the owner indexed: its row, one page and the object in the bucket. */
   const addIndexedUpload = async () => {
@@ -65,7 +86,9 @@ describe.skipIf(!hasLocalDb)('DELETE /api/sources/[id]', () => {
 
     const { error: uploadError } = await service.storage
       .from(STORAGE_BUCKET)
-      .upload(path, new Blob(['# Guide\n\nRead me.'], { type: 'text/markdown' }), { contentType: 'text/markdown' });
+      .upload(path, new Blob(['# Guide\n\nRead me.'], { type: 'text/markdown' }), {
+        contentType: 'text/markdown',
+      });
 
     if (uploadError) {
       throw new Error(uploadError.message);
@@ -104,7 +127,10 @@ describe.skipIf(!hasLocalDb)('DELETE /api/sources/[id]', () => {
   };
 
   beforeAll(async () => {
-    [owner, stranger] = await Promise.all([createTestAccount(service, 'delete-owner'), createTestAccount(service, 'delete-other')]);
+    [owner, stranger] = await Promise.all([
+      createTestAccount(service, 'delete-owner'),
+      createTestAccount(service, 'delete-other'),
+    ]);
   });
 
   afterAll(async () => {
@@ -140,7 +166,11 @@ describe.skipIf(!hasLocalDb)('DELETE /api/sources/[id]', () => {
     expect(response.status).toBe(404);
     await expect(response.json()).resolves.toEqual({ error: 'That source does not exist.' });
 
-    const { data: row } = await service.from('sources').select('id, document_count').eq('id', id).maybeSingle();
+    const { data: row } = await service
+      .from('sources')
+      .select('id, document_count')
+      .eq('id', id)
+      .maybeSingle();
 
     expect(row).toEqual({ id, document_count: 1 });
     expect(await storedFile(path)).not.toBeNull();

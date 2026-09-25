@@ -10,7 +10,8 @@ const MESSAGES: Record<string, string> = {
   weak_password: `Choose a stronger password with at least ${PASSWORD_MIN_LENGTH} characters.`,
   same_password: 'Choose a password that differs from the current one.',
   over_request_rate_limit: 'Too many attempts. Wait a minute and try again.',
-  over_email_send_rate_limit: 'Too many emails were sent to this address. Wait a while and try again.',
+  over_email_send_rate_limit:
+    'Too many emails were sent to this address. Wait a while and try again.',
   signup_disabled: 'Sign up is switched off at the moment.',
   user_not_found: 'No account uses this email.',
   session_expired: 'Your session expired. Sign in again.',

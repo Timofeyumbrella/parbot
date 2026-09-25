@@ -1,4 +1,9 @@
-import { type ChatStreamEvent, encodeSseEvent, type WidgetConfig, type WidgetScheme } from '@parbot/shared';
+import {
+  type ChatStreamEvent,
+  encodeSseEvent,
+  type WidgetConfig,
+  type WidgetScheme,
+} from '@parbot/shared';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ask, boot, destroy, resetForTests, setScheme } from './boot';
@@ -366,7 +371,9 @@ describe('widget', () => {
     email.value = 'not-an-email';
     send.click();
     expect(hint.textContent).toBe('Check the email address and retry.');
-    expect(fetchMock.mock.calls.some(([url]) => String(url) === `${API}/api/widget/lead`)).toBe(false);
+    expect(fetchMock.mock.calls.some(([url]) => String(url) === `${API}/api/widget/lead`)).toBe(
+      false,
+    );
   });
 
   it('shows an error with retry when the api refuses, and retries', async () => {
@@ -640,7 +647,12 @@ describe('widget', () => {
     expect(document.getElementById('parbot-widget')).toBeNull();
 
     // Its shortcut goes with it: Cmd+K belongs to the page again.
-    const shortcut = new KeyboardEvent('keydown', { key: 'k', metaKey: true, bubbles: true, cancelable: true });
+    const shortcut = new KeyboardEvent('keydown', {
+      key: 'k',
+      metaKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
     document.dispatchEvent(shortcut);
     expect(shortcut.defaultPrevented).toBe(false);
     expect(widget!.opened).toBe(false);

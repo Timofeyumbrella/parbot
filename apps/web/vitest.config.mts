@@ -17,7 +17,13 @@ const envFromFile = () => {
         .map((line) => {
           const index = line.indexOf('=');
 
-          return [line.slice(0, index).trim(), line.slice(index + 1).trim().replace(/^"|"$/g, '')];
+          return [
+            line.slice(0, index).trim(),
+            line
+              .slice(index + 1)
+              .trim()
+              .replace(/^"|"$/g, ''),
+          ];
         }),
     );
   } catch {

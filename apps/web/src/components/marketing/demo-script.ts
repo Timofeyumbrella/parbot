@@ -18,7 +18,9 @@ export const DEMO_SCENES: DemoScene[] = [
     question: 'How do I rotate an API key?',
     answer:
       'Open Settings, then API keys, and choose Rotate next to the key [1]. The old key keeps working for 24 hours so deployed services can switch over without a gap [1].',
-    citations: [{ index: 1, title: 'Authentication › API keys', url: 'https://docs.acme.dev/auth/api-keys' }],
+    citations: [
+      { index: 1, title: 'Authentication › API keys', url: 'https://docs.acme.dev/auth/api-keys' },
+    ],
   },
   {
     question: 'Does the SDK run on Deno?',
@@ -31,8 +33,16 @@ export const DEMO_SCENES: DemoScene[] = [
     answer:
       'Compute an HMAC-SHA256 of the raw request body with your signing secret and compare it to the X-Acme-Signature header using a constant-time comparison [1]. Reject deliveries whose timestamp is older than five minutes [2].',
     citations: [
-      { index: 1, title: 'Webhooks › Verifying signatures', url: 'https://docs.acme.dev/webhooks/verify' },
-      { index: 2, title: 'Webhooks › Replay protection', url: 'https://docs.acme.dev/webhooks/replay' },
+      {
+        index: 1,
+        title: 'Webhooks › Verifying signatures',
+        url: 'https://docs.acme.dev/webhooks/verify',
+      },
+      {
+        index: 2,
+        title: 'Webhooks › Replay protection',
+        url: 'https://docs.acme.dev/webhooks/replay',
+      },
     ],
   },
 ];

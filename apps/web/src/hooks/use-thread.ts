@@ -34,7 +34,9 @@ export const useFeedback = (conversationId: string) => {
     async (messageId: string, value: 1 | -1 | null) => {
       const previous = queryClient.getQueryData<Thread>(key);
 
-      queryClient.setQueryData<Thread>(key, (thread) => (thread ? setFeedback(thread, messageId, value) : thread));
+      queryClient.setQueryData<Thread>(key, (thread) =>
+        thread ? setFeedback(thread, messageId, value) : thread,
+      );
 
       try {
         const response = await fetch(`/api/messages/${messageId}/feedback`, {

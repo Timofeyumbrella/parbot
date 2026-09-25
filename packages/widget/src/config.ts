@@ -73,7 +73,8 @@ export const findScript = (): HTMLScriptElement | null => {
   return document.querySelector<HTMLScriptElement>('script[data-parbot]');
 };
 
-const asString = (value: unknown, fallback: string) => (typeof value === 'string' ? value : fallback);
+const asString = (value: unknown, fallback: string) =>
+  typeof value === 'string' ? value : fallback;
 
 /** Accepts only what the config endpoint documents; anything odd falls back to a safe default. */
 export const normalizeConfig = (value: unknown): WidgetConfig | null => {
@@ -92,7 +93,9 @@ export const normalizeConfig = (value: unknown): WidgetConfig | null => {
     name: raw.name,
     welcomeMessage: asString(raw.welcomeMessage, ''),
     suggestedQuestions: Array.isArray(raw.suggestedQuestions)
-      ? raw.suggestedQuestions.filter((item): item is string => typeof item === 'string' && item.trim() !== '').slice(0, 4)
+      ? raw.suggestedQuestions
+          .filter((item): item is string => typeof item === 'string' && item.trim() !== '')
+          .slice(0, 4)
       : [],
     mode: isWidgetMode(raw.mode) ? raw.mode : 'bubble',
     theme: normalizeWidgetTheme(raw.theme),
@@ -106,7 +109,11 @@ export const normalizeConfig = (value: unknown): WidgetConfig | null => {
  * Loads the config fresh on every page load: the browser never caches it, and a version from
  * the preview page also defeats any shared cache in front of the API, so a save shows at once.
  */
-export const fetchConfig = async (api: string, key: string, version?: string | null): Promise<WidgetConfig | null> => {
+export const fetchConfig = async (
+  api: string,
+  key: string,
+  version?: string | null,
+): Promise<WidgetConfig | null> => {
   const query = `key=${encodeURIComponent(key)}${version ? `&v=${encodeURIComponent(version)}` : ''}`;
   const response = await fetch(`${api}/api/widget/config?${query}`, {
     method: 'GET',
@@ -138,10 +145,14 @@ export const luminance = (color: string) => {
 export const onAccent = (accent: string) => (luminance(accent) > 0.35 ? '#111114' : '#ffffff');
 
 const mix = (color: string, target: string, amount: number) => {
-  const parse = (hex: string) => [1, 3, 5].map((offset) => parseInt(hex.slice(offset, offset + 2), 16));
+  const parse = (hex: string) =>
+    [1, 3, 5].map((offset) => parseInt(hex.slice(offset, offset + 2), 16));
   const [r1, g1, b1] = parse(color);
   const [r2, g2, b2] = parse(target);
-  const blend = (a = 0, b = 0) => Math.round(a + (b - a) * amount).toString(16).padStart(2, '0');
+  const blend = (a = 0, b = 0) =>
+    Math.round(a + (b - a) * amount)
+      .toString(16)
+      .padStart(2, '0');
 
   return `#${blend(r1, r2)}${blend(g1, g2)}${blend(b1, b2)}`;
 };

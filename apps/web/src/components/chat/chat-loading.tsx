@@ -24,7 +24,7 @@ export const ChatLoading = () => {
           <WelcomeSkeleton />
         </div>
       </div>
-      <div className="bg-background border-t px-4 pt-3 pb-3 sm:px-6">
+      <div className="bg-background border-t px-4 pb-3 pt-3 sm:px-6">
         <div className="mx-auto w-full max-w-3xl">
           <ComposerSkeleton />
         </div>

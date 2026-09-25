@@ -4,18 +4,32 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { MAX_TITLE_LENGTH } from '@/lib/chat/conversations';
 import { getSession } from '@/lib/session';
-import { createServiceClient, createTestAccount, deleteTestAccount, hasLocalDb, type TestAccount } from '@/test/local-db';
+import {
+  createServiceClient,
+  createTestAccount,
+  deleteTestAccount,
+  hasLocalDb,
+  type TestAccount,
+} from '@/test/local-db';
 
 import { deleteConversation, renameConversation } from './conversations';
 
-vi.mock('next/cache', () => ({ revalidatePath: vi.fn(), revalidateTag: vi.fn(), updateTag: vi.fn() }));
+vi.mock('next/cache', () => ({
+  revalidatePath: vi.fn(),
+  revalidateTag: vi.fn(),
+  updateTag: vi.fn(),
+}));
 vi.mock('@/lib/session', () => ({ getSession: vi.fn() }));
 
-const signedOut = () => vi.mocked(getSession).mockResolvedValue({ supabase: {}, user: null } as never);
+const signedOut = () =>
+  vi.mocked(getSession).mockResolvedValue({ supabase: {}, user: null } as never);
 
 /** A client whose every write fails, the way a dropped connection or a cancelled statement does. */
 const failingClient = () => {
-  const failed = { data: null, error: { code: '57014', message: 'canceling statement due to statement timeout' } };
+  const failed = {
+    data: null,
+    error: { code: '57014', message: 'canceling statement due to statement timeout' },
+  };
   // `update().eq().select()` and `delete().eq()` both end in the same failed answer.
   const eq = () => Object.assign(Promise.resolve(failed), { select: async () => failed });
 
@@ -31,8 +45,13 @@ describe('conversation actions without the database', () => {
       error: `A title needs 1 to ${MAX_TITLE_LENGTH} characters.`,
     });
     await expect(renameConversation({ id, title: '   ' })).resolves.toMatchObject({ ok: false });
-    await expect(renameConversation({ id, title: 'x'.repeat(MAX_TITLE_LENGTH + 1) })).resolves.toMatchObject({ ok: false });
-    await expect(deleteConversation({ id: 'nope' })).resolves.toEqual({ ok: false, error: 'That conversation id is not valid.' });
+    await expect(
+      renameConversation({ id, title: 'x'.repeat(MAX_TITLE_LENGTH + 1) }),
+    ).resolves.toMatchObject({ ok: false });
+    await expect(deleteConversation({ id: 'nope' })).resolves.toEqual({
+      ok: false,
+      error: 'That conversation id is not valid.',
+    });
     expect(getSession).not.toHaveBeenCalled();
   });
 
@@ -45,11 +64,17 @@ describe('conversation actions without the database', () => {
       ok: false,
       error: 'Sign in to rename a conversation.',
     });
-    await expect(deleteConversation({ id })).resolves.toEqual({ ok: false, error: 'Sign in to delete a conversation.' });
+    await expect(deleteConversation({ id })).resolves.toEqual({
+      ok: false,
+      error: 'Sign in to delete a conversation.',
+    });
   });
 
   it('report a database failure in their own words', async () => {
-    vi.mocked(getSession).mockResolvedValue({ supabase: failingClient(), user: { id: crypto.randomUUID() } } as never);
+    vi.mocked(getSession).mockResolvedValue({
+      supabase: failingClient(),
+      user: { id: crypto.randomUUID() },
+    } as never);
 
     const id = crypto.randomUUID();
 
@@ -71,7 +96,9 @@ describe.skipIf(!hasLocalDb)('conversation actions against the local database', 
   let stranger: TestAccount | null = null;
 
   const signInAs = (account: TestAccount) =>
-    vi.mocked(getSession).mockResolvedValue({ supabase: account.client, user: { id: account.userId } } as never);
+    vi
+      .mocked(getSession)
+      .mockResolvedValue({ supabase: account.client, user: { id: account.userId } } as never);
 
   const addConversation = async (title: string) => {
     const { data } = await service
@@ -90,7 +117,10 @@ describe.skipIf(!hasLocalDb)('conversation actions against the local database', 
   };
 
   beforeAll(async () => {
-    [owner, stranger] = await Promise.all([createTestAccount(service, 'chat-owner'), createTestAccount(service, 'chat-other')]);
+    [owner, stranger] = await Promise.all([
+      createTestAccount(service, 'chat-owner'),
+      createTestAccount(service, 'chat-other'),
+    ]);
   });
 
   afterAll(async () => {
@@ -102,7 +132,9 @@ describe.skipIf(!hasLocalDb)('conversation actions against the local database', 
 
     signInAs(owner!);
 
-    await expect(renameConversation({ id, title: '  Pricing questions  ' })).resolves.toEqual({ ok: true });
+    await expect(renameConversation({ id, title: '  Pricing questions  ' })).resolves.toEqual({
+      ok: true,
+    });
     expect(await titleOf(id)).toBe('Pricing questions');
     // The chat list already shows the new title; a revalidation would refetch the chat route.
     expect(revalidatePath).not.toHaveBeenCalled();

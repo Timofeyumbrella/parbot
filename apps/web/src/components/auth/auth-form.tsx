@@ -41,7 +41,9 @@ export const LoginForm = ({ next }: { next?: string }) => {
         )}
       </FormField>
       <FormField label="Password" error={state.fieldErrors?.password}>
-        {(control) => <Input {...control} name="password" type="password" autoComplete="current-password" />}
+        {(control) => (
+          <Input {...control} name="password" type="password" autoComplete="current-password" />
+        )}
       </FormField>
       <SubmitButton pending={pending}>Sign in</SubmitButton>
     </form>
@@ -91,7 +93,9 @@ export const SignupForm = ({ plan, interval }: { plan?: string; interval?: strin
         hint={`At least ${PASSWORD_MIN_LENGTH} characters.`}
         error={state.fieldErrors?.password}
       >
-        {(control) => <Input {...control} name="password" type="password" autoComplete="new-password" />}
+        {(control) => (
+          <Input {...control} name="password" type="password" autoComplete="new-password" />
+        )}
       </FormField>
       <SubmitButton pending={pending}>Create account</SubmitButton>
     </form>

@@ -13,7 +13,6 @@ const { signIn, signUp } = vi.hoisted(() => ({
 
 vi.mock('@/actions/auth', () => ({ signIn, signUp }));
 
-
 afterEach(cleanup);
 describe('LoginForm', () => {
   it('sends the fields and the safe next path, then shows the server message and keeps the email', async () => {
@@ -63,7 +62,10 @@ describe('LoginForm', () => {
 
 describe('SignupForm', () => {
   it('carries the plan and interval through hidden fields', async () => {
-    signUp.mockResolvedValue({ status: 'success', message: 'We sent a confirmation link to ada@example.com. Open it, then sign in.' });
+    signUp.mockResolvedValue({
+      status: 'success',
+      message: 'We sent a confirmation link to ada@example.com. Open it, then sign in.',
+    });
     const user = userEvent.setup();
 
     render(<SignupForm plan="starter" interval="yearly" />);

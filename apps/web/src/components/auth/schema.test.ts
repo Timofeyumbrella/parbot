@@ -30,7 +30,11 @@ describe('signInSchema', () => {
 
 describe('signUpSchema', () => {
   it('requires a name and at least 8 characters of password', () => {
-    const parsed = signUpSchema.safeParse({ fullName: ' ', email: 'ada@example.com', password: '1234567' });
+    const parsed = signUpSchema.safeParse({
+      fullName: ' ',
+      email: 'ada@example.com',
+      password: '1234567',
+    });
 
     expect(parsed.success).toBe(false);
 
@@ -71,12 +75,12 @@ describe('onboardingPath', () => {
 
 describe('authErrorMessage', () => {
   it('turns known codes into plain words', () => {
-    expect(authErrorMessage({ code: 'invalid_credentials', message: 'Invalid login credentials' })).toBe(
-      'Wrong email or password.',
-    );
-    expect(authErrorMessage({ code: 'user_already_exists', message: 'User already registered' })).toMatch(
-      /already exists/,
-    );
+    expect(
+      authErrorMessage({ code: 'invalid_credentials', message: 'Invalid login credentials' }),
+    ).toBe('Wrong email or password.');
+    expect(
+      authErrorMessage({ code: 'user_already_exists', message: 'User already registered' }),
+    ).toMatch(/already exists/);
     expect(authErrorMessage({ code: 'weak_password', message: 'x' })).toMatch(/at least 8/);
   });
 

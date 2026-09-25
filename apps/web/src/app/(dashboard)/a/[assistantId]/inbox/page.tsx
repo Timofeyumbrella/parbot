@@ -15,7 +15,10 @@ export const metadata: Metadata = { title: 'Inbox' };
 
 const LEAD_ROWS = 200;
 
-export default async function InboxPage({ params, searchParams }: PageProps<'/a/[assistantId]/inbox'>) {
+export default async function InboxPage({
+  params,
+  searchParams,
+}: PageProps<'/a/[assistantId]/inbox'>) {
   const [{ assistantId }, query] = await Promise.all([params, searchParams]);
   const [{ supabase }, assistant] = await Promise.all([requireUser(), getAssistant(assistantId)]);
 
@@ -39,15 +42,26 @@ export default async function InboxPage({ params, searchParams }: PageProps<'/a/
           .order('created_at', { ascending: false })
           .limit(LEAD_ROWS)
       : null,
-    supabase.from('conversations').select('id', { count: 'exact', head: true }).eq('assistant_id', assistantId),
-    supabase.from('leads').select('id', { count: 'exact', head: true }).eq('assistant_id', assistantId),
+    supabase
+      .from('conversations')
+      .select('id', { count: 'exact', head: true })
+      .eq('assistant_id', assistantId),
+    supabase
+      .from('leads')
+      .select('id', { count: 'exact', head: true })
+      .eq('assistant_id', assistantId),
   ]);
 
-  const failure = [conversations, leads, conversationCount, leadCount].find((result) => result?.error)?.error;
+  const failure = [conversations, leads, conversationCount, leadCount].find(
+    (result) => result?.error,
+  )?.error;
 
   return (
     <PageContainer>
-      <PageHeader title="Inbox" description={`Every conversation ${assistant.name} had, and the leads it captured.`} />
+      <PageHeader
+        title="Inbox"
+        description={`Every conversation ${assistant.name} had, and the leads it captured.`}
+      />
 
       <PendingNav>
         <InboxTabs
@@ -58,11 +72,14 @@ export default async function InboxPage({ params, searchParams }: PageProps<'/a/
         />
 
         {failure ? (
-          <div role="alert" className="border-destructive/40 bg-destructive/10 rounded-lg border p-4 text-sm">
+          <div
+            role="alert"
+            className="border-destructive/40 bg-destructive/10 rounded-lg border p-4 text-sm"
+          >
             <p className="font-medium">The inbox could not be loaded.</p>
             <p className="text-muted-foreground mt-1">
-              The database did not answer as expected. Reload the page to try again; if it keeps happening, the
-              assistant may have been deleted.
+              The database did not answer as expected. Reload the page to try again; if it keeps
+              happening, the assistant may have been deleted.
             </p>
           </div>
         ) : tab === 'leads' ? (

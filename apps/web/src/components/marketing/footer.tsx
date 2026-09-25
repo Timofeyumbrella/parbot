@@ -23,11 +23,16 @@ export const MarketingFooter = () => (
         <nav aria-label="Footer" className="grid grid-cols-2 gap-8 sm:gap-16">
           {GROUPS.map((group) => (
             <div key={group.title} className="flex flex-col gap-3">
-              <p className="text-muted-foreground text-xs font-medium tracking-wider uppercase">{group.title}</p>
+              <p className="text-muted-foreground text-xs font-medium uppercase tracking-wider">
+                {group.title}
+              </p>
               <ul className="flex flex-col gap-2 text-sm">
                 {group.links.map((link) => (
                   <li key={link.href}>
-                    <Link href={link.href} className="text-foreground/80 hover:text-foreground transition-colors">
+                    <Link
+                      href={link.href}
+                      className="text-foreground/80 hover:text-foreground transition-colors"
+                    >
                       {link.label}
                     </Link>
                   </li>

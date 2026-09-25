@@ -5,7 +5,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 export default function Loading() {
   return (
     <main id="main" className="flex-1" aria-busy="true" aria-label="Loading">
-      <Container className="grid items-center gap-12 pt-14 pb-20 sm:pt-20 sm:pb-28 lg:grid-cols-[1.05fr_1fr] lg:gap-16">
+      <Container className="grid items-center gap-12 pb-20 pt-14 sm:pb-28 sm:pt-20 lg:grid-cols-[1.05fr_1fr] lg:gap-16">
         <div className="flex flex-col gap-6">
           <Skeleton className="h-3 w-44" />
           <div className="flex flex-col gap-3">

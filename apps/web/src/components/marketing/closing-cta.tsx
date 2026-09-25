@@ -16,13 +16,13 @@ export const ClosingCta = () => (
           <div className="relative flex flex-col items-center gap-6">
             <h2
               id="closing-heading"
-              className="max-w-2xl text-3xl font-semibold tracking-tight text-balance sm:text-4xl"
+              className="max-w-2xl text-balance text-3xl font-semibold tracking-tight sm:text-4xl"
             >
               Put an assistant on your docs this afternoon.
             </h2>
-            <p className="text-muted-foreground max-w-xl leading-relaxed text-pretty">
-              Create an account, paste a URL, add one script tag. Hobby is free, and every answer cites
-              its source from the first question.
+            <p className="text-muted-foreground max-w-xl text-pretty leading-relaxed">
+              Create an account, paste a URL, add one script tag. Hobby is free, and every answer
+              cites its source from the first question.
             </p>
             <div className="flex flex-wrap justify-center gap-3">
               <Button asChild size="lg" className="px-4">

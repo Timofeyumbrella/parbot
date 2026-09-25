@@ -28,9 +28,15 @@ describe('DailyChart', () => {
     const bars = within(wide).getAllByTestId('chart-bar');
     expect(bars).toHaveLength(7);
 
-    expect(bars[2]!.querySelector('title')?.textContent).toBe('Sep 19: 3 questions, 2 answered, 1 unanswered');
-    expect(bars[6]!.querySelector('title')?.textContent).toBe('Sep 23: 2 questions, 0 answered, 2 unanswered');
-    expect(bars[3]!.querySelector('title')?.textContent).toBe('Sep 20: 0 questions, 0 answered, 0 unanswered');
+    expect(bars[2]!.querySelector('title')?.textContent).toBe(
+      'Sep 19: 3 questions, 2 answered, 1 unanswered',
+    );
+    expect(bars[6]!.querySelector('title')?.textContent).toBe(
+      'Sep 23: 2 questions, 0 answered, 2 unanswered',
+    );
+    expect(bars[3]!.querySelector('title')?.textContent).toBe(
+      'Sep 20: 0 questions, 0 answered, 0 unanswered',
+    );
 
     // A stacked day paints both series; a fully answered day paints only the answered one.
     expect(bars[2]!.querySelector('.fill-chart-2')).not.toBeNull();
@@ -49,7 +55,11 @@ describe('DailyChart', () => {
   });
 
   it('draws a phone-sized twin with fewer labels so they stay legible', () => {
-    const month = bucketDaily([{ day: '2026-09-23', questions: 1, answered: 1, unanswered: 0 }], periodStart(30, NOW), 30);
+    const month = bucketDaily(
+      [{ day: '2026-09-23', questions: 1, answered: 1, unanswered: 0 }],
+      periodStart(30, NOW),
+      30,
+    );
     render(<DailyChart rows={month} days={30} />);
 
     const wide = screen.getByTestId('chart-wide');

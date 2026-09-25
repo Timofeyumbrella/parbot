@@ -12,7 +12,12 @@ import {
   pillNavClass,
   SegmentedLink,
 } from '@/components/inbox/pending-nav';
-import { CONVERSATION_FILTERS, type ConversationFilter, inboxHref, type InboxTab } from '@/lib/analytics';
+import {
+  CONVERSATION_FILTERS,
+  type ConversationFilter,
+  inboxHref,
+  type InboxTab,
+} from '@/lib/analytics';
 import { formatCount } from '@/lib/format';
 
 const FILTER_LABELS: Record<ConversationFilter, string> = {
@@ -85,7 +90,7 @@ export const InboxTabs = ({
               {label}
               <span
                 className={cn(
-                  'rounded-full px-1.5 py-0.5 text-[11px] leading-none tabular-nums',
+                  'rounded-full px-1.5 py-0.5 text-[11px] tabular-nums leading-none',
                   'bg-muted/60 text-muted-foreground group-aria-[current=page]:bg-muted group-aria-[current=page]:text-foreground',
                 )}
                 data-testid={`${key}-count`}
@@ -101,7 +106,13 @@ export const InboxTabs = ({
 };
 
 /** All / Widget / In-app / Unanswered, as links that rewrite `?filter=`. */
-export const ConversationFilters = ({ assistantId, filter }: { assistantId: string; filter: ConversationFilter }) => (
+export const ConversationFilters = ({
+  assistantId,
+  filter,
+}: {
+  assistantId: string;
+  filter: ConversationFilter;
+}) => (
   <nav aria-label="Filter conversations" className={pillNavClass}>
     {CONVERSATION_FILTERS.map((key) => (
       <SegmentedLink

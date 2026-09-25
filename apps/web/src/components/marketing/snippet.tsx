@@ -37,11 +37,18 @@ export const Snippet = ({ code, label }: { code: string; label: string }) => {
 
   return (
     <div className="bg-card flex items-center gap-3 rounded-lg border p-2 pl-4">
-      <pre className="min-w-0 flex-1 overflow-x-auto py-1.5 font-mono text-[13px] leading-relaxed" aria-label={label}>
+      <pre
+        className="min-w-0 flex-1 overflow-x-auto py-1.5 font-mono text-[13px] leading-relaxed"
+        aria-label={label}
+      >
         <code ref={codeRef}>{code}</code>
       </pre>
       <Button type="button" variant="outline" size="sm" onClick={copy} className="shrink-0">
-        {state === 'copied' ? <Check data-icon="inline-start" /> : <Copy data-icon="inline-start" />}
+        {state === 'copied' ? (
+          <Check data-icon="inline-start" />
+        ) : (
+          <Copy data-icon="inline-start" />
+        )}
         {state === 'copied' ? 'Copied' : state === 'select' ? 'Selected' : 'Copy'}
       </Button>
     </div>

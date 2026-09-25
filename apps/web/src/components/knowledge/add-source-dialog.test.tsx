@@ -30,7 +30,11 @@ const renderDialog = (tab: AddSourceTab, overrides: Partial<AddSourceDialogProps
   };
   const view = render(<AddSourceDialog {...props} />);
 
-  return { ...props, rerender: (next: Partial<AddSourceDialogProps>) => view.rerender(<AddSourceDialog {...props} {...next} />) };
+  return {
+    ...props,
+    rerender: (next: Partial<AddSourceDialogProps>) =>
+      view.rerender(<AddSourceDialog {...props} {...next} />),
+  };
 };
 
 const dialog = () => screen.getByRole('dialog', { name: 'Add source' });
@@ -54,7 +58,10 @@ describe('AddSourceDialog', () => {
 
     expect(within(dialog()).getByText('We follow links under this path.')).toBeInTheDocument();
 
-    await user.type(within(dialog()).getByLabelText('Start page'), 'https://docs.example.com/guide/');
+    await user.type(
+      within(dialog()).getByLabelText('Start page'),
+      'https://docs.example.com/guide/',
+    );
     await user.click(within(dialog()).getByRole('button', { name: 'Add website' }));
 
     // The row and the close happen on the way out, not on the way back.
@@ -92,7 +99,8 @@ describe('AddSourceDialog', () => {
 
   it('brings the dialog back with the text intact and the reason when the server refuses', async () => {
     const user = userEvent.setup();
-    const reason = "Your plan's page limit is reached. Upgrade on the Billing page or remove a source.";
+    const reason =
+      "Your plan's page limit is reached. Upgrade on the Billing page or remove a source.";
 
     addSource.mockResolvedValue({ error: reason });
 
@@ -107,22 +115,31 @@ describe('AddSourceDialog', () => {
     expect(pending).toMatchObject({ kind: 'text', title: 'Refunds', mime_type: 'text/markdown' });
     expect(pending.byte_size).toBeGreaterThan(0);
 
-    expect(await within(dialog()).findByRole('alert')).toHaveTextContent("Your plan's page limit is reached.");
+    expect(await within(dialog()).findByRole('alert')).toHaveTextContent(
+      "Your plan's page limit is reached.",
+    );
     expect(onSettled).toHaveBeenCalledWith(pending.id, null);
     expect(onTabChange).toHaveBeenLastCalledWith('text');
     expect(onOpenChange).toHaveBeenLastCalledWith(true);
     expect(within(dialog()).getByLabelText('Title')).toHaveValue('Refunds');
-    expect(within(dialog()).getByLabelText('Text')).toHaveValue('Refunds are issued within 30 days.');
+    expect(within(dialog()).getByLabelText('Text')).toHaveValue(
+      'Refunds are issued within 30 days.',
+    );
   });
 
   it('checks the address itself before drawing anything', async () => {
     const user = userEvent.setup();
     const { onPending } = renderDialog('sitemap');
 
-    await user.type(within(dialog()).getByLabelText('Sitemap address'), 'ftp://docs.example.com/sitemap.xml');
+    await user.type(
+      within(dialog()).getByLabelText('Sitemap address'),
+      'ftp://docs.example.com/sitemap.xml',
+    );
     await user.click(within(dialog()).getByRole('button', { name: 'Add sitemap' }));
 
-    expect(within(dialog()).getByRole('alert')).toHaveTextContent('Enter a full address that starts with http:// or https://.');
+    expect(within(dialog()).getByRole('alert')).toHaveTextContent(
+      'Enter a full address that starts with http:// or https://.',
+    );
     expect(onPending).not.toHaveBeenCalled();
     expect(addSource).not.toHaveBeenCalled();
   });
@@ -146,7 +163,9 @@ describe('AddSourceDialog', () => {
     await user.type(field, 'docs.example.com');
     await user.click(within(dialog()).getByRole('button', { name: 'Add website' }));
 
-    expect(within(dialog()).getByRole('alert')).toHaveTextContent('Enter a full address that starts with http:// or https://.');
+    expect(within(dialog()).getByRole('alert')).toHaveTextContent(
+      'Enter a full address that starts with http:// or https://.',
+    );
     expect(onPending).not.toHaveBeenCalled();
     expect(addSource).not.toHaveBeenCalled();
   });
@@ -159,7 +178,10 @@ describe('AddSourceDialog', () => {
 
     const alerts = within(dialog()).getAllByRole('alert');
 
-    expect(alerts.map((alert) => alert.textContent)).toEqual(['Give the source a title.', 'Paste some text.']);
+    expect(alerts.map((alert) => alert.textContent)).toEqual([
+      'Give the source a title.',
+      'Paste some text.',
+    ]);
     expect(within(dialog()).getByLabelText('Title')).toHaveAttribute('aria-invalid', 'true');
     expect(within(dialog()).getByLabelText('Text')).toHaveAttribute('aria-invalid', 'true');
 
@@ -197,7 +219,9 @@ describe('AddSourceDialog', () => {
     expect(within(dialog()).getByRole('button', { name: 'Upload file' })).toBeDisabled();
 
     await user.upload(picker, new File(['x'], 'tool.exe', { type: 'application/octet-stream' }));
-    expect(within(dialog()).getByRole('alert')).toHaveTextContent('That file type is not supported.');
+    expect(within(dialog()).getByRole('alert')).toHaveTextContent(
+      'That file type is not supported.',
+    );
 
     const file = new File(['# Manual\n\nRead me.'], 'manual.md', { type: 'text/markdown' });
 
@@ -211,7 +235,12 @@ describe('AddSourceDialog', () => {
 
     const pending = vi.mocked(onPending).mock.calls[0]![0];
 
-    expect(pending).toMatchObject({ kind: 'upload', title: 'manual.md', mime_type: 'text/markdown', byte_size: file.size });
+    expect(pending).toMatchObject({
+      kind: 'upload',
+      title: 'manual.md',
+      mime_type: 'text/markdown',
+      byte_size: file.size,
+    });
     expect(pending.storage_path).toMatch(/\.md$/);
     expect(onOpenChange).toHaveBeenCalledWith(false);
 
@@ -231,15 +260,23 @@ describe('AddSourceDialog', () => {
     const user = userEvent.setup();
 
     vi.mocked(fetch).mockResolvedValue(
-      Response.json({ error: 'That file is larger than 25 MB. Split it or pick a smaller one.' }, { status: 400 }),
+      Response.json(
+        { error: 'That file is larger than 25 MB. Split it or pick a smaller one.' },
+        { status: 400 },
+      ),
     );
 
     const { onPending, onSettled, onTabChange } = renderDialog('upload');
 
-    await user.upload(within(dialog()).getByLabelText('Choose file'), new File(['x'], 'big.pdf', { type: 'application/pdf' }));
+    await user.upload(
+      within(dialog()).getByLabelText('Choose file'),
+      new File(['x'], 'big.pdf', { type: 'application/pdf' }),
+    );
     await user.click(within(dialog()).getByRole('button', { name: 'Upload file' }));
 
-    expect(await within(dialog()).findByRole('alert')).toHaveTextContent('That file is larger than 25 MB.');
+    expect(await within(dialog()).findByRole('alert')).toHaveTextContent(
+      'That file is larger than 25 MB.',
+    );
     expect(onSettled).toHaveBeenCalledWith(vi.mocked(onPending).mock.calls[0]![0].id, null);
     expect(onTabChange).toHaveBeenLastCalledWith('upload');
     // The file is still picked, so a retry is one click away.

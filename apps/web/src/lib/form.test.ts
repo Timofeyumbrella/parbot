@@ -20,7 +20,10 @@ const form = (entries: Record<string, string>) => {
 
 describe('formValues', () => {
   it('reads the named fields as strings and fills in blanks', () => {
-    expect(formValues(form({ email: 'a@b.co' }), ['email', 'password'])).toEqual({ email: 'a@b.co', password: '' });
+    expect(formValues(form({ email: 'a@b.co' }), ['email', 'password'])).toEqual({
+      email: 'a@b.co',
+      password: '',
+    });
   });
 });
 

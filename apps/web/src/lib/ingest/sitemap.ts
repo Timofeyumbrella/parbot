@@ -10,7 +10,9 @@ export const MAX_CHILD_SITEMAPS = 50;
 
 const decodeXml = (text: string) =>
   text
-    .replace(/&#x([0-9a-f]+);/gi, (_, hex: string) => String.fromCodePoint(Number.parseInt(hex, 16)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex: string) =>
+      String.fromCodePoint(Number.parseInt(hex, 16)),
+    )
     .replace(/&#(\d+);/g, (_, code: string) => String.fromCodePoint(Number(code)))
     .replace(/&quot;/g, '"')
     .replace(/&apos;/g, "'")
@@ -26,7 +28,10 @@ export const parseSitemap = (xml: string): ParsedSitemap => {
   const locs = new Set<string>();
 
   for (const match of xml.matchAll(/<loc>([\s\S]*?)<\/loc>/gi)) {
-    const raw = match[1]!.replace(/^\s*<!\[CDATA\[/, '').replace(/\]\]>\s*$/, '').trim();
+    const raw = match[1]!
+      .replace(/^\s*<!\[CDATA\[/, '')
+      .replace(/\]\]>\s*$/, '')
+      .trim();
     const value = decodeXml(raw);
 
     if (isHttpUrl(value)) {
@@ -41,7 +46,11 @@ const isGzip = (bytes: Uint8Array, url: string) =>
   (bytes[0] === 0x1f && bytes[1] === 0x8b) || /\.gz(\?|$)/i.test(url);
 
 const fetchSitemapXml = async (url: string, fetchImpl: FetchImpl, lookup: HostLookup) => {
-  const resource = await fetchResource(url, { fetchImpl, lookup, accept: 'application/xml,text/xml;q=0.9,*/*;q=0.5' });
+  const resource = await fetchResource(url, {
+    fetchImpl,
+    lookup,
+    accept: 'application/xml,text/xml;q=0.9,*/*;q=0.5',
+  });
   const bytes = isGzip(resource.bytes, url) ? gunzipSync(resource.bytes) : resource.bytes;
 
   return new TextDecoder().decode(bytes);

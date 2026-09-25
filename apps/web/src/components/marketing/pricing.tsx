@@ -54,7 +54,9 @@ const PlanCard = ({ plan, interval }: { plan: Plan; interval: BillingInterval })
             {formatPrice(cents)}
           </span>
           {!free ? (
-            <span className="text-muted-foreground text-sm">/{interval === 'monthly' ? 'month' : 'year'}</span>
+            <span className="text-muted-foreground text-sm">
+              /{interval === 'monthly' ? 'month' : 'year'}
+            </span>
           ) : null}
         </p>
         <p className="text-muted-foreground text-xs">{caption}</p>
@@ -96,7 +98,11 @@ export const Pricing = ({ plans }: { plans: Plan[] }) => {
         </Reveal>
 
         <Reveal className="flex justify-center">
-          <div role="group" aria-label="Billing interval" className="bg-muted inline-flex rounded-lg p-1">
+          <div
+            role="group"
+            aria-label="Billing interval"
+            className="bg-muted inline-flex rounded-lg p-1"
+          >
             {INTERVALS.map((option) => (
               <button
                 key={option.id}
@@ -104,7 +110,7 @@ export const Pricing = ({ plans }: { plans: Plan[] }) => {
                 aria-pressed={interval === option.id}
                 onClick={() => setInterval(option.id)}
                 className={cn(
-                  'focus-visible:ring-ring/50 flex items-center gap-1.5 rounded-md px-4 py-1.5 text-sm font-medium transition-colors outline-none focus-visible:ring-3',
+                  'focus-visible:ring-ring/50 focus-visible:ring-3 flex items-center gap-1.5 rounded-md px-4 py-1.5 text-sm font-medium outline-none transition-colors',
                   interval === option.id
                     ? 'bg-background text-foreground shadow-sm'
                     : 'text-muted-foreground hover:text-foreground',
@@ -127,8 +133,9 @@ export const Pricing = ({ plans }: { plans: Plan[] }) => {
 
         <Reveal>
           <p className="text-muted-foreground mx-auto max-w-2xl text-center text-sm leading-relaxed">
-            Every plan includes streamed answers with citations, the conversation inbox and the bubble
-            widget. Limits are per account, shared across its assistants. Prices are in US dollars.
+            Every plan includes streamed answers with citations, the conversation inbox and the
+            bubble widget. Limits are per account, shared across its assistants. Prices are in US
+            dollars.
           </p>
         </Reveal>
       </Container>

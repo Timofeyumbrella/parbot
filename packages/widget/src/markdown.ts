@@ -12,7 +12,8 @@ const ESCAPES: Record<string, string> = {
   "'": '&#39;',
 };
 
-export const escapeHtml = (text: string) => text.replace(/[&<>"']/g, (char) => ESCAPES[char] ?? char);
+export const escapeHtml = (text: string) =>
+  text.replace(/[&<>"']/g, (char) => ESCAPES[char] ?? char);
 
 const SAFE_URL = /^(https?:\/\/|mailto:)/i;
 
@@ -39,15 +40,24 @@ export const renderInline = (raw: string) => {
   const lifted: string[] = [];
   const lift = (html: string) => `${TOKEN}${lifted.push(html) - 1}${TOKEN}`;
 
-  let text = escapeHtml(raw).replace(/`([^`\n]+)`/g, (_, code: string) => lift(`<code>${code}</code>`));
+  let text = escapeHtml(raw).replace(/`([^`\n]+)`/g, (_, code: string) =>
+    lift(`<code>${code}</code>`),
+  );
 
   text = text.replace(/\[([^\]\n]+)\]\(([^)\s]+)\)/g, (match, label: string, url: string) => {
     // The label was escaped along with the rest, so quotes in the URL were too. Undo that
     // before validating; the attribute is re-escaped below.
-    const href = safeUrl(url.replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, "'"));
+    const href = safeUrl(
+      url
+        .replace(/&amp;/g, '&')
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'"),
+    );
 
     return href
-      ? lift(`<a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">${emphasis(label)}</a>`)
+      ? lift(
+          `<a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">${emphasis(label)}</a>`,
+        )
       : match;
   });
 
@@ -64,7 +74,9 @@ export const renderInline = (raw: string) => {
 
   // A lifted link may hold a lifted code span, so restoring is recursive.
   const restore = (html: string): string =>
-    html.replace(new RegExp(`${TOKEN}(\\d+)${TOKEN}`, 'g'), (_, index: string) => restore(lifted[Number(index)] ?? ''));
+    html.replace(new RegExp(`${TOKEN}(\\d+)${TOKEN}`, 'g'), (_, index: string) =>
+      restore(lifted[Number(index)] ?? ''),
+    );
 
   return restore(text);
 };
@@ -187,7 +199,9 @@ export const renderMarkdown = (markdown: string) =>
     .map((block) => {
       switch (block.kind) {
         case 'code': {
-          const language = LANGUAGE.test(block.language) ? ` class="language-${escapeHtml(block.language)}"` : '';
+          const language = LANGUAGE.test(block.language)
+            ? ` class="language-${escapeHtml(block.language)}"`
+            : '';
 
           return `<pre><code${language}>${escapeHtml(block.body)}</code></pre>`;
         }

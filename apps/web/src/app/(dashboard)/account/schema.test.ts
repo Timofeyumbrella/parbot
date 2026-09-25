@@ -4,7 +4,10 @@ import { emailSchema, passwordSchema, profileSchema } from './schema';
 
 describe('account schemas', () => {
   it('trims the name and rejects an empty one', () => {
-    expect(profileSchema.safeParse({ fullName: '  Ada ' })).toMatchObject({ success: true, data: { fullName: 'Ada' } });
+    expect(profileSchema.safeParse({ fullName: '  Ada ' })).toMatchObject({
+      success: true,
+      data: { fullName: 'Ada' },
+    });
     expect(profileSchema.safeParse({ fullName: '   ' }).success).toBe(false);
   });
 
@@ -17,16 +20,26 @@ describe('account schemas', () => {
   });
 
   it('requires the two passwords to match and to be long enough', () => {
-    expect(passwordSchema.safeParse({ password: 'longenough', confirmPassword: 'longenough' }).success).toBe(true);
+    expect(
+      passwordSchema.safeParse({ password: 'longenough', confirmPassword: 'longenough' }).success,
+    ).toBe(true);
 
-    const mismatch = passwordSchema.safeParse({ password: 'longenough', confirmPassword: 'different' });
+    const mismatch = passwordSchema.safeParse({
+      password: 'longenough',
+      confirmPassword: 'different',
+    });
 
     expect(mismatch.success).toBe(false);
 
     if (!mismatch.success) {
-      expect(mismatch.error.issues[0]).toMatchObject({ path: ['confirmPassword'], message: 'The two passwords differ.' });
+      expect(mismatch.error.issues[0]).toMatchObject({
+        path: ['confirmPassword'],
+        message: 'The two passwords differ.',
+      });
     }
 
-    expect(passwordSchema.safeParse({ password: 'short', confirmPassword: 'short' }).success).toBe(false);
+    expect(passwordSchema.safeParse({ password: 'short', confirmPassword: 'short' }).success).toBe(
+      false,
+    );
   });
 });

@@ -78,7 +78,8 @@ const paid = {
   leadCapture: 'on',
 };
 
-const updatePayload = () => calls.find((call) => call.method === 'update')?.args[0] as Row | undefined;
+const updatePayload = () =>
+  calls.find((call) => call.method === 'update')?.args[0] as Row | undefined;
 
 beforeEach(() => {
   queue.length = 0;
@@ -168,7 +169,10 @@ describe('saveWidgetSettings', () => {
   });
 
   it('explains a validation failure and hands the typed values back', async () => {
-    const state = await saveWidgetSettings(idle, form({ ...free, suggestedQuestions: '1\n2\n3\n4\n5' }));
+    const state = await saveWidgetSettings(
+      idle,
+      form({ ...free, suggestedQuestions: '1\n2\n3\n4\n5' }),
+    );
 
     expect(state).toMatchObject({
       status: 'error',
@@ -178,7 +182,7 @@ describe('saveWidgetSettings', () => {
     expect(updatePayload()).toBeUndefined();
   });
 
-  it('reads as not found when the id is malformed or the row is not the visitor\'s', async () => {
+  it("reads as not found when the id is malformed or the row is not the visitor's", async () => {
     expect(await saveWidgetSettings(idle, form({ ...free, assistantId: 'nope' }))).toMatchObject({
       status: 'error',
       error: 'That assistant could not be found.',

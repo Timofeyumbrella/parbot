@@ -6,7 +6,13 @@ import { getAiProvider } from '@/lib/ai';
 import type { Database, Source } from '@/lib/db';
 import { checkCapacity } from '@/lib/plans';
 import { createSupabaseServiceClient } from '@/lib/supabase/service';
-import { MAX_UPLOAD_BYTES, storagePathFor, UPLOAD_TYPES, UPLOAD_TYPES_LABEL, uploadTypeFor } from '@/lib/uploads';
+import {
+  MAX_UPLOAD_BYTES,
+  storagePathFor,
+  UPLOAD_TYPES,
+  UPLOAD_TYPES_LABEL,
+  uploadTypeFor,
+} from '@/lib/uploads';
 
 import { ingestSource, PAGE_LIMIT_MESSAGE, STALE_RUN_MS, STORAGE_BUCKET } from './index';
 import { labelForUrl } from './label';
@@ -30,7 +36,13 @@ export class SourceError extends Error {
 export type { SourceInput } from './schema';
 export { firstIssue, MAX_TEXT_CHARS, sourceInputSchema } from './schema';
 
-export type UploadInput = { kind: 'upload'; assistantId: string; id?: string; title?: string; file: File };
+export type UploadInput = {
+  kind: 'upload';
+  assistantId: string;
+  id?: string;
+  title?: string;
+  file: File;
+};
 
 export type CreateSourceInput = SourceInput | UploadInput;
 
@@ -56,7 +68,13 @@ export const parseUploadForm = (form: FormData): UploadInput => {
     throw new SourceError(400, `That file type is not supported. Upload ${UPLOAD_TYPES_LABEL}.`);
   }
 
-  return { kind: 'upload', assistantId: fields.data.assistantId, id: fields.data.id, title: fields.data.title, file };
+  return {
+    kind: 'upload',
+    assistantId: fields.data.assistantId,
+    id: fields.data.id,
+    title: fields.data.title,
+    file,
+  };
 };
 
 const assertOwnsAssistant = async (supabase: UserClient, id: string) => {
@@ -103,8 +121,11 @@ const insertSource = async (
  * generic type for Markdown and Word files, so the bytes are re-wrapped with the type we resolved.
  */
 const storeObject = async (supabase: UserClient, path: string, body: Blob, contentType: string) => {
-  const typed = body.type === contentType ? body : new Blob([await body.arrayBuffer()], { type: contentType });
-  const { error } = await supabase.storage.from(STORAGE_BUCKET).upload(path, typed, { contentType, upsert: false });
+  const typed =
+    body.type === contentType ? body : new Blob([await body.arrayBuffer()], { type: contentType });
+  const { error } = await supabase.storage
+    .from(STORAGE_BUCKET)
+    .upload(path, typed, { contentType, upsert: false });
 
   if (error) {
     throw new SourceError(500, 'The file could not be stored. Try the upload again.');
@@ -167,7 +188,10 @@ export const createSource = async ({
       const type = uploadTypeFor(input.file.name, input.file.type);
 
       if (!type) {
-        throw new SourceError(400, `That file type is not supported. Upload ${UPLOAD_TYPES_LABEL}.`);
+        throw new SourceError(
+          400,
+          `That file type is not supported. Upload ${UPLOAD_TYPES_LABEL}.`,
+        );
       }
 
       const spec = UPLOAD_TYPES[type];
@@ -193,8 +217,19 @@ export const createSource = async ({
 };
 
 /** Removes the row as the user; the stored file goes only once that succeeded. */
-export const deleteSource = async ({ supabase, sourceId }: { supabase: UserClient; sourceId: string }) => {
-  const { data, error } = await supabase.from('sources').delete().eq('id', sourceId).select('id, storage_path').maybeSingle();
+export const deleteSource = async ({
+  supabase,
+  sourceId,
+}: {
+  supabase: UserClient;
+  sourceId: string;
+}) => {
+  const { data, error } = await supabase
+    .from('sources')
+    .delete()
+    .eq('id', sourceId)
+    .select('id, storage_path')
+    .maybeSingle();
 
   if (error) {
     console.error('[sources] delete failed', error);
@@ -215,7 +250,13 @@ export const deleteSource = async ({ supabase, sourceId }: { supabase: UserClien
  * (two tabs, a double click, the API) queue it once: the second finds it taken and gets a 409. A
  * run that has not moved for a while is treated as dead and may be started over.
  */
-export const requestReindex = async ({ supabase, sourceId }: { supabase: UserClient; sourceId: string }): Promise<Source> => {
+export const requestReindex = async ({
+  supabase,
+  sourceId,
+}: {
+  supabase: UserClient;
+  sourceId: string;
+}): Promise<Source> => {
   const staleBefore = new Date(Date.now() - STALE_RUN_MS).toISOString();
   const { data, error } = await supabase
     .from('sources')
@@ -234,7 +275,11 @@ export const requestReindex = async ({ supabase, sourceId }: { supabase: UserCli
     return data;
   }
 
-  const { data: current } = await supabase.from('sources').select('id').eq('id', sourceId).maybeSingle();
+  const { data: current } = await supabase
+    .from('sources')
+    .select('id')
+    .eq('id', sourceId)
+    .maybeSingle();
 
   if (!current) {
     throw new SourceError(404, 'That source does not exist.');
@@ -246,7 +291,11 @@ export const requestReindex = async ({ supabase, sourceId }: { supabase: UserCli
 /** Runs ingestion once the response has gone out, with the service role and the configured model. */
 export const scheduleIngestion = (sourceId: string) => {
   after(async () => {
-    await ingestSource({ service: createSupabaseServiceClient(), provider: getAiProvider(), sourceId });
+    await ingestSource({
+      service: createSupabaseServiceClient(),
+      provider: getAiProvider(),
+      sourceId,
+    });
   });
 };
 
@@ -256,7 +305,12 @@ export const sourceErrorResponse = (cause: unknown) => {
   }
 
   return Response.json(
-    { error: cause instanceof Error && cause.message ? cause.message : 'Something went wrong. Try again.' },
+    {
+      error:
+        cause instanceof Error && cause.message
+          ? cause.message
+          : 'Something went wrong. Try again.',
+    },
     { status: 500 },
   );
 };

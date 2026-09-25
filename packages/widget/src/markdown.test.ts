@@ -42,7 +42,9 @@ describe('renderInline', () => {
   });
 
   it('renders italic without touching arithmetic or bold', () => {
-    expect(renderInline('Click *New* then **Save**')).toBe('Click <em>New</em> then <strong>Save</strong>');
+    expect(renderInline('Click *New* then **Save**')).toBe(
+      'Click <em>New</em> then <strong>Save</strong>',
+    );
     expect(renderInline('2 * 3 * 4 = 24')).toBe('2 * 3 * 4 = 24');
     expect(renderInline('*a*')).toBe('<em>a</em>');
     expect(renderInline('snake_case_name stays')).toBe('snake_case_name stays');
@@ -82,7 +84,24 @@ describe('renderInline', () => {
 describe('parseBlocks', () => {
   it('splits paragraphs, lists, headings and fences', () => {
     const blocks = parseBlocks(
-      ['# Title', 'Para one', 'still one', '', '- a', '- b', '', '1. x', '2. y', '', '```ts', 'const a = 1;', '', 'done', '```', 'tail'].join('\n'),
+      [
+        '# Title',
+        'Para one',
+        'still one',
+        '',
+        '- a',
+        '- b',
+        '',
+        '1. x',
+        '2. y',
+        '',
+        '```ts',
+        'const a = 1;',
+        '',
+        'done',
+        '```',
+        'tail',
+      ].join('\n'),
     );
 
     expect(blocks).toEqual([
@@ -105,7 +124,9 @@ describe('parseBlocks', () => {
 
 describe('renderMarkdown', () => {
   it('renders a full answer', () => {
-    const html = renderMarkdown('Create keys in **Settings** [1].\n\n- Open Settings\n- Click *New*\n\n```sh\ncurl -X POST <url>\n```');
+    const html = renderMarkdown(
+      'Create keys in **Settings** [1].\n\n- Open Settings\n- Click *New*\n\n```sh\ncurl -X POST <url>\n```',
+    );
 
     expect(html).toBe(
       '<p>Create keys in <strong>Settings</strong> <sup class="pb-cite" data-cite="1">1</sup>.</p>' +
@@ -115,11 +136,15 @@ describe('renderMarkdown', () => {
   });
 
   it('joins lines of a paragraph with breaks and numbers ordered lists from their start', () => {
-    expect(renderMarkdown('a\nb\n\n3. c\n4. d')).toBe('<p>a<br>b</p><ol start="3"><li>c</li><li>d</li></ol>');
+    expect(renderMarkdown('a\nb\n\n3. c\n4. d')).toBe(
+      '<p>a<br>b</p><ol start="3"><li>c</li><li>d</li></ol>',
+    );
   });
 
   it('never lets raw html through', () => {
-    expect(renderMarkdown('<img src=x onerror=alert(1)>')).toBe('<p>&lt;img src=x onerror=alert(1)&gt;</p>');
+    expect(renderMarkdown('<img src=x onerror=alert(1)>')).toBe(
+      '<p>&lt;img src=x onerror=alert(1)&gt;</p>',
+    );
   });
 
   it('renders nothing for empty input', () => {

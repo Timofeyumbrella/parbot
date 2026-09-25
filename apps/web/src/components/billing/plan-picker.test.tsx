@@ -58,13 +58,11 @@ describe('PlanPicker', () => {
 
   it('posts the choice and follows the URL that comes back', async () => {
     const user = userEvent.setup();
-    const fetchMock = vi
-      .spyOn(globalThis, 'fetch')
-      .mockResolvedValue(
-        jsonResponse({
-          url: 'http://localhost:3000/billing?mock_plan=starter&mock_interval=yearly',
-        }),
-      );
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse({
+        url: 'http://localhost:3000/billing?mock_plan=starter&mock_interval=yearly',
+      }),
+    );
     render(<PlanPicker {...baseProps} />);
 
     await user.click(screen.getByRole('tab', { name: 'Yearly' }));

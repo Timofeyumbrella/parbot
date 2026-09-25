@@ -7,7 +7,16 @@ afterEach(cleanup);
 
 describe('StatTiles', () => {
   it('shows the four headline numbers with formatted values and captions', () => {
-    render(<StatTiles days={30} conversations={1234} questions={5678} answered={40} unanswered={10} leads={7} />);
+    render(
+      <StatTiles
+        days={30}
+        conversations={1234}
+        questions={5678}
+        answered={40}
+        unanswered={10}
+        leads={7}
+      />,
+    );
 
     const tiles = screen.getAllByTestId('stat-tile');
     expect(tiles).toHaveLength(4);
@@ -29,7 +38,9 @@ describe('StatTiles', () => {
   });
 
   it('reads 0% and says so when nothing was answered yet', () => {
-    render(<StatTiles days={7} conversations={0} questions={0} answered={0} unanswered={0} leads={0} />);
+    render(
+      <StatTiles days={7} conversations={0} questions={0} answered={0} unanswered={0} leads={0} />,
+    );
 
     const rate = screen.getAllByTestId('stat-tile')[2]!;
     expect(within(rate).getByText('0%')).toBeInTheDocument();

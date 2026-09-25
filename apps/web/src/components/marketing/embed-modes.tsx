@@ -9,8 +9,20 @@ export const embedSnippet = (appUrl: string) =>
   `<script src="${appUrl.replace(/\/$/, '')}/widget.js" data-parbot="pb_your_public_key" async></script>`;
 
 /** A few lines standing in for a docs page, so both modes sit on the same backdrop. */
-const DocsPage = ({ alt, children, dim = false }: { alt: string; children?: React.ReactNode; dim?: boolean }) => (
-  <div role="img" aria-label={alt} className="bg-background ring-foreground/10 relative aspect-[4/3] overflow-hidden rounded-lg ring-1">
+const DocsPage = ({
+  alt,
+  children,
+  dim = false,
+}: {
+  alt: string;
+  children?: React.ReactNode;
+  dim?: boolean;
+}) => (
+  <div
+    role="img"
+    aria-label={alt}
+    className="bg-background ring-foreground/10 relative aspect-[4/3] overflow-hidden rounded-lg ring-1"
+  >
     <div aria-hidden="true" className="contents">
       <div className="flex h-7 items-center gap-1.5 border-b px-3">
         <span className="bg-foreground/15 size-2 rounded-full" />
@@ -47,7 +59,7 @@ const DocsPage = ({ alt, children, dim = false }: { alt: string; children?: Reac
 
 const BubbleIllustration = () => (
   <DocsPage alt="A docs page with a round launcher in the bottom corner and an open chat panel showing a cited answer">
-    <div className="bg-card ring-foreground/10 absolute right-12 bottom-14 flex w-[62%] max-w-[15rem] flex-col rounded-lg shadow-xl shadow-black/20 ring-1 sm:right-14 sm:bottom-16">
+    <div className="bg-card ring-foreground/10 absolute bottom-14 right-12 flex w-[62%] max-w-[15rem] flex-col rounded-lg shadow-xl shadow-black/20 ring-1 sm:bottom-16 sm:right-14">
       <div className="flex h-7 items-center gap-1.5 border-b px-2.5 text-[10px] font-medium">
         <span className="bg-primary size-1.5 rounded-full" />
         Acme Docs
@@ -70,14 +82,17 @@ const BubbleIllustration = () => (
         <span className="text-muted-foreground">Ask a question</span>
       </div>
     </div>
-    <span className="bg-primary text-primary-foreground absolute right-3 bottom-3 flex size-8 items-center justify-center rounded-full shadow-lg sm:right-4 sm:bottom-4 sm:size-9">
+    <span className="bg-primary text-primary-foreground absolute bottom-3 right-3 flex size-8 items-center justify-center rounded-full shadow-lg sm:bottom-4 sm:right-4 sm:size-9">
       <MessageCircle className="size-4" />
     </span>
   </DocsPage>
 );
 
 const PaletteIllustration = () => (
-  <DocsPage alt="A docs page dimmed behind a command palette with a question box and three suggested questions" dim>
+  <DocsPage
+    alt="A docs page dimmed behind a command palette with a question box and three suggested questions"
+    dim
+  >
     <div className="bg-popover ring-foreground/10 absolute inset-x-6 top-12 flex flex-col rounded-lg shadow-xl shadow-black/20 ring-1 sm:inset-x-10 sm:top-14">
       <div className="flex h-9 items-center gap-2 border-b px-3 text-[11px]">
         <Search className="text-muted-foreground size-3.5" />
@@ -98,7 +113,9 @@ const PaletteIllustration = () => (
           What are the rate limits?
         </li>
       </ul>
-      <div className="text-muted-foreground border-t px-3 py-1.5 text-[9px]">Answers cite the page they came from</div>
+      <div className="text-muted-foreground border-t px-3 py-1.5 text-[9px]">
+        Answers cite the page they came from
+      </div>
     </div>
   </DocsPage>
 );
@@ -147,10 +164,17 @@ export const EmbedModes = ({ appUrl }: { appUrl: string }) => (
         <Snippet code={embedSnippet(appUrl)} label="Widget install snippet" />
         <p className="text-muted-foreground text-sm leading-relaxed">
           Replace the key with the one from your assistant&apos;s Widget screen. Add{' '}
-          <code className="bg-muted rounded px-1 py-0.5 font-mono text-xs">data-mode=&quot;palette&quot;</code>{' '}
-          or <code className="bg-muted rounded px-1 py-0.5 font-mono text-xs">data-mode=&quot;bubble&quot;</code>{' '}
+          <code className="bg-muted rounded px-1 py-0.5 font-mono text-xs">
+            data-mode=&quot;palette&quot;
+          </code>{' '}
+          or{' '}
+          <code className="bg-muted rounded px-1 py-0.5 font-mono text-xs">
+            data-mode=&quot;bubble&quot;
+          </code>{' '}
           to override the mode set in the dashboard, and{' '}
-          <code className="bg-muted rounded px-1 py-0.5 font-mono text-xs">data-launcher=&quot;false&quot;</code>{' '}
+          <code className="bg-muted rounded px-1 py-0.5 font-mono text-xs">
+            data-launcher=&quot;false&quot;
+          </code>{' '}
           to hide the launcher and rely on the shortcut.
         </p>
       </Reveal>

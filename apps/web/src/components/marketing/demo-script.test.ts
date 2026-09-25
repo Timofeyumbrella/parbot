@@ -17,7 +17,9 @@ describe('splitCitationMarkers', () => {
   });
 
   it('returns plain text untouched', () => {
-    expect(splitCitationMarkers('No markers here.')).toEqual([{ type: 'text', text: 'No markers here.' }]);
+    expect(splitCitationMarkers('No markers here.')).toEqual([
+      { type: 'text', text: 'No markers here.' },
+    ]);
     expect(splitCitationMarkers('')).toEqual([]);
   });
 });
@@ -30,7 +32,10 @@ describe('DEMO_SCENES', () => {
         .map((segment) => segment.index);
 
       for (const index of indexes) {
-        expect(scene.citations.some((citation) => citation.index === index), `${scene.question} [${index}]`).toBe(true);
+        expect(
+          scene.citations.some((citation) => citation.index === index),
+          `${scene.question} [${index}]`,
+        ).toBe(true);
       }
     }
 

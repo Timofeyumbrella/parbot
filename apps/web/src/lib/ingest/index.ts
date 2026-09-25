@@ -29,7 +29,14 @@ export type IngestParams = {
 };
 
 export type IngestResult =
-  | { status: 'ready'; pages: number; documents: number; chunks: number; unchanged: number; note: string | null }
+  | {
+      status: 'ready';
+      pages: number;
+      documents: number;
+      chunks: number;
+      unchanged: number;
+      note: string | null;
+    }
   | { status: 'failed'; error: string }
   | { status: 'skipped'; reason: string };
 
@@ -99,7 +106,9 @@ const readStorageObject = async (service: ServiceClient, path: string) => {
   const { data, error } = await service.storage.from(STORAGE_BUCKET).download(path);
 
   if (error || !data) {
-    throw new IngestError('The uploaded file could not be read from storage. Delete this source and upload it again.');
+    throw new IngestError(
+      'The uploaded file could not be read from storage. Delete this source and upload it again.',
+    );
   }
 
   return new Uint8Array(await data.arrayBuffer());
@@ -122,9 +131,19 @@ const removeDocuments = async (service: ServiceClient, ids: string[], failure: s
  */
 const remainingPages = async (service: ServiceClient, source: Pick<Source, 'id' | 'owner_id'>) => {
   const [{ data: subscription }, account, own] = await Promise.all([
-    service.from('subscriptions').select('plan_id, status').eq('account_id', source.owner_id).maybeSingle(),
-    service.from('documents').select('id', { count: 'exact', head: true }).eq('owner_id', source.owner_id),
-    service.from('documents').select('id', { count: 'exact', head: true }).eq('source_id', source.id),
+    service
+      .from('subscriptions')
+      .select('plan_id, status')
+      .eq('account_id', source.owner_id)
+      .maybeSingle(),
+    service
+      .from('documents')
+      .select('id', { count: 'exact', head: true })
+      .eq('owner_id', source.owner_id),
+    service
+      .from('documents')
+      .select('id', { count: 'exact', head: true })
+      .eq('source_id', source.id),
   ]);
   const planId = entitledPlanId(subscription);
   const used = Math.max((account.count ?? 0) - (own.count ?? 0), 0);
@@ -149,10 +168,17 @@ const discoverPages = async (
 
       if (source.kind === 'sitemap') {
         // One more than the limit tells whether the sitemap goes on beyond what this run indexes.
-        const listed = await discoverSitemapUrls({ url: uri, fetchImpl, lookup, limit: pageLimit + 1 });
+        const listed = await discoverSitemapUrls({
+          url: uri,
+          fetchImpl,
+          lookup,
+          limit: pageLimit + 1,
+        });
 
         if (listed.length === 0) {
-          throw new IngestError('The sitemap lists no pages. Check the address or add the site as a website instead.');
+          throw new IngestError(
+            'The sitemap lists no pages. Check the address or add the site as a website instead.',
+          );
         }
 
         truncated = listed.length > pageLimit;
@@ -173,7 +199,11 @@ const discoverPages = async (
       });
 
       return {
-        pages: result.pages.map((page) => ({ url: page.url, title: page.title, markdown: page.markdown })),
+        pages: result.pages.map((page) => ({
+          url: page.url,
+          title: page.title,
+          markdown: page.markdown,
+        })),
         problems: result.errors.map((error) => error.message),
         truncated: truncated || result.truncated,
       };
@@ -183,7 +213,9 @@ const discoverPages = async (
       const type = uploadTypeFor(path, source.mime_type);
 
       if (!type) {
-        throw new IngestError('This file type is not supported. Upload a PDF, Word, HTML, Markdown or text file.');
+        throw new IngestError(
+          'This file type is not supported. Upload a PDF, Word, HTML, Markdown or text file.',
+        );
       }
 
       const extracted = await extractUpload(await readStorageObject(service, path), type);
@@ -211,7 +243,9 @@ const noContentMessage = (source: Source, problems: string[]) => {
     return 'The pasted text is empty.';
   }
 
-  return problems[0] ? `No pages could be read. ${problems[0]}` : 'No readable content was found on the pages.';
+  return problems[0]
+    ? `No pages could be read. ${problems[0]}`
+    : 'No readable content was found on the pages.';
 };
 
 /** What a person should know about a run that finished: pages left out and why. */
@@ -241,7 +275,9 @@ export const describeRun = ({
     const shown = problems.slice(0, 3).join(' ');
     const more = problems.length > 3 ? ` And ${problems.length - 3} more.` : '';
 
-    notes.push(`${problems.length} ${problems.length === 1 ? 'page' : 'pages'} could not be read. ${shown}${more}`);
+    notes.push(
+      `${problems.length} ${problems.length === 1 ? 'page' : 'pages'} could not be read. ${shown}${more}`,
+    );
   }
 
   return notes.length > 0 ? notes.join(' ').slice(0, 1000) : null;
@@ -258,7 +294,9 @@ const embedChunks = async (provider: AiProvider, chunks: Chunk[], title: string)
     const embedded = await provider.embed(batch, 'document');
 
     if (embedded.length !== batch.length) {
-      throw new IngestError('The embedding provider returned the wrong number of vectors. Re-index to try again.');
+      throw new IngestError(
+        'The embedding provider returned the wrong number of vectors. Re-index to try again.',
+      );
     }
 
     vectors.push(...embedded);
@@ -306,7 +344,11 @@ export const ingestSource = async (params: IngestParams): Promise<IngestResult> 
     }
   };
 
-  const { data: source, error: loadError } = await service.from('sources').select('*').eq('id', sourceId).maybeSingle();
+  const { data: source, error: loadError } = await service
+    .from('sources')
+    .select('*')
+    .eq('id', sourceId)
+    .maybeSingle();
 
   if (loadError) {
     return { status: 'failed', error: 'The source could not be loaded. Re-index to try again.' };
@@ -337,11 +379,19 @@ export const ingestSource = async (params: IngestParams): Promise<IngestResult> 
       throw new IngestError(PAGE_LIMIT_MESSAGE);
     }
 
-    const pageLimit = Math.max(1, Math.min(capacity.remaining, params.pageLimit ?? MAX_PAGES_PER_RUN, MAX_PAGES_PER_RUN));
+    const pageLimit = Math.max(
+      1,
+      Math.min(capacity.remaining, params.pageLimit ?? MAX_PAGES_PER_RUN, MAX_PAGES_PER_RUN),
+    );
     const atPlanLimit = pageLimit === capacity.remaining && capacity.remaining < MAX_PAGES_PER_RUN;
 
-    const { pages, problems, truncated } = await discoverPages(service, source, pageLimit, fetchImpl, lookup, (count) =>
-      progress.set({ pages_found: count }),
+    const { pages, problems, truncated } = await discoverPages(
+      service,
+      source,
+      pageLimit,
+      fetchImpl,
+      lookup,
+      (count) => progress.set({ pages_found: count }),
     );
 
     const readable = pages.filter((page) => page.markdown.trim().length > 0);
@@ -358,17 +408,23 @@ export const ingestSource = async (params: IngestParams): Promise<IngestResult> 
       .eq('source_id', sourceId);
 
     if (existingError) {
-      throw new IngestError('The pages indexed earlier could not be loaded. Re-index to try again.');
+      throw new IngestError(
+        'The pages indexed earlier could not be loaded. Re-index to try again.',
+      );
     }
 
     const keyOf = (url: string | null) => url ?? '';
-    const previousByKey = new Map((existing ?? []).map((document) => [keyOf(document.url), document]));
+    const previousByKey = new Map(
+      (existing ?? []).map((document) => [keyOf(document.url), document]),
+    );
     const planned = new Set(readable.map((page) => keyOf(page.url)));
 
     // Pages that vanished go first: they should not count against the plan while the rest is written.
     await removeDocuments(
       service,
-      (existing ?? []).filter((document) => !planned.has(keyOf(document.url))).map((document) => document.id),
+      (existing ?? [])
+        .filter((document) => !planned.has(keyOf(document.url)))
+        .map((document) => document.id),
       'Pages that no longer exist could not be removed. Re-index to try again.',
     );
 
@@ -413,18 +469,21 @@ export const ingestSource = async (params: IngestParams): Promise<IngestResult> 
 
       // The insert checks the account's page count in the same transaction, so runs that overlap
       // share one allowance. A null id means the limit is reached; the earlier copy, if any, stays.
-      const { data: documentId, error: documentError } = await service.rpc('insert_document_within_limit', {
-        page_limit: capacity.limit,
-        assistant: source.assistant_id,
-        owner: source.owner_id,
-        source: source.id,
-        page_url: page.url ?? undefined,
-        page_title: title,
-        page_content: page.markdown,
-        page_checksum: checksum,
-        page_token_count: estimateTokens(page.markdown),
-        replaces: previous?.id,
-      });
+      const { data: documentId, error: documentError } = await service.rpc(
+        'insert_document_within_limit',
+        {
+          page_limit: capacity.limit,
+          assistant: source.assistant_id,
+          owner: source.owner_id,
+          source: source.id,
+          page_url: page.url ?? undefined,
+          page_title: title,
+          page_content: page.markdown,
+          page_checksum: checksum,
+          page_token_count: estimateTokens(page.markdown),
+          replaces: previous?.id,
+        },
+      );
 
       if (documentError) {
         throw new IngestError('A page could not be saved. Re-index to try again.');
@@ -452,7 +511,9 @@ export const ingestSource = async (params: IngestParams): Promise<IngestResult> 
         if (error) {
           // A document without its chunks would be invisible to retrieval; leave nothing behind.
           await service.from('documents').delete().eq('id', documentId);
-          throw new IngestError('The passages of a page could not be saved. Re-index to try again.');
+          throw new IngestError(
+            'The passages of a page could not be saved. Re-index to try again.',
+          );
         }
       }
 
@@ -478,7 +539,10 @@ export const ingestSource = async (params: IngestParams): Promise<IngestResult> 
       throw new IngestError(PAGE_LIMIT_MESSAGE);
     }
 
-    const chunkCount = documents.reduce((sum, document) => sum + (document.chunks[0]?.count ?? 0), 0);
+    const chunkCount = documents.reduce(
+      (sum, document) => sum + (document.chunks[0]?.count ?? 0),
+      0,
+    );
     const indexed = stoppedAtLimit ? done : readable.length;
     const note = describeRun({
       pages: indexed,
@@ -498,7 +562,14 @@ export const ingestSource = async (params: IngestParams): Promise<IngestResult> 
       ...(title ? { title } : {}),
     });
 
-    return { status: 'ready', pages: indexed, documents: documents.length, chunks: chunkCount, unchanged, note };
+    return {
+      status: 'ready',
+      pages: indexed,
+      documents: documents.length,
+      chunks: chunkCount,
+      unchanged,
+      note,
+    };
   } catch (cause) {
     const error = humanizeIngestError(cause);
 
@@ -516,7 +587,13 @@ export { type Chunk, chunkMarkdown, estimateTokens } from './chunk';
 export { crawlableLinks, crawlPages, crawlScope, isInScope, normalizeUrl } from './crawl';
 export { humanizeIngestError, IngestError } from './errors';
 export { checksumOf, extractText, extractUpload } from './extract';
-export { assertPublicUrl, type HostLookup, isBlockedAddress, isBlockedHostname, publicLookup } from './guard';
+export {
+  assertPublicUrl,
+  type HostLookup,
+  isBlockedAddress,
+  isBlockedHostname,
+  publicLookup,
+} from './guard';
 export { htmlToMarkdown } from './html';
 export { type FetchImpl, FetchPageError } from './http';
 export { isAutoLabel, labelForUrl } from './label';

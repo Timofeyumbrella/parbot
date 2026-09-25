@@ -48,8 +48,7 @@ export const fieldErrorsOf = <Field extends string>(error: ZodError): FieldError
 };
 
 export type ParseResult<Output, Field extends string> =
-  | { ok: true; data: Output }
-  | { ok: false; state: FormState<Field> };
+  { ok: true; data: Output } | { ok: false; state: FormState<Field> };
 
 /**
  * Validates a submit. On failure the returned state carries the field messages and the values

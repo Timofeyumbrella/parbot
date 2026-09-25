@@ -3,7 +3,13 @@
 import { SendHorizontal } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
-import { DEMO_ASSISTANT_NAME, DEMO_SCENES, DEMO_TIMING, type DemoScene, splitCitationMarkers } from './demo-script';
+import {
+  DEMO_ASSISTANT_NAME,
+  DEMO_SCENES,
+  DEMO_TIMING,
+  type DemoScene,
+  splitCitationMarkers,
+} from './demo-script';
 import { AssistantTurn, CitationMarker, DemoWindow, ThinkingDots, UserBubble } from './demo-window';
 
 type Phase =
@@ -62,7 +68,10 @@ export const ScriptedDemo = ({ scenes = DEMO_SCENES }: { scenes?: DemoScene[] })
 
         for (let length = 1; length <= scene.question.length; length += 1) {
           await sleep(DEMO_TIMING.keystrokeMs, signal);
-          setState({ scene: index, phase: { kind: 'typing', typed: scene.question.slice(0, length) } });
+          setState({
+            scene: index,
+            phase: { kind: 'typing', typed: scene.question.slice(0, length) },
+          });
         }
 
         await sleep(DEMO_TIMING.beforeSendMs, signal);
@@ -105,7 +114,9 @@ export const ScriptedDemo = ({ scenes = DEMO_SCENES }: { scenes?: DemoScene[] })
               {phase.kind === 'typing' && phase.typed ? (
                 <span className="streaming-caret truncate">{phase.typed}</span>
               ) : (
-                <span className="text-muted-foreground truncate">Ask a question about the docs</span>
+                <span className="text-muted-foreground truncate">
+                  Ask a question about the docs
+                </span>
               )}
             </div>
             <span className="bg-primary text-primary-foreground flex size-9 shrink-0 items-center justify-center rounded-md">
@@ -154,7 +165,9 @@ export const ScriptedDemo = ({ scenes = DEMO_SCENES }: { scenes?: DemoScene[] })
                         <CitationMarker
                           key={position}
                           index={segment.index}
-                          citation={scene.citations.find((citation) => citation.index === segment.index)}
+                          citation={scene.citations.find(
+                            (citation) => citation.index === segment.index,
+                          )}
                         />
                       ),
                     )}
@@ -172,7 +185,10 @@ export const ScriptedDemo = ({ scenes = DEMO_SCENES }: { scenes?: DemoScene[] })
 
 /** What the widget offers after an unanswered question on plans with lead capture. Decorative. */
 const LeadCapturePreview = () => (
-  <div className="bg-muted/60 ml-9 flex flex-col gap-2 rounded-lg border p-3 text-xs" aria-hidden="true">
+  <div
+    className="bg-muted/60 ml-9 flex flex-col gap-2 rounded-lg border p-3 text-xs"
+    aria-hidden="true"
+  >
     <p className="font-medium">Want the team to follow up? Leave your email.</p>
     <div className="flex gap-2">
       <div className="bg-background text-muted-foreground flex h-8 flex-1 items-center rounded-md border px-2">

@@ -71,7 +71,10 @@ describe('storage', () => {
     window.localStorage.setItem('parbot:pb_a:messages', '{not json');
     expect(loadMessages('pb_a')).toEqual([]);
 
-    window.localStorage.setItem('parbot:pb_a:messages', JSON.stringify([{ role: 'x' }, 5, { role: 'user', text: 'ok', citations: [] }]));
+    window.localStorage.setItem(
+      'parbot:pb_a:messages',
+      JSON.stringify([{ role: 'x' }, 5, { role: 'user', text: 'ok', citations: [] }]),
+    );
     expect(loadMessages('pb_a')).toEqual([{ role: 'user', text: 'ok', citations: [] }]);
   });
 });

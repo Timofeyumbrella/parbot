@@ -28,7 +28,10 @@ export const humanizeIngestError = (cause: unknown): string => {
   if (cause instanceof ProviderError) {
     if (cause.status === 401 || cause.status === 403) {
       // The key is the operator's to fix; the row speaks to the account that added the source.
-      console.error('[ingest] the embedding provider refused the API key; check GEMINI_API_KEY', cause);
+      console.error(
+        '[ingest] the embedding provider refused the API key; check GEMINI_API_KEY',
+        cause,
+      );
 
       return 'The embedding provider turned the request down, so nothing new was indexed. Re-index later.';
     }

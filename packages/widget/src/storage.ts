@@ -51,7 +51,8 @@ const randomBytes = (length: number) => {
   return bytes;
 };
 
-const hex = (bytes: Uint8Array) => Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+const hex = (bytes: Uint8Array) =>
+  Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
 
 /** A version 4 UUID, from the platform when it offers one. */
 export const uuid = () => {

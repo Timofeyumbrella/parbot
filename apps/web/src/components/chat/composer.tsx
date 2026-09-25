@@ -63,7 +63,8 @@ export const Composer = ({
     }
 
     // A phone would pop its keyboard over the welcome screen; only a pointer device gets focus.
-    const fine = typeof window.matchMedia === 'function' ? window.matchMedia('(pointer: fine)').matches : true;
+    const fine =
+      typeof window.matchMedia === 'function' ? window.matchMedia('(pointer: fine)').matches : true;
 
     if (fine) {
       const textarea = textareaRef.current;
@@ -112,7 +113,7 @@ export const Composer = ({
         submit();
       }}
     >
-      <div className="bg-card focus-within:border-ring focus-within:ring-ring/50 flex items-end gap-2 rounded-xl border p-2 transition-[border-color,box-shadow] focus-within:ring-3">
+      <div className="bg-card focus-within:border-ring focus-within:ring-ring/50 focus-within:ring-3 flex items-end gap-2 rounded-xl border p-2 transition-[border-color,box-shadow]">
         <textarea
           ref={textareaRef}
           name="message"
@@ -126,7 +127,13 @@ export const Composer = ({
           className="placeholder:text-muted-foreground max-h-50 min-h-8 flex-1 resize-none bg-transparent px-1.5 py-1.5 text-sm leading-6 outline-none"
         />
         {streaming ? (
-          <Button type="button" size="icon-sm" variant="secondary" aria-label="Stop" onClick={onStop}>
+          <Button
+            type="button"
+            size="icon-sm"
+            variant="secondary"
+            aria-label="Stop"
+            onClick={onStop}
+          >
             <Square className="size-3 fill-current" />
           </Button>
         ) : (

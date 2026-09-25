@@ -8,13 +8,29 @@ import { toast } from 'sonner';
 
 import { updateLeadStatus } from '@/actions/leads';
 import { LocalTime } from '@/components/inbox/local-time';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { hostnameOf, LEAD_STATUSES, type LeadStatus } from '@/lib/analytics';
 import type { Lead } from '@/lib/db';
 import { safeHttpUrl } from '@parbot/shared';
 
-export type LeadRow = Pick<Lead, 'id' | 'email' | 'note' | 'page_url' | 'status' | 'created_at' | 'conversation_id'>;
+export type LeadRow = Pick<
+  Lead,
+  'id' | 'email' | 'note' | 'page_url' | 'status' | 'created_at' | 'conversation_id'
+>;
 
 const STATUS_LABELS: Record<LeadStatus, string> = {
   new: 'New',
@@ -79,11 +95,20 @@ const StatusSelect = ({
 };
 
 /** Below `sm` each row is a card and every cell carries its own label. */
-const cell = 'flex items-start justify-between gap-3 whitespace-normal sm:table-cell sm:whitespace-nowrap';
+const cell =
+  'flex items-start justify-between gap-3 whitespace-normal sm:table-cell sm:whitespace-nowrap';
 const label =
   'before:text-muted-foreground before:shrink-0 before:text-xs before:content-[attr(data-label)] sm:before:hidden';
 
-export const LeadsTable = ({ rows, assistantId, now }: { rows: LeadRow[]; assistantId: string; now: number }) => {
+export const LeadsTable = ({
+  rows,
+  assistantId,
+  now,
+}: {
+  rows: LeadRow[];
+  assistantId: string;
+  now: number;
+}) => {
   // What the server has confirmed since the page was rendered; server props win otherwise.
   const [saved, setSaved] = useState<Record<string, LeadStatus>>({});
 
@@ -93,9 +118,12 @@ export const LeadsTable = ({ rows, assistantId, now }: { rows: LeadRow[]; assist
         <Mail aria-hidden="true" className="text-muted-foreground size-5" />
         <p className="font-medium">No leads yet</p>
         <p className="text-muted-foreground max-w-md text-sm">
-          With lead capture on, visitors can leave their email after a question the docs could not answer. Turn it on
-          from the{' '}
-          <Link href={`/a/${assistantId}/widget`} className="text-foreground underline underline-offset-4">
+          With lead capture on, visitors can leave their email after a question the docs could not
+          answer. Turn it on from the{' '}
+          <Link
+            href={`/a/${assistantId}/widget`}
+            className="text-foreground underline underline-offset-4"
+          >
             Widget screen
           </Link>
           ; it is part of the Starter and Growth plans.
@@ -122,20 +150,36 @@ export const LeadsTable = ({ rows, assistantId, now }: { rows: LeadRow[]; assist
             const host = hostnameOf(lead.page_url);
 
             return (
-              <TableRow key={lead.id} data-lead-id={lead.id} className="max-sm:flex max-sm:flex-col max-sm:gap-2 max-sm:p-3">
+              <TableRow
+                key={lead.id}
+                data-lead-id={lead.id}
+                className="max-sm:flex max-sm:flex-col max-sm:gap-2 max-sm:p-3"
+              >
                 <TableCell data-label="Email" className={cn(cell, label, 'max-sm:p-0')}>
-                  <a href={`mailto:${lead.email}`} className="font-medium break-all underline-offset-4 hover:underline">
+                  <a
+                    href={`mailto:${lead.email}`}
+                    className="break-all font-medium underline-offset-4 hover:underline"
+                  >
                     {lead.email}
                   </a>
                 </TableCell>
                 <TableCell
                   data-label="Note"
-                  className={cn(cell, label, 'text-muted-foreground max-sm:p-0 sm:max-w-64 sm:truncate sm:whitespace-normal')}
+                  className={cn(
+                    cell,
+                    label,
+                    'text-muted-foreground max-sm:p-0 sm:max-w-64 sm:truncate sm:whitespace-normal',
+                  )}
                   title={lead.note ?? undefined}
                 >
-                  <span className="min-w-0 text-right sm:text-left">{lead.note || <span aria-label="No note">–</span>}</span>
+                  <span className="min-w-0 text-right sm:text-left">
+                    {lead.note || <span aria-label="No note">–</span>}
+                  </span>
                 </TableCell>
-                <TableCell data-label="Page" className={cn(cell, label, 'text-muted-foreground max-sm:p-0')}>
+                <TableCell
+                  data-label="Page"
+                  className={cn(cell, label, 'text-muted-foreground max-sm:p-0')}
+                >
                   {lead.page_url && safeHttpUrl(lead.page_url) ? (
                     <a
                       href={safeHttpUrl(lead.page_url)!}
@@ -150,17 +194,26 @@ export const LeadsTable = ({ rows, assistantId, now }: { rows: LeadRow[]; assist
                     <span aria-label="No page">–</span>
                   )}
                 </TableCell>
-                <TableCell data-label="Time" className={cn(cell, label, 'text-muted-foreground max-sm:p-0')}>
+                <TableCell
+                  data-label="Time"
+                  className={cn(cell, label, 'text-muted-foreground max-sm:p-0')}
+                >
                   <LocalTime value={lead.created_at} now={now} />
                 </TableCell>
-                <TableCell data-label="Status" className={cn(cell, label, 'items-center max-sm:p-0')}>
+                <TableCell
+                  data-label="Status"
+                  className={cn(cell, label, 'items-center max-sm:p-0')}
+                >
                   <StatusSelect
                     lead={lead}
                     status={saved[lead.id] ?? lead.status}
                     onSaved={(status) => setSaved((current) => ({ ...current, [lead.id]: status }))}
                   />
                 </TableCell>
-                <TableCell data-label="Conversation" className={cn(cell, label, 'max-sm:p-0 sm:text-right')}>
+                <TableCell
+                  data-label="Conversation"
+                  className={cn(cell, label, 'max-sm:p-0 sm:text-right')}
+                >
                   {lead.conversation_id ? (
                     <Link
                       href={`/a/${assistantId}/inbox/${lead.conversation_id}`}

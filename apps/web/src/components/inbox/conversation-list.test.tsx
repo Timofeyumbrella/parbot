@@ -32,20 +32,46 @@ const list = (...pages: ConversationRow[][]): ListData => ({
 type Payload = RealtimePostgresChangesPayload<ConversationRow>;
 
 const insert = (next: ConversationRow): Payload =>
-  ({ eventType: 'INSERT', new: next, old: {}, schema: 'public', table: 'conversations', commit_timestamp: '', errors: [] }) as Payload;
+  ({
+    eventType: 'INSERT',
+    new: next,
+    old: {},
+    schema: 'public',
+    table: 'conversations',
+    commit_timestamp: '',
+    errors: [],
+  }) as Payload;
 
 const update = (next: ConversationRow): Payload =>
-  ({ eventType: 'UPDATE', new: next, old: { id: next.id }, schema: 'public', table: 'conversations', commit_timestamp: '', errors: [] }) as Payload;
+  ({
+    eventType: 'UPDATE',
+    new: next,
+    old: { id: next.id },
+    schema: 'public',
+    table: 'conversations',
+    commit_timestamp: '',
+    errors: [],
+  }) as Payload;
 
 const remove = (id: string): Payload =>
-  ({ eventType: 'DELETE', new: {}, old: { id }, schema: 'public', table: 'conversations', commit_timestamp: '', errors: [] }) as Payload;
+  ({
+    eventType: 'DELETE',
+    new: {},
+    old: { id },
+    schema: 'public',
+    table: 'conversations',
+    commit_timestamp: '',
+    errors: [],
+  }) as Payload;
 
 const ids = (data: ListData) => data.pages.flatMap((page) => page.rows.map((item) => item.id));
 
 const NOW = Date.parse('2026-09-23T12:00:00Z');
 
 const renderList = (initialRows: ConversationRow[]) => {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false, staleTime: Infinity } },
+  });
 
   render(
     <QueryClientProvider client={queryClient}>
@@ -56,7 +82,8 @@ const renderList = (initialRows: ConversationRow[]) => {
   return queryClient;
 };
 
-const shownIds = () => screen.getAllByRole('listitem').map((item) => item.getAttribute('data-conversation-id'));
+const shownIds = () =>
+  screen.getAllByRole('listitem').map((item) => item.getAttribute('data-conversation-id'));
 
 describe('ConversationList', () => {
   it('shows rows in the order the server pages them, a row without a message last', async () => {
@@ -74,7 +101,11 @@ describe('ConversationList', () => {
     // Its first message arrives over Realtime and only then does it move to the top.
     queryClient.setQueryData<ListData>(conversationListKey('asst', 'all'), (data) =>
       data
-        ? applyChange(data, update(row({ id: 'z', last_message_at: '2026-09-23T11:59:30+00:00' })), 'all').data
+        ? applyChange(
+            data,
+            update(row({ id: 'z', last_message_at: '2026-09-23T11:59:30+00:00' })),
+            'all',
+          ).data
         : data,
     );
 
@@ -106,15 +137,26 @@ describe('applyChange', () => {
 
   it('updates a known row in place without marking it new', () => {
     const data = list([row({ id: 'a', message_count: 2 })], [row({ id: 'b', message_count: 4 })]);
-    const result = applyChange(data, update(row({ id: 'b', message_count: 5, last_message_at: '2026-09-23T11:00:00Z' })), 'all');
+    const result = applyChange(
+      data,
+      update(row({ id: 'b', message_count: 5, last_message_at: '2026-09-23T11:00:00Z' })),
+      'all',
+    );
 
     expect(result.added).toBeNull();
-    expect(result.data.pages[1]?.rows[0]).toMatchObject({ id: 'b', message_count: 5, last_message_at: '2026-09-23T11:00:00Z' });
+    expect(result.data.pages[1]?.rows[0]).toMatchObject({
+      id: 'b',
+      message_count: 5,
+      last_message_at: '2026-09-23T11:00:00Z',
+    });
     expect(ids(result.data)).toEqual(['a', 'b']);
   });
 
   it('drops a known row once an update moves it out of the filter', () => {
-    const data = list([row({ id: 'a', unanswered_count: 1 }), row({ id: 'b', unanswered_count: 2 })]);
+    const data = list([
+      row({ id: 'a', unanswered_count: 1 }),
+      row({ id: 'b', unanswered_count: 2 }),
+    ]);
     const result = applyChange(data, update(row({ id: 'a', unanswered_count: 0 })), 'unanswered');
 
     expect(ids(result.data)).toEqual(['b']);

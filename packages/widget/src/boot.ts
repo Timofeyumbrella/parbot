@@ -98,7 +98,10 @@ export const boot = async (script = findScript()): Promise<ParbotWidget | null> 
 
     return widget;
   } catch (cause) {
-    console.warn('[Parbot]', cause instanceof Error ? cause.message : 'The widget could not start.');
+    console.warn(
+      '[Parbot]',
+      cause instanceof Error ? cause.message : 'The widget could not start.',
+    );
 
     return null;
   }

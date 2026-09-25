@@ -50,7 +50,13 @@ describe('LiveDemo', () => {
         {
           type: 'citations',
           citations: [
-            { index: 1, documentId: 'd', title: 'Authentication › API keys', url: 'https://docs.acme.dev/auth', snippet: '' },
+            {
+              index: 1,
+              documentId: 'd',
+              title: 'Authentication › API keys',
+              url: 'https://docs.acme.dev/auth',
+              snippet: '',
+            },
           ],
         },
         { type: 'done', answered: true, latencyMs: 12 },
@@ -66,13 +72,17 @@ describe('LiveDemo', () => {
 
     await user.click(screen.getByRole('button', { name: 'How do I rotate a key?' }));
 
-    expect(await screen.findByText('Open Settings, then API keys', { exact: false })).toBeInTheDocument();
+    expect(
+      await screen.findByText('Open Settings, then API keys', { exact: false }),
+    ).toBeInTheDocument();
     expect(screen.getByText('How do I rotate a key?')).toBeInTheDocument();
 
     const chip = await screen.findByRole('link', { name: '1' });
 
     expect(chip).toHaveAttribute('href', 'https://docs.acme.dev/auth');
-    expect(screen.getByRole('list', { name: 'Sources' })).toHaveTextContent('Authentication › API keys');
+    expect(screen.getByRole('list', { name: 'Sources' })).toHaveTextContent(
+      'Authentication › API keys',
+    );
 
     const chatCall = fetchMock.mock.calls.find(([input]) => String(input) === '/api/widget/chat');
 
@@ -85,7 +95,9 @@ describe('LiveDemo', () => {
     expect(body.visitorId).toMatch(/^[A-Za-z0-9_-]{8,64}$/);
     expect(body.conversationId).toMatch(/^[0-9a-f-]{36}$/);
 
-    await waitFor(() => expect(screen.getByRole('textbox', { name: 'Ask a question' })).toBeEnabled());
+    await waitFor(() =>
+      expect(screen.getByRole('textbox', { name: 'Ask a question' })).toBeEnabled(),
+    );
   });
 
   it('keeps the same conversation across questions typed into the form', async () => {
@@ -123,16 +135,24 @@ describe('LiveDemo', () => {
     fetchMock.mockImplementation(async (input: RequestInfo | URL) =>
       String(input).startsWith('/api/widget/config')
         ? json(CONFIG)
-        : json({ code: 'rate_limited', message: 'Too many questions. Try again in a minute.' }, 429),
+        : json(
+            { code: 'rate_limited', message: 'Too many questions. Try again in a minute.' },
+            429,
+          ),
     );
 
     const user = userEvent.setup();
 
     render(<LiveDemo demoKey="pb_demo" />);
 
-    await user.type(await screen.findByRole('textbox', { name: 'Ask a question' }), 'Anything{Enter}');
+    await user.type(
+      await screen.findByRole('textbox', { name: 'Ask a question' }),
+      'Anything{Enter}',
+    );
 
-    expect(await screen.findByText('Too many questions. Try again in a minute.')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Too many questions. Try again in a minute.'),
+    ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
   });
 

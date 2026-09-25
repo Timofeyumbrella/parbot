@@ -21,11 +21,16 @@ export const CHAT_NAMESPACE = ['chat'] as const;
 /** The inbox keeps its own conversation caches; a chat mutation tells it to refetch. */
 export const INBOX_NAMESPACE = ['inbox'] as const;
 
-export const conversationsKey = (assistantId: string) => [...CHAT_NAMESPACE, 'conversations', assistantId] as const;
-export const threadKey = (conversationId: string) => [...CHAT_NAMESPACE, 'thread', conversationId] as const;
+export const conversationsKey = (assistantId: string) =>
+  [...CHAT_NAMESPACE, 'conversations', assistantId] as const;
+export const threadKey = (conversationId: string) =>
+  [...CHAT_NAMESPACE, 'thread', conversationId] as const;
 
 /** The assistant's in-app conversations, newest first. Works with the server and the browser client. */
-export const fetchConversations = async (client: Client, assistantId: string): Promise<ConversationRow[]> => {
+export const fetchConversations = async (
+  client: Client,
+  assistantId: string,
+): Promise<ConversationRow[]> => {
   const { data, error } = await client
     .from('conversations')
     .select(CONVERSATION_COLUMNS)
@@ -42,7 +47,10 @@ export const fetchConversations = async (client: Client, assistantId: string): P
 };
 
 /** The list plus the clock it was read at, so the client can tell a newer snapshot from a replay. */
-export const readConversationSnapshot = async (client: Client, assistantId: string): Promise<ConversationSnapshot> => {
+export const readConversationSnapshot = async (
+  client: Client,
+  assistantId: string,
+): Promise<ConversationSnapshot> => {
   const rows = await fetchConversations(client, assistantId);
 
   return { rows, fetchedAt: Date.now() };

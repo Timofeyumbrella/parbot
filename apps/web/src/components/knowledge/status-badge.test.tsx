@@ -16,7 +16,9 @@ describe('StatusBadge', () => {
     rerender(<StatusBadge source={{ ...base, status: 'crawling', pages_found: 7 }} />);
     expect(screen.getByText('Crawling · 7 pages')).toBeInTheDocument();
 
-    rerender(<StatusBadge source={{ ...base, status: 'indexing', pages_found: 12, pages_done: 3 }} />);
+    rerender(
+      <StatusBadge source={{ ...base, status: 'indexing', pages_found: 12, pages_done: 3 }} />,
+    );
     expect(screen.getByText('Indexing 3 of 12 pages')).toBeInTheDocument();
 
     rerender(<StatusBadge source={{ ...base, status: 'ready' }} />);
@@ -28,7 +30,9 @@ describe('StatusBadge', () => {
 
     render(
       <TooltipProvider delayDuration={0}>
-        <StatusBadge source={{ ...base, status: 'failed', error: 'Could not fetch https://x.test: HTTP 404.' }} />
+        <StatusBadge
+          source={{ ...base, status: 'failed', error: 'Could not fetch https://x.test: HTTP 404.' }}
+        />
       </TooltipProvider>,
     );
 
@@ -36,6 +40,8 @@ describe('StatusBadge', () => {
 
     await user.hover(badge);
 
-    expect(await screen.findByRole('tooltip')).toHaveTextContent('Could not fetch https://x.test: HTTP 404.');
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(
+      'Could not fetch https://x.test: HTTP 404.',
+    );
   });
 });

@@ -12,7 +12,7 @@ export type PanelLead = Pick<Lead, 'id' | 'email' | 'status'>;
 const Row = ({ label, children }: { label: string; children: React.ReactNode }) => (
   <div className="flex flex-col gap-0.5">
     <dt className="text-muted-foreground text-xs">{label}</dt>
-    <dd className="min-w-0 text-sm break-words">{children}</dd>
+    <dd className="min-w-0 break-words text-sm">{children}</dd>
   </div>
 );
 
@@ -24,7 +24,14 @@ export const ConversationPanel = ({
 }: {
   conversation: Pick<
     Conversation,
-    'id' | 'assistant_id' | 'channel' | 'visitor_id' | 'page_url' | 'created_at' | 'message_count' | 'unanswered_count'
+    | 'id'
+    | 'assistant_id'
+    | 'channel'
+    | 'visitor_id'
+    | 'page_url'
+    | 'created_at'
+    | 'message_count'
+    | 'unanswered_count'
   >;
   leads: PanelLead[];
   now: number;
@@ -45,7 +52,9 @@ export const ConversationPanel = ({
           </Row>
           <Row label="Visitor">
             {conversation.visitor_id ? (
-              <code className="bg-muted rounded px-1 py-0.5 font-mono text-xs">{conversation.visitor_id}</code>
+              <code className="bg-muted rounded px-1 py-0.5 font-mono text-xs">
+                {conversation.visitor_id}
+              </code>
             ) : (
               <span className="text-muted-foreground">You, in Chat</span>
             )}
@@ -67,7 +76,10 @@ export const ConversationPanel = ({
           </Row>
           <Row label="Started">
             <LocalTime value={conversation.created_at} now={now} />
-            <AbsoluteTime value={conversation.created_at} className="text-muted-foreground block text-xs" />
+            <AbsoluteTime
+              value={conversation.created_at}
+              className="text-muted-foreground block text-xs"
+            />
           </Row>
           <Row label="Messages">
             <span className="tabular-nums">{formatCount(conversation.message_count)}</span>
@@ -85,7 +97,10 @@ export const ConversationPanel = ({
               <ul className="flex flex-col gap-1">
                 {leads.map((lead) => (
                   <li key={lead.id} className="flex items-center gap-2">
-                    <a href={`mailto:${lead.email}`} className="truncate underline underline-offset-4">
+                    <a
+                      href={`mailto:${lead.email}`}
+                      className="truncate underline underline-offset-4"
+                    >
                       {lead.email}
                     </a>
                     <span className="text-muted-foreground text-xs capitalize">{lead.status}</span>
@@ -96,7 +111,10 @@ export const ConversationPanel = ({
           </Row>
         </dl>
         <div className="mt-4 border-t pt-4">
-          <DeleteConversation assistantId={conversation.assistant_id} conversationId={conversation.id} />
+          <DeleteConversation
+            assistantId={conversation.assistant_id}
+            conversationId={conversation.id}
+          />
         </div>
       </CardContent>
     </Card>

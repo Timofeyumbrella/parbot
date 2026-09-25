@@ -17,10 +17,14 @@ describe('PagesMeter', () => {
   it('points at billing when the plan is nearly used up, and says so at the limit', () => {
     const { rerender } = render(<PagesMeter used={85} plan={{ name: 'Hobby', pages: 100 }} />);
 
-    expect(screen.getByRole('link', { name: 'Close to the limit. See plans on Billing' })).toHaveAttribute('href', '/billing');
+    expect(
+      screen.getByRole('link', { name: 'Close to the limit. See plans on Billing' }),
+    ).toHaveAttribute('href', '/billing');
 
     rerender(<PagesMeter used={100} plan={{ name: 'Hobby', pages: 100 }} />);
 
-    expect(screen.getByRole('link', { name: 'Page limit reached. Upgrade on Billing' })).toHaveAttribute('href', '/billing');
+    expect(
+      screen.getByRole('link', { name: 'Page limit reached. Upgrade on Billing' }),
+    ).toHaveAttribute('href', '/billing');
   });
 });

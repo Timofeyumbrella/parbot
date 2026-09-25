@@ -38,13 +38,23 @@ export const PendingNav = ({ children }: { children: React.ReactNode }) => {
     });
   };
 
-  return <PendingNavContext.Provider value={{ pending, target, navigate }}>{children}</PendingNavContext.Provider>;
+  return (
+    <PendingNavContext.Provider value={{ pending, target, navigate }}>
+      {children}
+    </PendingNavContext.Provider>
+  );
 };
 
 export const usePendingNav = () => useContext(PendingNavContext);
 
 /** Wraps the content a switch replaces; it dims and blocks clicks while the switch is pending. */
-export const PendingRegion = ({ children, className }: { children: React.ReactNode; className?: string }) => {
+export const PendingRegion = ({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) => {
   const { pending } = usePendingNav();
 
   return (
@@ -109,8 +119,10 @@ export const SegmentedLink = ({
 };
 
 /** The shared look of a compact pill switch (period, filter). */
-export const pillNavClass = 'bg-muted text-muted-foreground inline-flex h-8 w-fit max-w-full items-center rounded-lg p-[3px]';
-export const pillLinkClass = 'inline-flex h-full items-center rounded-md px-2.5 text-sm font-medium whitespace-nowrap transition-colors';
+export const pillNavClass =
+  'bg-muted text-muted-foreground inline-flex h-8 w-fit max-w-full items-center rounded-lg p-[3px]';
+export const pillLinkClass =
+  'inline-flex h-full items-center rounded-md px-2.5 text-sm font-medium whitespace-nowrap transition-colors';
 export const pillActiveClass =
   'bg-background text-foreground dark:bg-input/30 dark:border-input border border-transparent shadow-sm';
 export const pillInactiveClass = 'hover:text-foreground';

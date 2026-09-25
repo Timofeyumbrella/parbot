@@ -10,11 +10,24 @@ const NOW = new Date('2026-09-23T12:00:00Z').getTime();
 const base = {
   id: 'm1',
   role: 'assistant' as const,
-  content: 'Create the key in **Settings** [1]. Rotate it monthly [2]. Scopes limit it [4].\n\n```bash\nparbot keys create\n```',
+  content:
+    'Create the key in **Settings** [1]. Rotate it monthly [2]. Scopes limit it [4].\n\n```bash\nparbot keys create\n```',
   citations: [
-    { index: 1, documentId: 'd1', title: 'Authentication', url: 'https://docs.example.com/auth', snippet: 'API keys…' },
+    {
+      index: 1,
+      documentId: 'd1',
+      title: 'Authentication',
+      url: 'https://docs.example.com/auth',
+      snippet: 'API keys…',
+    },
     { index: 2, documentId: 'd2', title: 'Offline doc', url: null, snippet: 'No link' },
-    { index: 4, documentId: 'd1', title: 'Authentication', url: 'https://docs.example.com/auth', snippet: 'Scopes…' },
+    {
+      index: 4,
+      documentId: 'd1',
+      title: 'Authentication',
+      url: 'https://docs.example.com/auth',
+      snippet: 'Scopes…',
+    },
   ],
   answered: true,
   feedback: null,
@@ -39,7 +52,10 @@ describe('TranscriptMessage', () => {
     const sources = screen.getByTestId('sources');
 
     expect(sources).toHaveAttribute('id', 'sources-m1');
-    expect(within(sources).getByRole('link')).toHaveAttribute('href', 'https://docs.example.com/auth');
+    expect(within(sources).getByRole('link')).toHaveAttribute(
+      'href',
+      'https://docs.example.com/auth',
+    );
     expect(within(sources).getAllByText('Authentication')).toHaveLength(1);
     expect(within(sources).getByText('Offline doc').parentElement!.tagName).toBe('SPAN');
     expect(screen.getByText('5 min ago')).toBeInTheDocument();
@@ -55,7 +71,12 @@ describe('TranscriptMessage', () => {
 
     const chat = render(
       <MessageBubble
-        message={{ ...base, citations: parseCitations(base.citations), latency_ms: null, status: 'complete' }}
+        message={{
+          ...base,
+          citations: parseCitations(base.citations),
+          latency_ms: null,
+          status: 'complete',
+        }}
         assistantId="asst"
         assistantName="Acme Docs"
       />,
@@ -68,7 +89,13 @@ describe('TranscriptMessage', () => {
   it('marks unanswered answers and shows feedback as an indicator', () => {
     render(
       <TranscriptMessage
-        message={{ ...base, content: 'I could not find that.', citations: [], answered: false, feedback: -1 }}
+        message={{
+          ...base,
+          content: 'I could not find that.',
+          citations: [],
+          answered: false,
+          feedback: -1,
+        }}
         now={NOW}
       />,
     );
@@ -81,7 +108,14 @@ describe('TranscriptMessage', () => {
   it('shows helpful feedback and keeps user messages as plain text', () => {
     render(
       <TranscriptMessage
-        message={{ ...base, role: 'user', content: '**not markdown** [1]', citations: [], answered: null, feedback: 1 }}
+        message={{
+          ...base,
+          role: 'user',
+          content: '**not markdown** [1]',
+          citations: [],
+          answered: null,
+          feedback: 1,
+        }}
         now={NOW}
       />,
     );

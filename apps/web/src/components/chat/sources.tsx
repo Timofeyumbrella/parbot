@@ -38,7 +38,11 @@ const CHIP =
  * keeps the row clear of the fixed phone header when a marker jumps to it.
  */
 export const Sources = ({ citations, id }: { citations: Citation[]; id: string }) => (
-  <div id={id} className="flex scroll-mt-16 flex-wrap items-center gap-1.5 pt-1" data-testid="sources">
+  <div
+    id={id}
+    className="flex scroll-mt-16 flex-wrap items-center gap-1.5 pt-1"
+    data-testid="sources"
+  >
     <span className="text-muted-foreground mr-0.5 text-xs">Sources</span>
     {byDocument(citations).map(({ citation, indexes, snippets }) => {
       const host = hostnameOf(citation.url);
@@ -62,7 +66,14 @@ export const Sources = ({ citations, id }: { citations: Citation[]; id: string }
       );
 
       return citation.url ? (
-        <a key={indexes[0]} href={citation.url} target="_blank" rel="noreferrer" title={title} className={CHIP}>
+        <a
+          key={indexes[0]}
+          href={citation.url}
+          target="_blank"
+          rel="noreferrer"
+          title={title}
+          className={CHIP}
+        >
           {inner}
         </a>
       ) : (

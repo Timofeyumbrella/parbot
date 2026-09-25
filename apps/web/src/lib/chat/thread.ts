@@ -58,7 +58,8 @@ export type MessageRow = {
   latency_ms: number | null;
 };
 
-export const THREAD_MESSAGE_COLUMNS = 'id, role, content, citations, answered, feedback, created_at, latency_ms';
+export const THREAD_MESSAGE_COLUMNS =
+  'id, role, content, citations, answered, feedback, created_at, latency_ms';
 
 export const emptyThread = (): Thread => ({ messages: [], active: null });
 
@@ -164,7 +165,9 @@ const patchMessage = (
   patch: Partial<ThreadMessage> | ((message: ThreadMessage) => Partial<ThreadMessage>),
 ) =>
   messages.map((message) =>
-    message.id === id ? { ...message, ...(typeof patch === 'function' ? patch(message) : patch) } : message,
+    message.id === id
+      ? { ...message, ...(typeof patch === 'function' ? patch(message) : patch) }
+      : message,
   );
 
 /** Applies one protocol event to the exchange `thread.active` points at. Events with no active exchange are ignored. */
@@ -189,7 +192,10 @@ export const applyStreamEvent = (thread: Thread, event: ChatStreamEvent): Thread
         return message;
       });
 
-      return { messages, active: { userId: event.userMessageId, assistantId: event.assistantMessageId } };
+      return {
+        messages,
+        active: { userId: event.userMessageId, assistantId: event.assistantMessageId },
+      };
     }
 
     case 'token':

@@ -35,7 +35,7 @@ export const Segmented = <T extends string>({
   <fieldset className={cn('flex min-w-0 flex-col gap-1.5', className)}>
     <legend
       className={cn(
-        'mb-1.5 flex items-center gap-2 text-sm leading-none font-medium',
+        'mb-1.5 flex items-center gap-2 text-sm font-medium leading-none',
         hideLabel && 'sr-only',
       )}
     >
@@ -46,7 +46,7 @@ export const Segmented = <T extends string>({
       {options.map((option) => (
         <label
           key={option.value}
-          className="text-muted-foreground has-checked:bg-background has-checked:text-foreground has-focus-visible:ring-ring/50 cursor-pointer rounded-md px-3 py-1 text-sm font-medium transition-colors select-none has-checked:shadow-sm has-focus-visible:ring-2 has-disabled:cursor-not-allowed has-disabled:opacity-50"
+          className="text-muted-foreground has-checked:bg-background has-checked:text-foreground has-focus-visible:ring-ring/50 has-checked:shadow-sm has-focus-visible:ring-2 has-disabled:cursor-not-allowed has-disabled:opacity-50 cursor-pointer select-none rounded-md px-3 py-1 text-sm font-medium transition-colors"
         >
           <input
             type="radio"

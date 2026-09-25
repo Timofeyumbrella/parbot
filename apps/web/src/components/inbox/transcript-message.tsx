@@ -22,12 +22,19 @@ export const parseCitations = (value: unknown): Citation[] => {
   const parsed = z.array(citationSchema).safeParse(value);
 
   return parsed.success
-    ? parsed.data.map((citation) => ({ ...citation, url: citation.url ?? null, snippet: citation.snippet ?? '' }))
+    ? parsed.data.map((citation) => ({
+        ...citation,
+        url: citation.url ?? null,
+        snippet: citation.snippet ?? '',
+      }))
     : [];
 };
 
 export type TranscriptMessageProps = {
-  message: Pick<Message, 'id' | 'role' | 'content' | 'citations' | 'answered' | 'feedback' | 'created_at'>;
+  message: Pick<
+    Message,
+    'id' | 'role' | 'content' | 'citations' | 'answered' | 'feedback' | 'created_at'
+  >;
   now: number;
 };
 
@@ -85,12 +92,18 @@ export const TranscriptMessage = ({ message, now }: TranscriptMessageProps) => {
           <LocalTime value={message.created_at} now={now} />
           {unanswered ? <UnansweredBadge /> : null}
           {message.feedback === 1 ? (
-            <span className="inline-flex items-center gap-1" title="The reader marked this answer as helpful">
+            <span
+              className="inline-flex items-center gap-1"
+              title="The reader marked this answer as helpful"
+            >
               <ThumbsUp aria-hidden="true" className="text-success size-3.5" />
               Helpful
             </span>
           ) : message.feedback === -1 ? (
-            <span className="inline-flex items-center gap-1" title="The reader marked this answer as not helpful">
+            <span
+              className="inline-flex items-center gap-1"
+              title="The reader marked this answer as not helpful"
+            >
               <ThumbsDown aria-hidden="true" className="text-destructive size-3.5" />
               Not helpful
             </span>

@@ -23,7 +23,8 @@ export default function MarketingError({ error, retry, reset }: ErrorProps) {
         <h1 className="text-2xl font-semibold tracking-tight">This page could not be loaded.</h1>
         <p className="text-muted-foreground leading-relaxed">
           Something went wrong while rendering the landing page
-          {error.digest ? ` (reference ${error.digest})` : ''}. Try again, or go straight to sign in.
+          {error.digest ? ` (reference ${error.digest})` : ''}. Try again, or go straight to sign
+          in.
         </p>
         <div className="flex gap-2">
           <Button type="button" onClick={() => (retry ?? reset)()}>

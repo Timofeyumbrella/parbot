@@ -20,7 +20,15 @@ type WidgetScreenProps = {
 };
 
 /** The settings form on the left, install snippet and live preview on the right. */
-export const WidgetScreen = ({ assistantId, publicKey, settings, gates, snippet, appUrl, hasSources }: WidgetScreenProps) => {
+export const WidgetScreen = ({
+  assistantId,
+  publicKey,
+  settings,
+  gates,
+  snippet,
+  appUrl,
+  hasSources,
+}: WidgetScreenProps) => {
   const [preview, setPreview] = useState<{ mode: WidgetMode; version: number }>({
     mode: gates.palette ? settings.mode : 'bubble',
     version: 0,
@@ -32,7 +40,9 @@ export const WidgetScreen = ({ assistantId, publicKey, settings, gates, snippet,
         assistantId={assistantId}
         settings={settings}
         gates={gates}
-        onSaved={(saved) => setPreview((current) => ({ mode: saved.mode, version: current.version + 1 }))}
+        onSaved={(saved) =>
+          setPreview((current) => ({ mode: saved.mode, version: current.version + 1 }))
+        }
       />
       <div className="flex min-w-0 flex-col gap-4">
         <InstallCard snippet={snippet} />

@@ -7,7 +7,14 @@ import Link from 'next/link';
 import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
-import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 
 type WidgetPreviewProps = {
@@ -39,11 +46,20 @@ const PreviewFrame = ({ src }: { src: string }) => {
   );
 };
 
-export const WidgetPreview = ({ demoPath, demoUrl, mode, version, hasSources, knowledgeHref }: WidgetPreviewProps) => (
+export const WidgetPreview = ({
+  demoPath,
+  demoUrl,
+  mode,
+  version,
+  hasSources,
+  knowledgeHref,
+}: WidgetPreviewProps) => (
   <Card size="sm">
     <CardHeader>
       <CardTitle>Live preview</CardTitle>
-      <CardDescription>The public demo page with your saved settings, opened. It reloads after every save.</CardDescription>
+      <CardDescription>
+        The public demo page with your saved settings, opened. It reloads after every save.
+      </CardDescription>
       <CardAction>
         <Button asChild variant="outline" size="sm">
           <a href={demoUrl} target="_blank" rel="noopener noreferrer">

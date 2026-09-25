@@ -9,7 +9,10 @@ const bodySchema = z.object({ value: z.union([z.literal(1), z.literal(-1), z.nul
 const idSchema = z.uuid();
 
 /** Thumbs up, thumbs down or cleared. Row level security and the column grant scope the write. */
-export async function POST(request: NextRequest, context: RouteContext<'/api/messages/[messageId]/feedback'>) {
+export async function POST(
+  request: NextRequest,
+  context: RouteContext<'/api/messages/[messageId]/feedback'>,
+) {
   const { messageId } = await context.params;
 
   if (!idSchema.safeParse(messageId).success) {

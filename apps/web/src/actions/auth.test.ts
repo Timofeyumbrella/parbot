@@ -32,20 +32,29 @@ const idle = { status: 'idle' as const };
 
 beforeEach(() => {
   auth.signInWithPassword.mockResolvedValue({ data: {}, error: null });
-  auth.signUp.mockResolvedValue({ data: { session: { access_token: 'x' }, user: { id: '1' } }, error: null });
+  auth.signUp.mockResolvedValue({
+    data: { session: { access_token: 'x' }, user: { id: '1' } },
+    error: null,
+  });
 });
 
 describe('signIn', () => {
   it('goes to the dashboard by default', async () => {
-    await expect(signIn(idle, form({ email: 'ada@example.com', password: 'secret-1' }))).rejects.toThrow(
-      'REDIRECT /dashboard',
-    );
-    expect(auth.signInWithPassword).toHaveBeenCalledWith({ email: 'ada@example.com', password: 'secret-1' });
+    await expect(
+      signIn(idle, form({ email: 'ada@example.com', password: 'secret-1' })),
+    ).rejects.toThrow('REDIRECT /dashboard');
+    expect(auth.signInWithPassword).toHaveBeenCalledWith({
+      email: 'ada@example.com',
+      password: 'secret-1',
+    });
   });
 
   it('honours a relative next path and ignores an absolute one', async () => {
     await expect(
-      signIn(idle, form({ email: 'ada@example.com', password: 'secret-1', next: '/a/1/inbox?tab=leads' })),
+      signIn(
+        idle,
+        form({ email: 'ada@example.com', password: 'secret-1', next: '/a/1/inbox?tab=leads' }),
+      ),
     ).rejects.toThrow('REDIRECT /a/1/inbox?tab=leads');
 
     await expect(
@@ -72,7 +81,10 @@ describe('signIn', () => {
   it('validates before calling auth', async () => {
     const state = await signIn(idle, form({ email: 'nope', password: '' }));
 
-    expect(state.fieldErrors).toEqual({ email: 'Enter a valid email address.', password: 'Enter your password.' });
+    expect(state.fieldErrors).toEqual({
+      email: 'Enter a valid email address.',
+      password: 'Enter your password.',
+    });
     expect(auth.signInWithPassword).not.toHaveBeenCalled();
   });
 });
@@ -82,7 +94,13 @@ describe('signUp', () => {
     await expect(
       signUp(
         idle,
-        form({ fullName: ' Ada Lovelace ', email: 'Ada@Example.com', password: 'correct horse', plan: 'starter', interval: 'yearly' }),
+        form({
+          fullName: ' Ada Lovelace ',
+          email: 'Ada@Example.com',
+          password: 'correct horse',
+          plan: 'starter',
+          interval: 'yearly',
+        }),
       ),
     ).rejects.toThrow('REDIRECT /onboarding?plan=starter&interval=yearly');
 
@@ -95,7 +113,15 @@ describe('signUp', () => {
 
   it('drops a plan it does not know', async () => {
     await expect(
-      signUp(idle, form({ fullName: 'Ada', email: 'ada@example.com', password: 'correct horse', plan: 'gold' })),
+      signUp(
+        idle,
+        form({
+          fullName: 'Ada',
+          email: 'ada@example.com',
+          password: 'correct horse',
+          plan: 'gold',
+        }),
+      ),
     ).rejects.toThrow('REDIRECT /onboarding');
   });
 
@@ -105,12 +131,23 @@ describe('signUp', () => {
       error: { code: 'user_already_exists', message: 'User already registered' },
     });
 
-    const existing = await signUp(idle, form({ fullName: 'Ada', email: 'ada@example.com', password: 'correct horse' }));
+    const existing = await signUp(
+      idle,
+      form({ fullName: 'Ada', email: 'ada@example.com', password: 'correct horse' }),
+    );
 
     expect(existing.error).toBe('An account with this email already exists. Sign in instead.');
-    expect(existing.values).toEqual({ fullName: 'Ada', email: 'ada@example.com', plan: '', interval: '' });
+    expect(existing.values).toEqual({
+      fullName: 'Ada',
+      email: 'ada@example.com',
+      plan: '',
+      interval: '',
+    });
 
-    const weak = await signUp(idle, form({ fullName: 'Ada', email: 'ada@example.com', password: 'short' }));
+    const weak = await signUp(
+      idle,
+      form({ fullName: 'Ada', email: 'ada@example.com', password: 'short' }),
+    );
 
     expect(weak.fieldErrors).toEqual({ password: 'Use at least 8 characters.' });
   });
@@ -118,7 +155,10 @@ describe('signUp', () => {
   it('asks the visitor to confirm when no session comes back', async () => {
     auth.signUp.mockResolvedValue({ data: { session: null, user: { id: '1' } }, error: null });
 
-    const state = await signUp(idle, form({ fullName: 'Ada', email: 'ada@example.com', password: 'correct horse' }));
+    const state = await signUp(
+      idle,
+      form({ fullName: 'Ada', email: 'ada@example.com', password: 'correct horse' }),
+    );
 
     expect(state.status).toBe('success');
     expect(state.message).toMatch(/confirmation link to ada@example.com/);

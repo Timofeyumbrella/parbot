@@ -35,7 +35,13 @@ const meta: ChatStreamEvent = {
 };
 
 const citations: Citation[] = [
-  { index: 1, documentId: 'd1', title: 'Authentication', url: 'https://docs.example.com/auth', snippet: 'API keys…' },
+  {
+    index: 1,
+    documentId: 'd1',
+    title: 'Authentication',
+    url: 'https://docs.example.com/auth',
+    snippet: 'API keys…',
+  },
 ];
 
 const run = (thread: Thread, events: ChatStreamEvent[]) => events.reduce(applyStreamEvent, thread);
@@ -45,16 +51,35 @@ describe('beginExchange', () => {
     const thread = started();
 
     expect(thread.messages).toHaveLength(2);
-    expect(thread.messages[0]).toMatchObject({ id: 'tmp_user', role: 'user', status: 'pending', content: 'How do I rotate an API key?' });
-    expect(thread.messages[1]).toMatchObject({ id: 'tmp_assistant', role: 'assistant', status: 'streaming', content: '' });
+    expect(thread.messages[0]).toMatchObject({
+      id: 'tmp_user',
+      role: 'user',
+      status: 'pending',
+      content: 'How do I rotate an API key?',
+    });
+    expect(thread.messages[1]).toMatchObject({
+      id: 'tmp_assistant',
+      role: 'assistant',
+      status: 'streaming',
+      content: '',
+    });
     expect(thread.active).toEqual({ userId: 'tmp_user', assistantId: 'tmp_assistant' });
     expect(isStreaming(thread)).toBe(true);
   });
 
   it('keeps earlier messages', () => {
-    const thread = beginExchange(started(), { userId: 'tmp_2', assistantId: 'tmp_3', content: 'And on Windows?' });
+    const thread = beginExchange(started(), {
+      userId: 'tmp_2',
+      assistantId: 'tmp_3',
+      content: 'And on Windows?',
+    });
 
-    expect(thread.messages.map((message) => message.id)).toEqual(['tmp_user', 'tmp_assistant', 'tmp_2', 'tmp_3']);
+    expect(thread.messages.map((message) => message.id)).toEqual([
+      'tmp_user',
+      'tmp_assistant',
+      'tmp_2',
+      'tmp_3',
+    ]);
   });
 });
 
@@ -81,12 +106,20 @@ describe('applyStreamEvent', () => {
       { type: 'token', text: 'Settings [1]' },
     ]);
 
-    expect(thread.messages[1]).toMatchObject({ id: 'a1', content: 'Rotate it in Settings [1]', status: 'streaming' });
+    expect(thread.messages[1]).toMatchObject({
+      id: 'a1',
+      content: 'Rotate it in Settings [1]',
+      status: 'streaming',
+    });
     expect(thread.messages[0].content).toBe('How do I rotate an API key?');
   });
 
   it('citations land on the assistant message', () => {
-    const thread = run(started(), [meta, { type: 'token', text: 'x' }, { type: 'citations', citations }]);
+    const thread = run(started(), [
+      meta,
+      { type: 'token', text: 'x' },
+      { type: 'citations', citations },
+    ]);
 
     expect(thread.messages[1].citations).toEqual(citations);
   });
@@ -101,18 +134,31 @@ describe('applyStreamEvent', () => {
 
     expect(thread.active).toBeNull();
     expect(thread.messages[0]).toMatchObject({ status: 'complete' });
-    expect(thread.messages[1]).toMatchObject({ status: 'complete', answered: true, latency_ms: 820, content: 'Answer' });
+    expect(thread.messages[1]).toMatchObject({
+      status: 'complete',
+      answered: true,
+      latency_ms: 820,
+      content: 'Answer',
+    });
     expect(isStreaming(thread)).toBe(false);
   });
 
   it('done with answered false marks the message unanswered', () => {
-    const thread = run(started(), [meta, { type: 'token', text: 'No idea' }, { type: 'done', answered: false, latencyMs: 40 }]);
+    const thread = run(started(), [
+      meta,
+      { type: 'token', text: 'No idea' },
+      { type: 'done', answered: false, latencyMs: 40 },
+    ]);
 
     expect(thread.messages[1]).toMatchObject({ answered: false, status: 'complete' });
   });
 
   it('error fails the user message and turns the placeholder into an error bubble', () => {
-    const thread = applyStreamEvent(started(), { type: 'error', code: 'rate_limited', message: 'Slow down.' });
+    const thread = applyStreamEvent(started(), {
+      type: 'error',
+      code: 'rate_limited',
+      message: 'Slow down.',
+    });
 
     expect(thread.active).toBeNull();
     expect(thread.messages[0]).toMatchObject({ id: 'tmp_user', status: 'failed' });
@@ -125,7 +171,11 @@ describe('applyStreamEvent', () => {
   });
 
   it('an error after tokens keeps the partial text', () => {
-    const thread = run(started(), [meta, { type: 'token', text: 'Part' }, { type: 'error', code: 'internal', message: 'Lost.' }]);
+    const thread = run(started(), [
+      meta,
+      { type: 'token', text: 'Part' },
+      { type: 'error', code: 'internal', message: 'Lost.' },
+    ]);
 
     expect(thread.messages[1]).toMatchObject({ id: 'a1', content: 'Part', status: 'error' });
     expect(thread.messages[0]).toMatchObject({ id: 'u1', status: 'failed' });
@@ -138,10 +188,15 @@ describe('applyStreamEvent', () => {
   });
 
   it('only the active exchange changes', () => {
-    const earlier = run(started(), [meta, { type: 'token', text: 'first' }, { type: 'done', answered: true, latencyMs: 1 }]);
-    const thread = run(beginExchange(earlier, { userId: 'tmp_u2', assistantId: 'tmp_a2', content: 'again' }), [
-      { type: 'token', text: 'second' },
+    const earlier = run(started(), [
+      meta,
+      { type: 'token', text: 'first' },
+      { type: 'done', answered: true, latencyMs: 1 },
     ]);
+    const thread = run(
+      beginExchange(earlier, { userId: 'tmp_u2', assistantId: 'tmp_a2', content: 'again' }),
+      [{ type: 'token', text: 'second' }],
+    );
 
     expect(thread.messages[1].content).toBe('first');
     expect(thread.messages[3].content).toBe('second');
@@ -186,8 +241,26 @@ describe('removeExchange', () => {
 
   it('drops only the user message when nothing answers it', () => {
     const thread = threadFromRows([
-      { id: 'u1', role: 'user', content: 'a', citations: [], answered: null, feedback: null, created_at: 't', latency_ms: null },
-      { id: 'u2', role: 'user', content: 'b', citations: [], answered: null, feedback: null, created_at: 't', latency_ms: null },
+      {
+        id: 'u1',
+        role: 'user',
+        content: 'a',
+        citations: [],
+        answered: null,
+        feedback: null,
+        created_at: 't',
+        latency_ms: null,
+      },
+      {
+        id: 'u2',
+        role: 'user',
+        content: 'b',
+        citations: [],
+        answered: null,
+        feedback: null,
+        created_at: 't',
+        latency_ms: null,
+      },
     ]);
 
     expect(removeExchange(thread, 'u1').messages.map((message) => message.id)).toEqual(['u2']);
@@ -211,8 +284,26 @@ describe('setFeedback', () => {
 
 describe('mergeThread', () => {
   const rows: MessageRow[] = [
-    { id: 'u1', role: 'user', content: 'q', citations: [], answered: null, feedback: null, created_at: 't1', latency_ms: null },
-    { id: 'a1', role: 'assistant', content: 'a', citations: [{ index: 1, documentId: 'd', title: 'T', url: null, snippet: 's' }], answered: true, feedback: 1, created_at: 't2', latency_ms: 300 },
+    {
+      id: 'u1',
+      role: 'user',
+      content: 'q',
+      citations: [],
+      answered: null,
+      feedback: null,
+      created_at: 't1',
+      latency_ms: null,
+    },
+    {
+      id: 'a1',
+      role: 'assistant',
+      content: 'a',
+      citations: [{ index: 1, documentId: 'd', title: 'T', url: null, snippet: 's' }],
+      answered: true,
+      feedback: 1,
+      created_at: 't2',
+      latency_ms: 300,
+    },
   ];
 
   it('builds a thread from rows when nothing is cached', () => {
@@ -224,7 +315,14 @@ describe('mergeThread', () => {
   });
 
   it('shows an answer saved when the reader pressed Stop as stopped after a reload', () => {
-    const stopped: MessageRow = { ...rows[1]!, id: 'a2', content: 'Half an', citations: [], answered: null, feedback: null };
+    const stopped: MessageRow = {
+      ...rows[1]!,
+      id: 'a2',
+      content: 'Half an',
+      citations: [],
+      answered: null,
+      feedback: null,
+    };
     const thread = threadFromRows([rows[0]!, stopped]);
 
     expect(thread.messages.map((message) => message.status)).toEqual(['complete', 'stopped']);
@@ -232,7 +330,11 @@ describe('mergeThread', () => {
   });
 
   it('keeps in-flight and stopped messages the server does not know yet', () => {
-    const cached = beginExchange(threadFromRows(rows), { userId: 'tmp_u', assistantId: 'tmp_a', content: 'more' });
+    const cached = beginExchange(threadFromRows(rows), {
+      userId: 'tmp_u',
+      assistantId: 'tmp_a',
+      content: 'more',
+    });
     const thread = mergeThread(cached, rows);
 
     expect(thread.messages.map((message) => message.id)).toEqual(['u1', 'a1', 'tmp_u', 'tmp_a']);
@@ -240,11 +342,10 @@ describe('mergeThread', () => {
   });
 
   it('lets server rows replace confirmed messages', () => {
-    const cached = run(beginExchange(emptyThread(), { userId: 'tmp_u', assistantId: 'tmp_a', content: 'q' }), [
-      meta,
-      { type: 'token', text: 'a' },
-      { type: 'done', answered: true, latencyMs: 300 },
-    ]);
+    const cached = run(
+      beginExchange(emptyThread(), { userId: 'tmp_u', assistantId: 'tmp_a', content: 'q' }),
+      [meta, { type: 'token', text: 'a' }, { type: 'done', answered: true, latencyMs: 300 }],
+    );
     const thread = mergeThread(cached, rows);
 
     expect(thread.messages).toHaveLength(2);
@@ -256,7 +357,9 @@ describe('helpers', () => {
   it('parses citations defensively', () => {
     expect(parseCitations(null)).toEqual([]);
     expect(parseCitations('nope')).toEqual([]);
-    expect(parseCitations([{ index: 1, title: 'x' }, { bad: true }, 3])).toEqual([{ index: 1, title: 'x' }]);
+    expect(parseCitations([{ index: 1, title: 'x' }, { bad: true }, 3])).toEqual([
+      { index: 1, title: 'x' },
+    ]);
   });
 
   it('makes temporary ids that are recognisable', () => {

@@ -5,7 +5,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ConversationRow } from '@/lib/chat/conversations';
 import { conversationsKey, threadKey } from '@/lib/chat/queries';
 
-import { resetAppliedSnapshots, useConversationActions, useConversations, useConversationsRealtime } from './use-conversations';
+import {
+  resetAppliedSnapshots,
+  useConversationActions,
+  useConversations,
+  useConversationsRealtime,
+} from './use-conversations';
 
 const db = vi.hoisted(() => ({
   rows: [] as unknown[],
@@ -21,8 +26,12 @@ const realtime = vi.hoisted(() => ({
 }));
 
 const actions = vi.hoisted(() => ({
-  renameConversation: vi.fn(async () => ({ ok: true }) as { ok: true } | { ok: false; error: string }),
-  deleteConversation: vi.fn(async () => ({ ok: true }) as { ok: true } | { ok: false; error: string }),
+  renameConversation: vi.fn(
+    async () => ({ ok: true }) as { ok: true } | { ok: false; error: string },
+  ),
+  deleteConversation: vi.fn(
+    async () => ({ ok: true }) as { ok: true } | { ok: false; error: string },
+  ),
 }));
 
 const toast = vi.hoisted(() => ({ error: vi.fn() }));
@@ -95,7 +104,9 @@ const wrapper = ({ children }: { children: React.ReactNode }) => (
 const cached = () => queryClient.getQueryData<ConversationRow[]>(conversationsKey('asst'));
 
 beforeEach(() => {
-  queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 30_000 } } });
+  queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false, staleTime: 30_000 } },
+  });
   resetAppliedSnapshots();
   db.rows = [];
   realtime.ready = null;
@@ -146,7 +157,10 @@ describe('useConversations', () => {
     unmount();
 
     const second = {
-      rows: [row('elsewhere', '2026-09-23T12:00:00Z'), row('old', '2026-09-23T09:00:00Z', { title: 'Renamed elsewhere' })],
+      rows: [
+        row('elsewhere', '2026-09-23T12:00:00Z'),
+        row('old', '2026-09-23T09:00:00Z', { title: 'Renamed elsewhere' }),
+      ],
       fetchedAt: 2000,
     };
     const { result } = renderHook(() => useConversations('asst', second), { wrapper });
@@ -196,7 +210,10 @@ describe('useConversationsRealtime', () => {
     status('SUBSCRIBED');
     expect(warn).not.toHaveBeenCalled();
     status('CHANNEL_ERROR', new Error('invalid column for filter'));
-    expect(warn).toHaveBeenCalledWith(expect.stringContaining('CHANNEL_ERROR'), 'invalid column for filter');
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('CHANNEL_ERROR'),
+      'invalid column for filter',
+    );
 
     unmount();
     expect(realtime.removeChannel).toHaveBeenCalledTimes(1);
@@ -204,7 +221,9 @@ describe('useConversationsRealtime', () => {
   });
 
   it('applies title changes from the database to the list', async () => {
-    queryClient.setQueryData<ConversationRow[]>(conversationsKey('asst'), [row('a', '2026-09-23T10:00:00Z', { title: null })]);
+    queryClient.setQueryData<ConversationRow[]>(conversationsKey('asst'), [
+      row('a', '2026-09-23T10:00:00Z', { title: null }),
+    ]);
     renderHook(() => useConversationsRealtime('asst'), { wrapper });
 
     await act(async () => {
@@ -216,7 +235,14 @@ describe('useConversationsRealtime', () => {
     act(() => {
       handler({
         eventType: 'UPDATE',
-        new: { id: 'a', channel: 'app', title: 'Named by the engine', last_message_at: '2026-09-23T10:00:00Z', message_count: 2, unanswered_count: 0 },
+        new: {
+          id: 'a',
+          channel: 'app',
+          title: 'Named by the engine',
+          last_message_at: '2026-09-23T10:00:00Z',
+          message_count: 2,
+          unanswered_count: 0,
+        },
         old: {},
       });
     });
@@ -227,7 +253,10 @@ describe('useConversationsRealtime', () => {
 
 describe('useConversationActions', () => {
   it('removes the row and its thread at once, then tells the inbox to refetch', async () => {
-    queryClient.setQueryData<ConversationRow[]>(conversationsKey('asst'), [row('a', '2026-09-23T10:00:00Z'), row('b', '2026-09-23T09:00:00Z')]);
+    queryClient.setQueryData<ConversationRow[]>(conversationsKey('asst'), [
+      row('a', '2026-09-23T10:00:00Z'),
+      row('b', '2026-09-23T09:00:00Z'),
+    ]);
     queryClient.setQueryData(threadKey('a'), { messages: [], active: null });
 
     const invalidate = vi.spyOn(queryClient, 'invalidateQueries');
@@ -251,8 +280,13 @@ describe('useConversationActions', () => {
   });
 
   it('puts the row and the thread back when the delete fails', async () => {
-    actions.deleteConversation.mockResolvedValueOnce({ ok: false, error: 'That conversation no longer exists.' });
-    queryClient.setQueryData<ConversationRow[]>(conversationsKey('asst'), [row('a', '2026-09-23T10:00:00Z')]);
+    actions.deleteConversation.mockResolvedValueOnce({
+      ok: false,
+      error: 'That conversation no longer exists.',
+    });
+    queryClient.setQueryData<ConversationRow[]>(conversationsKey('asst'), [
+      row('a', '2026-09-23T10:00:00Z'),
+    ]);
     queryClient.setQueryData(threadKey('a'), { messages: [], active: null });
 
     const { result } = renderHook(() => useConversationActions('asst'), { wrapper });
@@ -267,7 +301,9 @@ describe('useConversationActions', () => {
   });
 
   it('renames optimistically and tells the inbox', async () => {
-    queryClient.setQueryData<ConversationRow[]>(conversationsKey('asst'), [row('a', '2026-09-23T10:00:00Z')]);
+    queryClient.setQueryData<ConversationRow[]>(conversationsKey('asst'), [
+      row('a', '2026-09-23T10:00:00Z'),
+    ]);
 
     const invalidate = vi.spyOn(queryClient, 'invalidateQueries');
     const { result } = renderHook(() => useConversationActions('asst'), { wrapper });

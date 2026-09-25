@@ -31,7 +31,9 @@ export const signUpSchema = z.object({
     .string()
     .trim()
     .min(1, { error: 'Enter your name.' })
-    .max(FULL_NAME_MAX_LENGTH, { error: `Keep your name under ${FULL_NAME_MAX_LENGTH} characters.` }),
+    .max(FULL_NAME_MAX_LENGTH, {
+      error: `Keep your name under ${FULL_NAME_MAX_LENGTH} characters.`,
+    }),
   email,
   password,
   plan: z.string().optional(),

@@ -39,7 +39,9 @@ export const createFakeService = (tables: FakeTables = {}): FakeService => {
   const from = (table: string) => {
     const filters: [string, unknown][] = [];
     const matches = () =>
-      (tables[table] ?? []).filter((row) => filters.every(([column, value]) => row[column] === value));
+      (tables[table] ?? []).filter((row) =>
+        filters.every(([column, value]) => row[column] === value),
+      );
 
     const query = {
       select: () => query,
@@ -60,7 +62,9 @@ export const createFakeService = (tables: FakeTables = {}): FakeService => {
         const rows = Array.isArray(payload) ? payload : [payload];
         (inserted[table] ??= []).push(...rows);
         const failure = failures[table];
-        const result = failure ? { data: null, error: { message: failure } } : { data: null, error: null };
+        const result = failure
+          ? { data: null, error: { message: failure } }
+          : { data: null, error: null };
 
         return {
           ...query,

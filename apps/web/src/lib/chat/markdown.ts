@@ -118,7 +118,11 @@ export const rehypeStreamingCaret = () => (tree: HastRoot) => {
 
   const properties = target.properties ?? {};
   const existing = properties.className;
-  const classes = Array.isArray(existing) ? existing : typeof existing === 'string' ? [existing] : [];
+  const classes = Array.isArray(existing)
+    ? existing
+    : typeof existing === 'string'
+      ? [existing]
+      : [];
 
   target.properties = { ...properties, className: [...classes, CARET_CLASS] };
 };

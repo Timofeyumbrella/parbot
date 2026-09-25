@@ -32,13 +32,69 @@ export const CRAWL_MAX_DEPTH = 3;
 
 /** File types that are never HTML pages, checked before a request is spent on them. */
 export const SKIPPED_EXTENSIONS = new Set([
-  'pdf', 'png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'avif', 'ico', 'bmp', 'tif', 'tiff',
-  'css', 'js', 'mjs', 'cjs', 'map', 'json', 'xml', 'rss', 'atom', 'txt', 'md', 'csv', 'yaml', 'yml',
-  'zip', 'gz', 'tgz', 'tar', 'bz2', '7z', 'rar', 'dmg', 'exe', 'msi', 'apk', 'deb', 'rpm',
-  'mp3', 'mp4', 'm4a', 'wav', 'ogg', 'webm', 'mov', 'avi', 'mkv',
-  'woff', 'woff2', 'ttf', 'otf', 'eot',
-  'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'epub',
-  'wasm', 'jar', 'war',
+  'pdf',
+  'png',
+  'jpg',
+  'jpeg',
+  'gif',
+  'svg',
+  'webp',
+  'avif',
+  'ico',
+  'bmp',
+  'tif',
+  'tiff',
+  'css',
+  'js',
+  'mjs',
+  'cjs',
+  'map',
+  'json',
+  'xml',
+  'rss',
+  'atom',
+  'txt',
+  'md',
+  'csv',
+  'yaml',
+  'yml',
+  'zip',
+  'gz',
+  'tgz',
+  'tar',
+  'bz2',
+  '7z',
+  'rar',
+  'dmg',
+  'exe',
+  'msi',
+  'apk',
+  'deb',
+  'rpm',
+  'mp3',
+  'mp4',
+  'm4a',
+  'wav',
+  'ogg',
+  'webm',
+  'mov',
+  'avi',
+  'mkv',
+  'woff',
+  'woff2',
+  'ttf',
+  'otf',
+  'eot',
+  'doc',
+  'docx',
+  'xls',
+  'xlsx',
+  'ppt',
+  'pptx',
+  'epub',
+  'wasm',
+  'jar',
+  'war',
 ]);
 
 /** The origin and directory a website crawl stays inside: /guide/intro crawls under /guide/. */
@@ -90,7 +146,11 @@ export const isInScope = (href: string, scope: CrawlScope) => {
     return false;
   }
 
-  return url.origin === scope.origin && url.pathname.startsWith(scope.pathPrefix) && !hasSkippedExtension(url);
+  return (
+    url.origin === scope.origin &&
+    url.pathname.startsWith(scope.pathPrefix) &&
+    !hasSkippedExtension(url)
+  );
 };
 
 /** The links on a page worth following: resolved, normalised, in scope, each once. */

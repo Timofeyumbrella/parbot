@@ -24,10 +24,16 @@ const seed = async (): Promise<Seeded | null> => {
     return null;
   }
 
-  const admin = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+  const admin = createClient(url, key, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
   const tag = unique();
   const email = `e2e-knowledge-${tag}@parbot.test`;
-  const { data: created, error } = await admin.auth.admin.createUser({ email, password: PASSWORD, email_confirm: true });
+  const { data: created, error } = await admin.auth.admin.createUser({
+    email,
+    password: PASSWORD,
+    email_confirm: true,
+  });
 
   if (error || !created.user) {
     throw new Error(`Could not create the e2e account: ${error?.message}`);
@@ -55,7 +61,8 @@ const signIn = async (page: Page, seeded: Seeded, next: string) => {
   await expect(page).toHaveURL(new RegExp(`${next}$`), { timeout: 30_000 });
 };
 
-const sourceRow = (page: Page, title: string) => page.getByTestId('source-row').filter({ hasText: title });
+const sourceRow = (page: Page, title: string) =>
+  page.getByTestId('source-row').filter({ hasText: title });
 
 test.describe('knowledge screen', () => {
   let seeded: Seeded | null = null;
@@ -74,7 +81,9 @@ test.describe('knowledge screen', () => {
     const { data: files } = await seeded.admin.storage.from(STORAGE_BUCKET).list(folder);
 
     if (files?.length) {
-      await seeded.admin.storage.from(STORAGE_BUCKET).remove(files.map((file) => `${folder}/${file.name}`));
+      await seeded.admin.storage
+        .from(STORAGE_BUCKET)
+        .remove(files.map((file) => `${folder}/${file.name}`));
     }
 
     await seeded.admin.auth.admin.deleteUser(seeded.userId);
@@ -85,7 +94,9 @@ test.describe('knowledge screen', () => {
 
     await signIn(page, seeded!, `/a/${seeded!.assistantId}/knowledge`);
     await expect(page.getByRole('heading', { name: 'Knowledge' })).toBeVisible();
-    await expect(page.getByRole('status').filter({ hasText: 'Answers are placeholders' })).not.toContainText('GEMINI');
+    await expect(
+      page.getByRole('status').filter({ hasText: 'Answers are placeholders' }),
+    ).not.toContainText('GEMINI');
 
     await page.getByRole('button', { name: 'Add source' }).click();
 
@@ -99,14 +110,20 @@ test.describe('knowledge screen', () => {
 
     await address.fill('docs.example.com');
     await dialog.getByRole('button', { name: 'Add website' }).click();
-    await expect(dialog.getByRole('alert')).toHaveText('Enter a full address that starts with http:// or https://.');
+    await expect(dialog.getByRole('alert')).toHaveText(
+      'Enter a full address that starts with http:// or https://.',
+    );
 
     await dialog.getByRole('tab', { name: /text/i }).click();
     await dialog.getByLabel('Title', { exact: true }).fill('Refund policy');
-    await dialog.getByLabel('Text', { exact: true }).fill('# Refunds\n\nRefunds are issued within 30 days of purchase.');
+    await dialog
+      .getByLabel('Text', { exact: true })
+      .fill('# Refunds\n\nRefunds are issued within 30 days of purchase.');
     await dialog.getByRole('button', { name: 'Add text' }).click();
     await expect(dialog).toBeHidden();
-    await expect(sourceRow(page, 'Refund policy').getByText('Ready')).toBeVisible({ timeout: 30_000 });
+    await expect(sourceRow(page, 'Refund policy').getByText('Ready')).toBeVisible({
+      timeout: 30_000,
+    });
     await expect(sourceRow(page, 'Refund policy')).toContainText('1 page');
 
     await page.getByRole('button', { name: 'Add source' }).click();
@@ -115,7 +132,9 @@ test.describe('knowledge screen', () => {
     await expect(dialog.getByText('handbook.docx')).toBeVisible();
     await dialog.getByRole('button', { name: 'Upload file' }).click();
     await expect(dialog).toBeHidden();
-    await expect(sourceRow(page, 'handbook.docx').getByText('Ready')).toBeVisible({ timeout: 30_000 });
+    await expect(sourceRow(page, 'handbook.docx').getByText('Ready')).toBeVisible({
+      timeout: 30_000,
+    });
     await expect(sourceRow(page, 'handbook.docx')).toContainText('1 page');
 
     const { data: documents } = await seeded!.admin

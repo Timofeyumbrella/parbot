@@ -22,11 +22,17 @@ describe('NewAssistantButton', () => {
   it('links to onboarding while the plan has room', () => {
     render(
       <TooltipProvider>
-        <NewAssistantButton capacity={checkCapacity('starter', 1, 'assistants')} planName="Starter" />
+        <NewAssistantButton
+          capacity={checkCapacity('starter', 1, 'assistants')}
+          planName="Starter"
+        />
       </TooltipProvider>,
     );
 
-    expect(screen.getByRole('link', { name: 'New assistant' })).toHaveAttribute('href', '/onboarding');
+    expect(screen.getByRole('link', { name: 'New assistant' })).toHaveAttribute(
+      'href',
+      '/onboarding',
+    );
     expect(screen.queryByRole('link', { name: 'Upgrade' })).not.toBeInTheDocument();
   });
 
@@ -46,6 +52,8 @@ describe('NewAssistantButton', () => {
 
     await user.hover(button.parentElement!);
 
-    expect(await screen.findByRole('tooltip')).toHaveTextContent('The Hobby plan includes 1 assistant. Upgrade to add more.');
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(
+      'The Hobby plan includes 1 assistant. Upgrade to add more.',
+    );
   });
 });

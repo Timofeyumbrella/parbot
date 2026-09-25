@@ -10,7 +10,13 @@ import { Button } from '@/components/ui/button';
  * Error boundary for the account level screens. Server errors arrive with their message
  * stripped in production, so the digest is shown to make support conversations concrete.
  */
-export default function DashboardError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+export default function DashboardError({
+  error,
+  reset,
+}: {
+  error: Error & { digest?: string };
+  reset: () => void;
+}) {
   return (
     <PageContainer className="max-w-xl">
       <div className="bg-card ring-foreground/10 flex flex-col gap-4 rounded-xl p-6 ring-1">
@@ -21,8 +27,8 @@ export default function DashboardError({ error, reset }: { error: Error & { dige
           <div className="flex flex-col gap-1">
             <h1 className="text-base font-semibold">This screen could not load</h1>
             <p className="text-muted-foreground text-sm">
-              {error.message || 'Something went wrong on our side.'} Trying again usually fixes it. If it keeps
-              happening, sign out and back in.
+              {error.message || 'Something went wrong on our side.'} Trying again usually fixes it.
+              If it keeps happening, sign out and back in.
             </p>
             {error.digest ? (
               <p className="text-muted-foreground font-mono text-xs">Reference {error.digest}</p>

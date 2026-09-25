@@ -71,10 +71,13 @@ describe('htmlToMarkdown', () => {
   });
 
   it('falls back to the title tag and then the first heading', () => {
-    expect(htmlToMarkdown('<html><head><title>Only title</title></head><body><p>x</p></body></html>').title).toBe(
-      'Only title',
+    expect(
+      htmlToMarkdown('<html><head><title>Only title</title></head><body><p>x</p></body></html>')
+        .title,
+    ).toBe('Only title');
+    expect(htmlToMarkdown('<html><body><h1>First heading</h1><p>x</p></body></html>').title).toBe(
+      'First heading',
     );
-    expect(htmlToMarkdown('<html><body><h1>First heading</h1><p>x</p></body></html>').title).toBe('First heading');
     expect(htmlToMarkdown('<p>nothing</p>').title).toBeNull();
   });
 

@@ -34,7 +34,12 @@ const fetchPage = async (
   filter: ConversationFilter,
   cursor: PageCursor | null,
 ): Promise<ConversationPage> => {
-  const { data, error } = await conversationPage(getSupabaseBrowserClient(), assistantId, filter, cursor);
+  const { data, error } = await conversationPage(
+    getSupabaseBrowserClient(),
+    assistantId,
+    filter,
+    cursor,
+  );
 
   if (error) {
     throw new Error(error.message);
@@ -57,7 +62,13 @@ export const applyChange = (
     }
 
     return {
-      data: { ...data, pages: data.pages.map((page) => ({ ...page, rows: page.rows.filter((row) => row.id !== id) })) },
+      data: {
+        ...data,
+        pages: data.pages.map((page) => ({
+          ...page,
+          rows: page.rows.filter((row) => row.id !== id),
+        })),
+      },
       added: null,
     };
   }
@@ -73,7 +84,9 @@ export const applyChange = (
         pages: data.pages.map((page) => ({
           ...page,
           rows: fits
-            ? page.rows.map((existing) => (existing.id === row.id ? { ...existing, ...row } : existing))
+            ? page.rows.map((existing) =>
+                existing.id === row.id ? { ...existing, ...row } : existing,
+              )
             : page.rows.filter((existing) => existing.id !== row.id),
         })),
       },
@@ -88,7 +101,10 @@ export const applyChange = (
   const [first, ...rest] = data.pages;
 
   return {
-    data: { ...data, pages: [{ ...(first ?? { cursor: null }), rows: [row, ...(first?.rows ?? [])] }, ...rest] },
+    data: {
+      ...data,
+      pages: [{ ...(first ?? { cursor: null }), rows: [row, ...(first?.rows ?? [])] }, ...rest],
+    },
     added: row.id,
   };
 };
@@ -125,7 +141,12 @@ const EMPTY_COPY: Record<ConversationFilter, { title: string; body: string }> = 
  * The conversation rows for one filter. The first page comes from the server; more pages load
  * through the browser client by keyset, and Realtime keeps the list current while it is open.
  */
-export const ConversationList = ({ assistantId, filter, initialRows, now }: ConversationListProps) => {
+export const ConversationList = ({
+  assistantId,
+  filter,
+  initialRows,
+  now,
+}: ConversationListProps) => {
   const queryClient = useQueryClient();
   const key = conversationListKey(assistantId, filter);
   const [fresh, setFresh] = useState<ReadonlySet<string>>(() => new Set());
@@ -145,7 +166,11 @@ export const ConversationList = ({ assistantId, filter, initialRows, now }: Conv
     const state = queryClient.getQueryState<ListData>(key);
 
     if (state && state.dataUpdatedAt < now) {
-      queryClient.setQueryData<ListData>(key, { pages: [pageOf(initialRows)], pageParams: [null] }, { updatedAt: now });
+      queryClient.setQueryData<ListData>(
+        key,
+        { pages: [pageOf(initialRows)], pageParams: [null] },
+        { updatedAt: now },
+      );
     }
     // The key is derived from these two; the rows belong to the same server render as `now`.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -169,7 +194,12 @@ export const ConversationList = ({ assistantId, filter, initialRows, now }: Conv
         .channel(`inbox:${assistantId}:${filter}`)
         .on(
           'postgres_changes',
-          { event: '*', schema: 'public', table: 'conversations', filter: `assistant_id=eq.${assistantId}` },
+          {
+            event: '*',
+            schema: 'public',
+            table: 'conversations',
+            filter: `assistant_id=eq.${assistantId}`,
+          },
           (payload: RealtimePostgresChangesPayload<ConversationRow>) => {
             const current = queryClient.getQueryData<ListData>(currentKey);
 
@@ -192,7 +222,9 @@ export const ConversationList = ({ assistantId, filter, initialRows, now }: Conv
               const delta = payload.eventType === 'INSERT' ? 1 : -1;
 
               queryClient.setQueryData<InboxCounts>(countsKey, (counts) =>
-                counts ? { ...counts, conversations: Math.max(counts.conversations + delta, 0) } : counts,
+                counts
+                  ? { ...counts, conversations: Math.max(counts.conversations + delta, 0) }
+                  : counts,
               );
             }
           },
@@ -277,13 +309,15 @@ export const ConversationList = ({ assistantId, filter, initialRows, now }: Conv
                 <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                   <div className="flex min-w-0 items-center gap-2">
                     {isNew ? (
-                      <span className="text-primary inline-flex shrink-0 items-center gap-1 text-[11px] font-medium tracking-wide uppercase">
+                      <span className="text-primary inline-flex shrink-0 items-center gap-1 text-[11px] font-medium uppercase tracking-wide">
                         <span aria-hidden="true" className="bg-primary size-1.5 rounded-full" />
                         New
                       </span>
                     ) : null}
                     <span className="truncate font-medium" title={row.title ?? undefined}>
-                      {row.title || <span className="text-muted-foreground font-normal">Untitled</span>}
+                      {row.title || (
+                        <span className="text-muted-foreground font-normal">Untitled</span>
+                      )}
                     </span>
                   </div>
                   <div className="text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
@@ -294,15 +328,18 @@ export const ConversationList = ({ assistantId, filter, initialRows, now }: Conv
                       </span>
                     ) : null}
                     <span className="tabular-nums">
-                      {formatCount(row.message_count)} {row.message_count === 1 ? 'message' : 'messages'}
+                      {formatCount(row.message_count)}{' '}
+                      {row.message_count === 1 ? 'message' : 'messages'}
                     </span>
-                    {row.unanswered_count > 0 ? <UnansweredBadge count={row.unanswered_count} /> : null}
+                    {row.unanswered_count > 0 ? (
+                      <UnansweredBadge count={row.unanswered_count} />
+                    ) : null}
                   </div>
                 </div>
                 <LocalTime
                   value={activityStamp(row)}
                   now={now}
-                  className="text-muted-foreground min-w-16 shrink-0 text-right text-xs whitespace-nowrap"
+                  className="text-muted-foreground min-w-16 shrink-0 whitespace-nowrap text-right text-xs"
                 />
               </Link>
             </li>

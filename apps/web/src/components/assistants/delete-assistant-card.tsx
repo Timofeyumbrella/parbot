@@ -22,8 +22,17 @@ import { type FormState, idleState } from '@/lib/form';
 
 import type { DeleteField } from './schema';
 
-export const DeleteAssistantCard = ({ assistantId, name }: { assistantId: string; name: string }) => {
-  const [state, action, pending] = useActionState(deleteAssistant, idleState as FormState<DeleteField>);
+export const DeleteAssistantCard = ({
+  assistantId,
+  name,
+}: {
+  assistantId: string;
+  name: string;
+}) => {
+  const [state, action, pending] = useActionState(
+    deleteAssistant,
+    idleState as FormState<DeleteField>,
+  );
   const [typed, setTyped] = useState('');
   const matches = typed.trim() === name;
 
@@ -32,8 +41,8 @@ export const DeleteAssistantCard = ({ assistantId, name }: { assistantId: string
       <CardHeader>
         <CardTitle className="text-destructive">Delete this assistant</CardTitle>
         <CardDescription>
-          Removes its sources, indexed pages, conversations and leads. Installed widgets stop answering. There is
-          no undo.
+          Removes its sources, indexed pages, conversations and leads. Installed widgets stop
+          answering. There is no undo.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -50,8 +59,8 @@ export const DeleteAssistantCard = ({ assistantId, name }: { assistantId: string
               <DialogHeader>
                 <DialogTitle>Delete {name}?</DialogTitle>
                 <DialogDescription>
-                  Everything this assistant indexed and every conversation it had will be gone. Type its name to
-                  confirm.
+                  Everything this assistant indexed and every conversation it had will be gone. Type
+                  its name to confirm.
                 </DialogDescription>
               </DialogHeader>
               {state.status === 'error' && state.error && !state.fieldErrors ? (

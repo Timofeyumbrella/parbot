@@ -29,8 +29,21 @@ export class BlockedHostError extends Error {
 export const BLOCKED_REASON = 'the address points at a private or internal network';
 export const UNRESOLVED_REASON = 'the host could not be found';
 
-const BLOCKED_HOSTNAMES = new Set(['localhost', 'ip6-localhost', 'ip6-loopback', 'metadata', 'metadata.google.internal']);
-const BLOCKED_SUFFIXES = ['.localhost', '.local', '.internal', '.localdomain', '.home.arpa', '.arpa'];
+const BLOCKED_HOSTNAMES = new Set([
+  'localhost',
+  'ip6-localhost',
+  'ip6-loopback',
+  'metadata',
+  'metadata.google.internal',
+]);
+const BLOCKED_SUFFIXES = [
+  '.localhost',
+  '.local',
+  '.internal',
+  '.localdomain',
+  '.home.arpa',
+  '.arpa',
+];
 
 const parseIpv4 = (text: string): number[] | null => {
   const parts = text.split('.');
@@ -67,7 +80,12 @@ const parseIpv6 = (text: string): number[] | null => {
     return null;
   }
 
-  const groupsOf = (part: string) => (part === '' ? [] : part.split(':').map((group) => (/^[0-9a-f]{1,4}$/i.test(group) ? Number.parseInt(group, 16) : -1)));
+  const groupsOf = (part: string) =>
+    part === ''
+      ? []
+      : part
+          .split(':')
+          .map((group) => (/^[0-9a-f]{1,4}$/i.test(group) ? Number.parseInt(group, 16) : -1));
   const head = groupsOf(halves[0]!);
   const tail = halves.length === 2 ? groupsOf(halves[1]!) : [];
 
@@ -99,7 +117,16 @@ const isBlockedIpv4 = ([a, b, c]: number[]) =>
   a! >= 224; // multicast, reserved, broadcast
 
 const isBlockedIpv6 = (groups: number[]) => {
-  const [g0, g1, g2, g3, g4, g5, g6, g7] = groups as [number, number, number, number, number, number, number, number];
+  const [g0, g1, g2, g3, g4, g5, g6, g7] = groups as [
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+  ];
   const embeddedIpv4 = [g6 >> 8, g6 & 0xff, g7 >> 8, g7 & 0xff];
 
   if (g0 === 0 && g1 === 0 && g2 === 0 && g3 === 0 && g4 === 0) {
@@ -141,9 +168,16 @@ export const isBlockedAddress = (address: string) => {
 
 /** True for names that only ever mean "this machine" or "this network". */
 export const isBlockedHostname = (hostname: string) => {
-  const name = hostname.replace(/^\[|\]$/g, '').replace(/\.$/, '').toLowerCase();
+  const name = hostname
+    .replace(/^\[|\]$/g, '')
+    .replace(/\.$/, '')
+    .toLowerCase();
 
-  if (!name || BLOCKED_HOSTNAMES.has(name) || BLOCKED_SUFFIXES.some((suffix) => name.endsWith(suffix))) {
+  if (
+    !name ||
+    BLOCKED_HOSTNAMES.has(name) ||
+    BLOCKED_SUFFIXES.some((suffix) => name.endsWith(suffix))
+  ) {
     return true;
   }
 
@@ -165,7 +199,10 @@ export const assertPublicUrl = async (url: string, lookup: HostLookup = defaultL
 
   const hostname = parsed.hostname.replace(/^\[|\]$/g, '');
 
-  if ((parsed.protocol !== 'http:' && parsed.protocol !== 'https:') || isBlockedHostname(hostname)) {
+  if (
+    (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') ||
+    isBlockedHostname(hostname)
+  ) {
     throw new BlockedHostError(hostname, BLOCKED_REASON);
   }
 
