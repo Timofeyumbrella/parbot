@@ -214,6 +214,34 @@ test.describe('widget on the demo page', () => {
     await expect(page.getByRole('link', { name: 'Go to the dashboard' })).toBeVisible();
   });
 
+  test('the live preview shows after a full page load and a reload', async ({ page }) => {
+    test.skip(!seeded, 'Needs the Supabase service role key from apps/web/.env');
+
+    await page.goto('/login');
+    await page.getByLabel(/email/i).fill(seeded!.email);
+    await page.getByLabel(/^password/i).fill(PASSWORD);
+    await page.getByRole('button', { name: 'Sign in' }).click();
+    await page.waitForURL(/\/(dashboard|a\/)/);
+
+    // A slow CPU lets the frame finish loading before React hydrates, which once left the
+    // skeleton over the preview for good.
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+
+    const frame = page.locator('iframe[title="Widget preview"]');
+
+    await page.goto(`/a/${seeded!.assistantId}/widget`);
+    await expect(frame).toHaveCSS('opacity', '1', { timeout: 20_000 });
+
+    await page.reload();
+    await expect(frame).toHaveCSS('opacity', '1', { timeout: 20_000 });
+    await expect(
+      page.frameLocator('iframe[title="Widget preview"]').locator('#parbot-widget'),
+    ).toBeAttached();
+
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
+  });
+
   test('a saved theme shows in the settings preview at once', async ({ page }) => {
     test.skip(!seeded, 'Needs the Supabase service role key from apps/web/.env');
 
