@@ -1,4 +1,4 @@
-import { type Browser, expect, type Page, test } from '@playwright/test';
+import { type Browser, expect, type Locator, type Page, test } from '@playwright/test';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 import { stubEmbedding } from '../src/lib/ai/stub';
@@ -16,6 +16,9 @@ const DEMO_EMAIL = 'demo@parbot.dev';
 const DEMO_PASSWORD = 'parbot-demo';
 
 const unique = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+
+/** Near the 120 character cap: wider than the empty pane on a phone and than a fixed chip on a desktop. */
+const LONG_QUESTION = 'What happens when the docs do not cover a question, and where do I see which questions visitors asked that day?';
 
 const admin = (): SupabaseClient => {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -59,7 +62,7 @@ const seedAssistant = async (service: SupabaseClient) => {
       name: 'Acme Docs (chat e2e)',
       slug,
       welcome_message: 'Ask me anything about the Acme docs.',
-      suggested_questions: ['How do I rotate an API key?', 'How are webhooks signed?'],
+      suggested_questions: ['How do I rotate an API key?', 'How are webhooks signed?', LONG_QUESTION],
     })
     .select('id')
     .single();
@@ -122,6 +125,10 @@ const CONVERSATION_URL = /\/chat\/([0-9a-f-]{36})$/;
 
 const openConversationId = (page: Page) => page.url().match(CONVERSATION_URL)![1]!;
 
+/** Whether an element's text spills past its box: an ellipsis, or a wrapped line under a fixed height. */
+const clipped = (element: Locator) =>
+  element.evaluate((node) => node.scrollWidth > node.clientWidth || node.scrollHeight > node.clientHeight);
+
 /** Holds every /api/chat request for a while before letting it through, so the optimistic path is observable. */
 const holdChat = (page: Page, ms: number) =>
   page.route('**/api/chat', async (route) => {
@@ -180,6 +187,13 @@ test.describe('the in-app chat', () => {
     await expect(page.getByRole('button', { name: 'How do I rotate an API key?' })).toBeVisible();
     await expect(list(page).getByText('No conversations yet')).toBeVisible();
     await expect(composer(page)).toBeFocused();
+
+    // The pane is empty, so a long question is readable in full: it wraps instead of ending in an ellipsis.
+    const chip = page.getByRole('button', { name: LONG_QUESTION });
+
+    await expect(chip).toBeVisible();
+    expect(await clipped(chip)).toBe(false);
+    expect((await chip.boundingBox())!.width).toBeLessThanOrEqual((await page.getByTestId('welcome').boundingBox())!.width);
   });
 
   test('a sent message shows at once with a streaming placeholder, before the server answers', async () => {
@@ -438,6 +452,16 @@ test.describe('the in-app chat', () => {
     await expect(mobile).toHaveURL(new RegExp(conversationIds[1]!));
     await expect(mobile.getByRole('dialog')).toHaveCount(0);
     await expect(mobile.locator('[data-role="user"]').getByText('How are webhooks signed?')).toBeVisible();
+
+    // A new chat on a phone: the longest suggested question wraps inside the pane and nothing scrolls sideways.
+    await mobile.goto(`/a/${assistantId}/chat`);
+    await expect(mobile.getByTestId('welcome')).toBeVisible();
+
+    const chip = mobile.getByRole('button', { name: LONG_QUESTION });
+
+    await expect(chip).toBeVisible();
+    expect(await clipped(chip)).toBe(false);
+    expect(await mobile.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
 
     await phone.close();
   });
