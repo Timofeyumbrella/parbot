@@ -1,6 +1,6 @@
 import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { FAQ_ITEMS } from '@/components/marketing/faq';
 import { FEATURES } from '@/components/marketing/features';
@@ -22,6 +22,11 @@ const section = (headingId: string) => {
 };
 
 describe('landing page', () => {
+  // The developer's .env may carry a real demo key; each case says which demo it wants.
+  beforeEach(() => {
+    vi.stubEnv('NEXT_PUBLIC_DEMO_ASSISTANT_KEY', '');
+  });
+
   afterEach(() => {
     cleanup();
     vi.unstubAllEnvs();
@@ -63,6 +68,11 @@ describe('landing page', () => {
       expect(features.getByRole('heading', { level: 3, name: feature.title })).toBeInTheDocument();
     }
 
+    // Citations only link when the source is a web page; uploads and pasted text have no URL.
+    expect(FEATURES.find((feature) => feature.title === 'Cites the page')?.body).toMatch(
+      /with a link whenever the source is a web page/,
+    );
+
     expect(document.getElementById('faq')?.querySelectorAll('details')).toHaveLength(6);
   });
 
@@ -82,8 +92,13 @@ describe('landing page', () => {
       }
     }
 
-    expect(within(screen.getByTestId('plan-hobby')).getByRole('link')).toHaveTextContent('Start free');
-    expect(screen.getByText('Recommended').closest('article')).toHaveAttribute('data-testid', 'plan-starter');
+    expect(within(screen.getByTestId('plan-hobby')).getByRole('link')).toHaveTextContent(
+      'Start free',
+    );
+    expect(screen.getByText('Recommended').closest('article')).toHaveAttribute(
+      'data-testid',
+      'plan-starter',
+    );
   });
 
   it('switches the amounts and the signup links when yearly is chosen', async () => {

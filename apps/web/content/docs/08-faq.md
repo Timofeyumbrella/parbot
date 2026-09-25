@@ -30,4 +30,4 @@ Write to support@parbot.dev and we will send your conversations and leads as CSV
 
 ## Is there an API?
 
-Not yet. The widget's public endpoints are stable and documented on the Widget page if you want to build your own interface.
+Not yet. The endpoints the widget talks to are not documented for direct use and may change. If you want to build your own interface, write to support@parbot.dev.
