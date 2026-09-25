@@ -8,6 +8,7 @@ import {
   originAllowed,
   preflight,
   requestOrigin,
+  selfOrigin,
   widgetConfigFor,
 } from '@/lib/widget-api';
 
@@ -36,8 +37,13 @@ export async function GET(request: Request) {
     return jsonError(404, 'not_found', 'No assistant has that key.', cors);
   }
 
-  if (!originAllowed(origin, assistant.allowed_origins)) {
-    return jsonError(403, 'origin_not_allowed', 'This site is not allowed to use the assistant.', cors);
+  if (!originAllowed(origin, assistant.allowed_origins, selfOrigin(request))) {
+    return jsonError(
+      403,
+      'origin_not_allowed',
+      'This site is not allowed to use the assistant.',
+      cors,
+    );
   }
 
   const plan = await loadOwnerPlan(service, assistant.owner_id);

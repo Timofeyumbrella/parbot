@@ -2,6 +2,7 @@ import type { ChatStreamEvent } from '@parbot/shared';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { resetRateLimits, type AnswerParams } from '@/lib/engine';
+import { appOrigin } from '@/lib/widget-api';
 import {
   assistantRow,
   createFakeService,
@@ -146,6 +147,29 @@ describe('POST /api/widget/chat', () => {
 
     const allowed = await post(body(), { origin: 'https://docs.example.com' });
     expect(allowed.status).toBe(200);
+  });
+
+  it('lets the demo page and preview through from the origin the app is served on', async () => {
+    holder.service = createFakeService({
+      assistants: [assistantRow({ allowed_origins: ['docs.example.com'] })],
+    });
+    const served = 'http://localhost:3400';
+    const at = (origin: string) =>
+      POST(
+        new Request(`${served}/api/widget/chat`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', origin },
+          body: JSON.stringify(body()),
+        }),
+      );
+
+    expect(served).not.toBe(appOrigin());
+
+    const allowed = await at(served);
+    expect(allowed.status).toBe(200);
+    await allowed.text();
+
+    expect((await at('http://localhost:3401')).status).toBe(403);
   });
 
   it('streams the answer with CORS headers and passes the widget conversation through', async () => {

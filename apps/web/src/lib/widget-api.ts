@@ -192,9 +192,22 @@ export const requestOrigin = (request: Request): string | null => {
   return referer ? (parseOrigin(referer)?.origin ?? null) : null;
 };
 
-/** The assistant's own list, plus the app itself so the demo page and the live preview work. */
-export const originAllowed = (origin: string | null, allowed: string[]) =>
-  isOriginAllowed(origin, allowed) || (origin !== null && origin === appOrigin());
+/**
+ * The origin a request was served on. The configured app URL can lag behind where the app really
+ * runs (another port in development, a preview deployment), and the demo page and the settings
+ * preview are always same-origin with the API that serves them.
+ */
+export const selfOrigin = (request: Request): string | null =>
+  parseOrigin(request.url)?.origin ?? null;
+
+/**
+ * The assistant's own list, plus the app itself, so the demo page and the live preview work even
+ * when the owner listed only their docs domain. "The app itself" is the configured app URL or the
+ * origin the request came in on; a browser on a foreign site cannot make either match.
+ */
+export const originAllowed = (origin: string | null, allowed: string[], self: string | null) =>
+  isOriginAllowed(origin, allowed) ||
+  (origin !== null && (origin === appOrigin() || origin === self));
 
 // ---------------------------------------------------------------------------
 // Responses

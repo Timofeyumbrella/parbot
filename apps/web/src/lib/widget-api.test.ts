@@ -19,6 +19,7 @@ import {
   parseWidgetSettings,
   requestOrigin,
   retryAfter,
+  selfOrigin,
   widgetChatSchema,
   widgetConfigFor,
   widgetLeadSchema,
@@ -136,9 +137,20 @@ describe('originAllowed', () => {
     const app = appOrigin();
 
     expect(app).toMatch(/^https?:\/\//);
-    expect(originAllowed(app, ['docs.example.com'])).toBe(true);
-    expect(originAllowed('https://elsewhere.io', ['docs.example.com'])).toBe(false);
-    expect(originAllowed(null, ['docs.example.com'])).toBe(false);
+    expect(originAllowed(app, ['docs.example.com'], null)).toBe(true);
+    expect(originAllowed('https://elsewhere.io', ['docs.example.com'], null)).toBe(false);
+    expect(originAllowed(null, ['docs.example.com'], null)).toBe(false);
+  });
+
+  it('also accepts the origin the request itself was served on, wherever the app runs', () => {
+    const served = selfOrigin(new Request('http://localhost:3400/api/widget/config?key=pb_1'));
+
+    expect(served).toBe('http://localhost:3400');
+    expect(served).not.toBe(appOrigin());
+    expect(originAllowed('http://localhost:3400', ['docs.example.com'], served)).toBe(true);
+    expect(originAllowed('http://localhost:3401', ['docs.example.com'], served)).toBe(false);
+    expect(originAllowed(null, ['docs.example.com'], served)).toBe(false);
+    expect(originAllowed('http://localhost:3400', ['docs.example.com'], null)).toBe(false);
   });
 });
 

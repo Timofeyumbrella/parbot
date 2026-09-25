@@ -12,6 +12,7 @@ import {
   readJson,
   requestOrigin,
   retryAfter,
+  selfOrigin,
   WIDGET_ASSISTANT_LIMIT,
   WIDGET_IP_LIMIT,
   WIDGET_OWNER_LIMIT,
@@ -45,7 +46,7 @@ export async function POST(request: Request) {
     return jsonError(404, 'not_found', 'No assistant has that key.', cors);
   }
 
-  if (!originAllowed(origin, assistant.allowed_origins)) {
+  if (!originAllowed(origin, assistant.allowed_origins, selfOrigin(request))) {
     return jsonError(
       403,
       'origin_not_allowed',

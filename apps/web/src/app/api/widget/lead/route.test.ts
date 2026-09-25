@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { resetRateLimits } from '@/lib/engine';
+import { appOrigin } from '@/lib/widget-api';
 import {
   assistantRow,
   createFakeService,
@@ -74,6 +75,25 @@ describe('POST /api/widget/lead', () => {
       assistants: [assistantRow({ allowed_origins: ['docs.example.com'] })],
     });
     expect((await post(body(), { origin: 'https://evil.example' })).status).toBe(403);
+  });
+
+  it('accepts a lead from the origin the app is served on, whatever the configured app url', async () => {
+    holder.service = starter({
+      assistants: [assistantRow({ allowed_origins: ['docs.example.com'] })],
+    });
+    const served = 'http://localhost:3400';
+    const at = (origin: string) =>
+      POST(
+        new Request(`${served}/api/widget/lead`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', origin },
+          body: JSON.stringify(body()),
+        }),
+      );
+
+    expect(served).not.toBe(appOrigin());
+    expect((await at(served)).status).toBe(201);
+    expect((await at('http://localhost:3401')).status).toBe(403);
   });
 
   it('refuses when lead capture is off for the plan or the assistant', async () => {
