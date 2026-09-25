@@ -223,23 +223,30 @@ test.describe('widget on the demo page', () => {
     await page.getByRole('button', { name: 'Sign in' }).click();
     await page.waitForURL(/\/(dashboard|a\/)/);
 
-    // A slow CPU lets the frame finish loading before React hydrates, which once left the
-    // skeleton over the preview for good.
-    const cdp = await page.context().newCDPSession(page);
-    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+    // The page's own scripts are held back, so the preview frame finishes loading before React
+    // hydrates, as it does on a slow machine. That once left the skeleton over it for good.
+    await page.route('**/_next/static/**', async (route) => {
+      const request = route.request();
+
+      if (request.frame() === page.mainFrame() && request.resourceType() === 'script') {
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+      }
+
+      await route.continue();
+    });
 
     const frame = page.locator('iframe[title="Widget preview"]');
 
     await page.goto(`/a/${seeded!.assistantId}/widget`);
-    await expect(frame).toHaveCSS('opacity', '1', { timeout: 20_000 });
+    await expect(frame).toHaveCSS('opacity', '1', { timeout: 10_000 });
 
     await page.reload();
-    await expect(frame).toHaveCSS('opacity', '1', { timeout: 20_000 });
+    await expect(frame).toHaveCSS('opacity', '1', { timeout: 10_000 });
     await expect(
       page.frameLocator('iframe[title="Widget preview"]').locator('#parbot-widget'),
     ).toBeAttached();
 
-    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
+    await page.unrouteAll({ behavior: 'wait' });
   });
 
   test('a saved theme shows in the settings preview at once', async ({ page }) => {
