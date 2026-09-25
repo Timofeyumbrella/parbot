@@ -45,6 +45,10 @@ test.describe('signing up and creating the first assistant', () => {
 
     await expect(page).toHaveURL(/\/onboarding/);
 
+    // Every account-level screen puts its title in the same place, so moving between them does not jump.
+    const titleX = async () => (await page.getByRole('heading', { level: 1 }).first().boundingBox())!.x;
+    const titles = [await titleX()];
+
     await page.getByLabel('Name', { exact: true }).fill('Acme Docs');
     await page.getByRole('button', { name: /create/i }).click();
 
@@ -61,6 +65,15 @@ test.describe('signing up and creating the first assistant', () => {
     const top = async (locator: typeof pages) => (await locator!.boundingBox())!.y;
 
     expect(Math.abs((await top(pages)) - (await top(conversations)))).toBeLessThan(1);
+
+    titles.push(await titleX());
+
+    for (const path of ['/account', '/billing']) {
+      await page.goto(path);
+      titles.push(await titleX());
+    }
+
+    expect(new Set(titles).size).toBe(1);
   });
 
   test('guarded routes bounce to login and keep the destination', async ({ page }) => {

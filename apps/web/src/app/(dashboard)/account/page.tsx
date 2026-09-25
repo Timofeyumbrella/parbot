@@ -39,58 +39,62 @@ export default async function AccountPage() {
   const renewal = periodEnd(account.currentPeriodEnd);
 
   return (
-    <PageContainer className="max-w-3xl">
+    <PageContainer>
       <PageHeader
         title="Account"
         description="Your name, how you sign in, and the plan this account is on."
       />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Plan</CardTitle>
-          <CardDescription>
-            {plan.name}, {price}.
-            {renewal
-              ? account.cancelAtPeriodEnd
-                ? ` Ends ${renewal}.`
-                : ` Renews ${renewal}.`
-              : plan.id === 'hobby'
-                ? ' Upgrade for more assistants, pages and answers.'
-                : ''}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button asChild variant="outline">
-            <Link href="/billing">
-              {plan.id === 'hobby' ? 'See plans' : 'Manage billing'}
-              <ArrowUpRight data-icon="inline-end" />
-            </Link>
-          </Button>
-        </CardContent>
-      </Card>
+      {/* The container keeps the width every screen shares, so the title does not jump when
+          moving here from Billing; only the forms are narrowed, and they stay left-aligned. */}
+      <div className="flex max-w-3xl flex-col gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Plan</CardTitle>
+            <CardDescription>
+              {plan.name}, {price}.
+              {renewal
+                ? account.cancelAtPeriodEnd
+                  ? ` Ends ${renewal}.`
+                  : ` Renews ${renewal}.`
+                : plan.id === 'hobby'
+                  ? ' Upgrade for more assistants, pages and answers.'
+                  : ''}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button asChild variant="outline">
+              <Link href="/billing">
+                {plan.id === 'hobby' ? 'See plans' : 'Manage billing'}
+                <ArrowUpRight data-icon="inline-end" />
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
 
-      <ProfileForm fullName={fullName} />
-      <EmailForm email={email} pendingEmail={pendingEmail} />
-      <PasswordForm />
+        <ProfileForm fullName={fullName} />
+        <EmailForm email={email} pendingEmail={pendingEmail} />
+        <PasswordForm />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Sign out</CardTitle>
-          <CardDescription>
-            Ends this session on this device. Your assistants keep running.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <SignOutButton />
-        </CardContent>
-      </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Sign out</CardTitle>
+            <CardDescription>
+              Ends this session on this device. Your assistants keep running.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <SignOutButton />
+          </CardContent>
+        </Card>
 
-      <section aria-label="Danger zone" className="flex flex-col gap-3">
-        <h2 className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
-          Danger zone
-        </h2>
-        <DeleteAccountCard email={email} />
-      </section>
+        <section aria-label="Danger zone" className="flex flex-col gap-3">
+          <h2 className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+            Danger zone
+          </h2>
+          <DeleteAccountCard email={email} />
+        </section>
+      </div>
     </PageContainer>
   );
 }
