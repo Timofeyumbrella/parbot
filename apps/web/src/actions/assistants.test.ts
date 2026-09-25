@@ -2,7 +2,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { PLANS } from '@/lib/plans';
 
-import { createAssistant, deleteAssistant, regeneratePublicKey, updateAssistant } from './assistants';
+import {
+  createAssistant,
+  deleteAssistant,
+  regeneratePublicKey,
+  updateAssistant,
+} from './assistants';
 
 const USER_ID = '00000000-0000-4000-8000-000000000001';
 const ASSISTANT_ID = '3fa85f64-5717-4562-b3fc-2c963f66afa6';
@@ -21,7 +26,8 @@ const { queue, calls } = vi.hoisted(() => ({
 const builder = () => {
   const next = () => queue.shift() ?? { data: null, error: null };
   const api: Row = {};
-  const chain = (method: string) =>
+  const chain =
+    (method: string) =>
     (...args: unknown[]) => {
       calls.push({ method, args });
 
@@ -40,7 +46,15 @@ const builder = () => {
   return api;
 };
 
-const { getAccountPlan, getAccountUsage, redirect, revalidatePath, requireUser } = vi.hoisted(() => ({
+const {
+  getAccountPlan,
+  getAccountUsage,
+  redirect,
+  revalidatePath,
+  requireUser,
+  removeStoredFiles,
+  service,
+} = vi.hoisted(() => ({
   getAccountPlan: vi.fn(),
   getAccountUsage: vi.fn(),
   redirect: vi.fn((url: string) => {
@@ -48,10 +62,14 @@ const { getAccountPlan, getAccountUsage, redirect, revalidatePath, requireUser }
   }),
   revalidatePath: vi.fn(),
   requireUser: vi.fn(),
+  removeStoredFiles: vi.fn(),
+  service: { role: 'service' },
 }));
 
 vi.mock('@/lib/account', () => ({ getAccountPlan, getAccountUsage }));
 vi.mock('@/lib/session', () => ({ requireUser }));
+vi.mock('@/lib/source-files', () => ({ removeStoredFiles }));
+vi.mock('@/lib/supabase/service', () => ({ createSupabaseServiceClient: () => service }));
 vi.mock('next/navigation', () => ({ redirect }));
 vi.mock('next/cache', () => ({ revalidatePath }));
 
@@ -93,13 +111,16 @@ describe('createAssistant', () => {
     getAccountUsage.mockResolvedValue({ assistants: 2, pages: 0, messagesThisMonth: 0 });
     queue.push({ data: [], error: null }, { data: { id: ASSISTANT_ID }, error: null });
 
-    await expect(createAssistant(idle, form({ name: 'Acme', slug: '', description: '' }))).rejects.toThrow(
-      `REDIRECT /a/${ASSISTANT_ID}/knowledge`,
-    );
+    await expect(
+      createAssistant(idle, form({ name: 'Acme', slug: '', description: '' })),
+    ).rejects.toThrow(`REDIRECT /a/${ASSISTANT_ID}/knowledge`);
   });
 
   it('returns field errors before checking anything else', async () => {
-    const state = await createAssistant(idle, form({ name: '', slug: 'Bad Slug', description: '' }));
+    const state = await createAssistant(
+      idle,
+      form({ name: '', slug: 'Bad Slug', description: '' }),
+    );
 
     expect(state.status).toBe('error');
     expect(state.fieldErrors).toEqual({
@@ -113,13 +134,18 @@ describe('createAssistant', () => {
     queue.push({ data: [{ slug: 'acme-docs' }, { slug: 'acme-docs-2' }], error: null });
     queue.push({ data: { id: ASSISTANT_ID }, error: null });
 
-    await expect(createAssistant(idle, form({ name: 'Acme Docs', slug: '', description: 'Notes' }))).rejects.toThrow(
-      `REDIRECT /a/${ASSISTANT_ID}/knowledge`,
-    );
+    await expect(
+      createAssistant(idle, form({ name: 'Acme Docs', slug: '', description: 'Notes' })),
+    ).rejects.toThrow(`REDIRECT /a/${ASSISTANT_ID}/knowledge`);
 
     const insert = calls.find((call) => call.method === 'insert');
 
-    expect(insert?.args[0]).toEqual({ owner_id: USER_ID, name: 'Acme Docs', slug: 'acme-docs-3', description: 'Notes' });
+    expect(insert?.args[0]).toEqual({
+      owner_id: USER_ID,
+      name: 'Acme Docs',
+      slug: 'acme-docs-3',
+      description: 'Notes',
+    });
     expect(revalidatePath).toHaveBeenCalledWith('/dashboard');
   });
 
@@ -128,11 +154,13 @@ describe('createAssistant', () => {
     queue.push({ data: null, error: { code: '23505', message: 'duplicate key' } });
     queue.push({ data: { id: ASSISTANT_ID }, error: null });
 
-    await expect(createAssistant(idle, form({ name: 'Acme', slug: 'acme', description: '' }))).rejects.toThrow(
-      'REDIRECT',
-    );
+    await expect(
+      createAssistant(idle, form({ name: 'Acme', slug: 'acme', description: '' })),
+    ).rejects.toThrow('REDIRECT');
 
-    const inserts = calls.filter((call) => call.method === 'insert').map((call) => (call.args[0] as Row).slug);
+    const inserts = calls
+      .filter((call) => call.method === 'insert')
+      .map((call) => (call.args[0] as Row).slug);
 
     expect(inserts).toEqual(['acme', 'acme-2']);
   });
@@ -143,7 +171,10 @@ describe('createAssistant', () => {
 
     const state = await createAssistant(idle, form({ name: 'Acme', slug: '', description: '' }));
 
-    expect(state).toMatchObject({ status: 'error', error: 'The assistant could not be created. Try again.' });
+    expect(state).toMatchObject({
+      status: 'error',
+      error: 'The assistant could not be created. Try again.',
+    });
   });
 });
 
@@ -154,14 +185,16 @@ describe('updateAssistant', () => {
     slug: 'acme',
     description: '',
     instructions: '',
-    welcomeMessage: 'Hi.',
-    suggestedQuestions: 'One\nTwo',
   };
 
-  it('writes the row and reports success', async () => {
+  it('writes the row and reports success, leaving the Widget page columns alone', async () => {
     queue.push({ data: { id: ASSISTANT_ID }, error: null });
 
-    const state = await updateAssistant(idle, form(fields));
+    // A stale form that still posts the old fields must not overwrite what the Widget page saved.
+    const state = await updateAssistant(
+      idle,
+      form({ ...fields, welcomeMessage: 'Stale.', suggestedQuestions: 'Old question' }),
+    );
 
     expect(state).toMatchObject({ status: 'success', message: 'Settings saved.' });
 
@@ -172,8 +205,6 @@ describe('updateAssistant', () => {
       slug: 'acme',
       description: null,
       instructions: null,
-      welcome_message: 'Hi.',
-      suggested_questions: ['One', 'Two'],
     });
     expect(revalidatePath).toHaveBeenCalledWith(`/a/${ASSISTANT_ID}/settings`);
   });
@@ -183,7 +214,9 @@ describe('updateAssistant', () => {
 
     const state = await updateAssistant(idle, form(fields));
 
-    expect(state.fieldErrors).toEqual({ slug: 'Another of your assistants already uses this slug.' });
+    expect(state.fieldErrors).toEqual({
+      slug: 'Another of your assistants already uses this slug.',
+    });
   });
 
   it('reports a row it cannot see as gone', async () => {
@@ -220,19 +253,53 @@ describe('deleteAssistant', () => {
   it('requires the typed name to match', async () => {
     queue.push({ data: { id: ASSISTANT_ID, name: 'Acme' }, error: null });
 
-    const state = await deleteAssistant(idle, form({ assistantId: ASSISTANT_ID, confirmName: 'acme' }));
+    const state = await deleteAssistant(
+      idle,
+      form({ assistantId: ASSISTANT_ID, confirmName: 'acme' }),
+    );
 
     expect(state.fieldErrors).toEqual({ confirmName: 'Type Acme exactly as shown.' });
     expect(calls.some((call) => call.method === 'delete')).toBe(false);
   });
 
-  it('deletes and redirects to the dashboard when it matches', async () => {
+  it('removes the stored files through the service role, then the row, and redirects', async () => {
     queue.push({ data: { id: ASSISTANT_ID, name: 'Acme' }, error: null });
     queue.push({ data: null, error: null });
+    let deletedBeforeFiles = false;
+    removeStoredFiles.mockImplementation(async () => {
+      deletedBeforeFiles = calls.some((call) => call.method === 'delete');
 
-    await expect(deleteAssistant(idle, form({ assistantId: ASSISTANT_ID, confirmName: ' Acme ' }))).rejects.toThrow(
-      'REDIRECT /dashboard',
-    );
+      return [`${USER_ID}/${ASSISTANT_ID}/one.md`];
+    });
+
+    await expect(
+      deleteAssistant(idle, form({ assistantId: ASSISTANT_ID, confirmName: ' Acme ' })),
+    ).rejects.toThrow('REDIRECT /dashboard');
+
+    expect(removeStoredFiles).toHaveBeenCalledWith(service, `${USER_ID}/${ASSISTANT_ID}`);
+    expect(deletedBeforeFiles).toBe(false);
     expect(calls.some((call) => call.method === 'delete')).toBe(true);
+  });
+
+  it('keeps the row when the files could not be removed, so nothing is orphaned', async () => {
+    queue.push({ data: { id: ASSISTANT_ID, name: 'Acme' }, error: null });
+    removeStoredFiles.mockRejectedValue(new Error('storage is down'));
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const state = await deleteAssistant(
+      idle,
+      form({ assistantId: ASSISTANT_ID, confirmName: 'Acme' }),
+    );
+
+    expect(state).toMatchObject({
+      status: 'error',
+      error: 'The assistant’s files could not be removed. Try again in a moment.',
+    });
+    expect(calls.some((call) => call.method === 'delete')).toBe(false);
+    expect(redirect).not.toHaveBeenCalled();
+    expect(consoleError).toHaveBeenCalledWith(
+      '[assistants] stored files were not removed',
+      expect.anything(),
+    );
   });
 });

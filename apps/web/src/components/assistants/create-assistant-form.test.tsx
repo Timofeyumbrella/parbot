@@ -54,6 +54,7 @@ describe('CreateAssistantForm', () => {
 
     expect(formData?.get('name')).toBe('Acme Docs');
     expect(formData?.get('slug')).toBe('acme-docs');
-    expect(screen.getByText('Next you will point it at your docs.')).toBeInTheDocument();
+    // The onboarding header already says what comes next; the form does not repeat it.
+    expect(screen.queryByText(/Next you will/)).toBeNull();
   });
 });

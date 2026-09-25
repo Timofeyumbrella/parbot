@@ -21,7 +21,7 @@ export default async function SettingsPage({ params }: PageProps<'/a/[assistantI
     <PageContainer>
       <PageHeader
         title="Settings"
-        description={`How ${assistant.name} introduces itself and behaves. The widget page handles appearance, mode and allowed origins.`}
+        description={`What ${assistant.name} is called and how it answers. The Widget page handles its welcome message, suggested questions, appearance, mode and allowed origins.`}
       />
       <AssistantSettingsForm
         assistant={{
@@ -30,13 +30,13 @@ export default async function SettingsPage({ params }: PageProps<'/a/[assistantI
           slug: assistant.slug,
           description: assistant.description,
           instructions: assistant.instructions,
-          welcome_message: assistant.welcome_message,
-          suggested_questions: assistant.suggested_questions,
         }}
       />
       <RegenerateKeyCard assistantId={assistant.id} publicKey={assistant.public_key} />
       <section aria-label="Danger zone" className="flex flex-col gap-3">
-        <h2 className="text-muted-foreground text-xs font-medium tracking-wide uppercase">Danger zone</h2>
+        <h2 className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+          Danger zone
+        </h2>
         <DeleteAssistantCard assistantId={assistant.id} name={assistant.name} />
       </section>
     </PageContainer>

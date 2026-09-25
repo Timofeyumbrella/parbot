@@ -3,6 +3,7 @@ import Link from 'next/link';
 
 import { Progress } from '@/components/ui/progress';
 import type { AccountUsage } from '@/lib/account';
+import { formatCount } from '@/lib/format';
 import { checkCapacity, type Plan } from '@/lib/plans';
 
 const Meter = ({ label, used, limit }: { label: string; used: number; limit: number }) => {
@@ -14,10 +15,14 @@ const Meter = ({ label, used, limit }: { label: string; used: number; limit: num
       <div className="flex items-baseline justify-between gap-2 text-xs">
         <span className="text-muted-foreground">{label}</span>
         <span className={full ? 'text-warning font-medium tabular-nums' : 'tabular-nums'}>
-          {used.toLocaleString('en-US')} / {limit.toLocaleString('en-US')}
+          {formatCount(used)} of {formatCount(limit)}
         </span>
       </div>
-      <Progress value={percent} aria-label={`${label}: ${used} of ${limit}`} className={full ? '[&_[data-slot=progress-indicator]]:bg-warning' : undefined} />
+      <Progress
+        value={percent}
+        aria-label={`${label}: ${formatCount(used)} of ${formatCount(limit)}`}
+        className={full ? '[&_[data-slot=progress-indicator]]:bg-warning' : undefined}
+      />
     </div>
   );
 };
@@ -35,7 +40,10 @@ export const PlanStrip = ({ plan, usage }: { plan: Plan; usage: AccountUsage }) 
     >
       <div className="flex shrink-0 items-center justify-between gap-3 sm:flex-col sm:items-start sm:gap-0.5">
         <span className="text-sm font-medium">{plan.name} plan</span>
-        <Link href="/billing" className="text-muted-foreground hover:text-foreground flex items-center gap-1 text-xs">
+        <Link
+          href="/billing"
+          className="text-muted-foreground hover:text-foreground flex items-center gap-1 text-xs"
+        >
           {plan.id === 'hobby' ? 'Upgrade' : 'Manage billing'}
           <ArrowUpRight className="size-3" />
         </Link>

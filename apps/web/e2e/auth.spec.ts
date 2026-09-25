@@ -6,6 +6,7 @@ import { trackAccounts } from './support/accounts';
 
 const accounts = trackAccounts();
 
+// A failed assertion must not leave its account behind in the shared database.
 test.afterEach(accounts.cleanup);
 
 test.describe('signing up and creating the first assistant', () => {
@@ -25,6 +26,11 @@ test.describe('signing up and creating the first assistant', () => {
 
     await expect(page).toHaveURL(/\/onboarding/);
 
+    // Every account-level screen puts its title in the same place, so moving between them does not jump.
+    const titleX = async () =>
+      (await page.getByRole('heading', { level: 1 }).first().boundingBox())!.x;
+    const titles = [await titleX()];
+
     await page.getByLabel('Name', { exact: true }).fill('Acme Docs');
     await page.getByRole('button', { name: /create/i }).click();
 
@@ -32,6 +38,24 @@ test.describe('signing up and creating the first assistant', () => {
 
     await page.goto('/dashboard');
     await expect(page.getByText('Acme Docs').first()).toBeVisible();
+
+    // At three cards a row "conversations in 30 days" wraps; both numbers still share one line.
+    const [pages, conversations] = await page
+      .getByRole('list', { name: 'Your assistants' })
+      .locator('dd')
+      .all();
+    const top = async (locator: typeof pages) => (await locator!.boundingBox())!.y;
+
+    expect(Math.abs((await top(pages)) - (await top(conversations)))).toBeLessThan(1);
+
+    titles.push(await titleX());
+
+    for (const path of ['/account', '/billing']) {
+      await page.goto(path);
+      titles.push(await titleX());
+    }
+
+    expect(new Set(titles).size).toBe(1);
   });
 
   test('guarded routes bounce to login and keep the destination', async ({ page }) => {
