@@ -6,15 +6,12 @@ import { PageContainer, PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { getAccountPlan } from '@/lib/account';
-import { formatPrice } from '@/lib/plans';
+import { planSummary } from '@/lib/billing/pricing';
 import { requireUser } from '@/lib/session';
 
 import { EmailForm, PasswordForm, ProfileForm, SignOutButton } from './account-forms';
 
 export const metadata: Metadata = { title: 'Account' };
-
-const periodEnd = (iso: string | null) =>
-  iso ? new Intl.DateTimeFormat('en-US', { dateStyle: 'medium' }).format(new Date(iso)) : null;
 
 export default async function AccountPage() {
   const { supabase, user } = await requireUser();
@@ -23,35 +20,24 @@ export default async function AccountPage() {
     getAccountPlan(),
   ]);
 
-  const fullName = profile?.full_name ?? (typeof user.user_metadata.full_name === 'string' ? user.user_metadata.full_name : '');
+  const fullName =
+    profile?.full_name ??
+    (typeof user.user_metadata.full_name === 'string' ? user.user_metadata.full_name : '');
   const email = user.email ?? profile?.email ?? '';
   const pendingEmail = user.new_email ?? null;
   const { plan } = account;
-  const price =
-    plan.monthlyCents === 0
-      ? 'Free'
-      : account.billingInterval === 'yearly'
-        ? `${formatPrice(plan.yearlyCents)} a year`
-        : `${formatPrice(plan.monthlyCents)} a month`;
-  const renewal = periodEnd(account.currentPeriodEnd);
 
   return (
     <PageContainer className="max-w-3xl">
-      <PageHeader title="Account" description="Your name, how you sign in, and the plan this account is on." />
+      <PageHeader
+        title="Account"
+        description="Your name, how you sign in, and the plan this account is on."
+      />
 
       <Card>
         <CardHeader>
           <CardTitle>Plan</CardTitle>
-          <CardDescription>
-            {plan.name}, {price}.
-            {renewal
-              ? account.cancelAtPeriodEnd
-                ? ` Ends ${renewal}.`
-                : ` Renews ${renewal}.`
-              : plan.id === 'hobby'
-                ? ' Upgrade for more assistants, pages and answers.'
-                : ''}
-          </CardDescription>
+          <CardDescription>{planSummary(account)}</CardDescription>
         </CardHeader>
         <CardContent>
           <Button asChild variant="outline">
@@ -70,7 +56,9 @@ export default async function AccountPage() {
       <Card>
         <CardHeader>
           <CardTitle>Sign out</CardTitle>
-          <CardDescription>Ends this session on this device. Your assistants keep running.</CardDescription>
+          <CardDescription>
+            Ends this session on this device. Your assistants keep running.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <SignOutButton />

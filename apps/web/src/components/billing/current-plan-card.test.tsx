@@ -30,12 +30,12 @@ const starter = account({
 describe('renewalLine', () => {
   it('says what happens next for each state', () => {
     expect(renewalLine(account())).toMatch(/Choose a plan below/);
-    expect(renewalLine(starter)).toBe('Renews on 2 November 2026.');
+    expect(renewalLine(starter)).toBe('Renews on Nov 2, 2026.');
     expect(renewalLine({ ...starter, cancelAtPeriodEnd: true })).toBe(
-      'Ends on 2 November 2026. You keep the plan until then.',
+      'Ends on Nov 2, 2026. You keep the plan until then.',
     );
     expect(renewalLine({ ...starter, status: 'past_due' })).toMatch(/payment failed/);
-    expect(renewalLine({ ...starter, status: 'trialing' })).toBe('Trial ends on 2 November 2026.');
+    expect(renewalLine({ ...starter, status: 'trialing' })).toBe('Trial ends on Nov 2, 2026.');
     expect(renewalLine({ ...account(), status: 'canceled' })).toMatch(/ended/);
   });
 
@@ -54,7 +54,7 @@ describe('CurrentPlanCard', () => {
 
     expect(screen.getByText('Starter')).toBeInTheDocument();
     expect(screen.getByText('$290 a year')).toBeInTheDocument();
-    expect(screen.getByText('Renews on 2 November 2026.')).toBeInTheDocument();
+    expect(screen.getByText('Renews on Nov 2, 2026.')).toBeInTheDocument();
     expect(screen.getByText('Active')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Manage subscription' })).toBeEnabled();
   });

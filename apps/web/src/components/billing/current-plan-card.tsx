@@ -9,8 +9,9 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import type { AccountPlan } from '@/lib/account';
-import { formatPeriodEnd, priceLabel } from '@/lib/billing/pricing';
+import { priceLabel } from '@/lib/billing/pricing';
 import type { BillingProviderName } from '@/lib/billing/types';
+import { formatDate } from '@/lib/format';
 
 import { ManageSubscriptionButton } from './manage-subscription-button';
 
@@ -39,7 +40,7 @@ const statusBadge = (account: AccountPlan) => {
 
 /** One sentence about what happens next with the subscription. */
 export const renewalLine = (account: AccountPlan) => {
-  const date = formatPeriodEnd(account.currentPeriodEnd);
+  const date = account.currentPeriodEnd ? formatDate(account.currentPeriodEnd) : null;
 
   if (account.status === 'canceled') {
     return 'Your paid subscription ended. You are on Hobby.';
