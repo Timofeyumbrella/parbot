@@ -1,7 +1,10 @@
 // @vitest-environment node
+import { readFileSync } from 'node:fs';
+
 import { describe, expect, it, vi } from 'vitest';
 
 import { checksumOf, extractText, extractUpload, markdownTitle } from './extract';
+import { minimalPdf } from './fixtures/pdf';
 
 const bytes = (text: string) => new TextEncoder().encode(text);
 
@@ -44,10 +47,26 @@ describe('extractUpload', () => {
     expect(result.markdown).not.toContain('skip');
   });
 
-  it('reads the text of a PDF', async () => {
-    const result = await extractUpload(bytes(MINIMAL_PDF), 'pdf');
+  it('reads the text of a PDF and the title it carries', async () => {
+    const result = await extractUpload(minimalPdf('Hello Parbot', 'Welcome guide'), 'pdf');
 
-    expect(result.markdown).toContain('Hello Parbot');
+    expect(result).toEqual({ title: 'Welcome guide', markdown: 'Hello Parbot' });
+  });
+
+  it('reads a Word file, keeping its headings and emphasis as Markdown', async () => {
+    const docx = new Uint8Array(readFileSync(new URL('./fixtures/handbook.docx', import.meta.url)));
+    const result = await extractUpload(docx, 'docx');
+
+    expect(result.title).toBe('Handbook');
+    expect(result.markdown).toBe(
+      [
+        '# Handbook',
+        'Welcome to the Parbot handbook. It explains how the assistant answers.',
+        '## Refunds',
+        '**Refunds are issued within 30 days of purchase.**',
+        'Contact support with the order number to start one.',
+      ].join('\n\n'),
+    );
   });
 });
 
@@ -56,40 +75,6 @@ describe('extractText', () => {
     expect(extractText(bytes('# Refunds\n\nWithin 30 days.'))).toEqual({ title: 'Refunds', markdown: '# Refunds\n\nWithin 30 days.' });
   });
 });
-
-/** A one-page PDF with a single text object, built by hand so the test needs no fixture file. */
-const MINIMAL_PDF = (() => {
-  const objects = [
-    '<< /Type /Catalog /Pages 2 0 R >>',
-    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
-    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 144] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>',
-    null,
-    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
-  ];
-  const stream = 'BT /F1 18 Tf 20 100 Td (Hello Parbot) Tj ET';
-
-  objects[3] = `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`;
-
-  let body = '%PDF-1.4\n';
-  const offsets: number[] = [];
-
-  objects.forEach((object, index) => {
-    offsets.push(body.length);
-    body += `${index + 1} 0 obj\n${object}\nendobj\n`;
-  });
-
-  const xref = body.length;
-
-  body += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
-
-  for (const offset of offsets) {
-    body += `${String(offset).padStart(10, '0')} 00000 n \n`;
-  }
-
-  body += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
-
-  return body;
-})();
 
 describe('extractUpload with damaged files', () => {
   it('explains a Word file that is not really a docx', async () => {

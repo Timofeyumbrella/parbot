@@ -1,11 +1,15 @@
 // @vitest-environment node
+import { readFileSync } from 'node:fs';
+
 import { createClient } from '@supabase/supabase-js';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { createStubProvider } from '@/lib/ai';
 import type { Database } from '@/lib/db';
 import { PLANS } from '@/lib/plans';
+import { storagePathFor, UPLOAD_TYPES } from '@/lib/uploads';
 
+import { minimalPdf } from './fixtures/pdf';
 import { publicLookup } from './guard';
 import type { FetchImpl } from './http';
 import { ingestSource, PAGE_LIMIT_MESSAGE, STORAGE_BUCKET } from './index';
@@ -297,6 +301,55 @@ describe.skipIf(!serviceKey)('ingestSource against the local database', () => {
 
     expect(document).toMatchObject({ url: null, title: 'Refunds (pasted)' });
     expect((await loadSource(sourceId)).status).toBe('ready');
+  });
+
+  it.each([
+    {
+      type: 'docx' as const,
+      fileName: 'handbook.docx',
+      bytes: () => new Uint8Array(readFileSync(new URL('./fixtures/handbook.docx', import.meta.url))),
+      title: 'Handbook',
+      passage: 'Refunds are issued within 30 days of purchase.',
+    },
+    {
+      type: 'pdf' as const,
+      fileName: 'guide.pdf',
+      bytes: () => minimalPdf('Hello Parbot', 'Welcome guide'),
+      title: 'Welcome guide',
+      passage: 'Hello Parbot',
+    },
+  ])('indexes an uploaded $type file from the bucket under the title inside it', async ({ type, fileName, bytes, title, passage }) => {
+    // Stored the way POST /api/sources stores an upload: under the account, typed by its extension.
+    const spec = UPLOAD_TYPES[type];
+    const path = storagePathFor(userId, assistantId, spec.extensions[0]!);
+
+    storagePaths.push(path);
+
+    const { error: uploadError } = await service.storage
+      .from(STORAGE_BUCKET)
+      .upload(path, new Blob([bytes()], { type: spec.mime }), { contentType: spec.mime });
+
+    expect(uploadError).toBeNull();
+
+    const sourceId = await createSource({ kind: 'upload', title: fileName, storage_path: path, mime_type: spec.mime });
+    const result = await ingestSource({ service, provider, sourceId });
+
+    expect(result).toMatchObject({ status: 'ready', pages: 1, documents: 1, note: null });
+
+    const [document] = await loadDocuments(sourceId);
+
+    expect(document).toMatchObject({ url: null, title });
+
+    const { data: chunks } = await service.from('chunks').select('content').eq('document_id', document!.id);
+
+    expect(chunks?.some((chunk) => chunk.content.includes(passage))).toBe(true);
+    expect(await loadSource(sourceId)).toMatchObject({
+      status: 'ready',
+      error: null,
+      pages_done: 1,
+      document_count: 1,
+      chunk_count: chunks?.length,
+    });
   });
 
   it('reports a source that does not exist', async () => {
