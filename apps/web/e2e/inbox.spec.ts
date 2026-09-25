@@ -2,8 +2,9 @@ import { type Browser, expect, type Page, test } from '@playwright/test';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 /**
- * The Inbox against real rows: the list pages in the server's order and keeps it after
- * "Load more", and a transcript shows its sources exactly as the chat shows them.
+ * The Inbox and the Overview against real rows: the list pages in the server's order and keeps it
+ * after "Load more", a transcript shows its sources exactly as the chat shows them, and the
+ * question lists keep their columns aligned whatever a row's count or date reads.
  *
  * Runs as a throwaway account the spec creates and deletes, so the demo rows are never touched.
  */
@@ -93,6 +94,24 @@ const seed = async (service: SupabaseClient): Promise<Seed> => {
           role: 'user',
           content: index === asked.length - 1 ? OLD_QUESTION : QUESTIONS[index % QUESTIONS.length]!,
           created_at: questionAt(index),
+        })),
+      )
+      .select('id'),
+  );
+
+  // The newest and the oldest question went unanswered, so that list mixes a relative time and a date too.
+  must(
+    await service
+      .from('messages')
+      .insert(
+        [0, asked.length - 1].map((index) => ({
+          conversation_id: asked[index]!.id,
+          assistant_id: assistantId,
+          owner_id: userId,
+          role: 'assistant',
+          content: 'The docs do not cover that yet.',
+          answered: false,
+          created_at: new Date(Date.parse(questionAt(index)) + 1000).toISOString(),
         })),
       )
       .select('id'),
@@ -233,5 +252,57 @@ test.describe('the inbox and the overview', () => {
     await expect(chatSources).toBeVisible();
     await expect(chatAnswer.locator('sup[data-citation]')).toHaveText(['2', '3', '5']);
     expect(await chatSources.evaluate((node) => node.outerHTML)).toBe(transcriptHtml);
+  });
+
+  test('the question lists keep their count and time columns aligned', async () => {
+    /** Where each row's count and time text ends, and whether any of it wrapped or spilled. */
+    const measure = (testId: string) =>
+      page
+        .getByTestId(testId)
+        .locator('li')
+        .evaluateAll((items) =>
+          items.map((item) => {
+            const text = (element: Element) => {
+              const range = document.createRange();
+
+              range.selectNodeContents(element);
+
+              return { rect: range.getBoundingClientRect(), fits: element.scrollWidth <= element.clientWidth };
+            };
+            const count = text(item.querySelector('[title^="Asked"]')!);
+            const time = text(item.querySelector('time')!);
+
+            return {
+              countRight: count.rect.right,
+              timeRight: time.rect.right,
+              lineHeight: Math.max(count.rect.height, time.rect.height),
+              fits: count.fits && time.fits,
+              timeText: item.querySelector('time')!.textContent ?? '',
+            };
+          }),
+        );
+
+    await page.goto(`/a/${seeded.assistantId}`);
+    await expect(page.getByTestId('top-questions').getByText(OLD_QUESTION)).toBeVisible();
+
+    const top = await measure('top-questions');
+    const unanswered = await measure('unanswered-questions');
+
+    // The three repeated questions, the old one and the one asked in the cited conversation.
+    expect(top).toHaveLength(QUESTIONS.length + 2);
+    expect(unanswered).toHaveLength(2);
+
+    for (const rows of [top, unanswered]) {
+      // The old question's row reads a full date, the widest a time gets; the others a relative time.
+      expect(rows.some((row) => /\d{4}$/.test(row.timeText))).toBe(true);
+      expect(rows.some((row) => /ago$/.test(row.timeText))).toBe(true);
+
+      for (const row of rows) {
+        expect(row.countRight).toBeCloseTo(rows[0]!.countRight, 0);
+        expect(row.timeRight).toBeCloseTo(rows[0]!.timeRight, 0);
+        expect(row.fits).toBe(true);
+        expect(row.lineHeight).toBeLessThan(20);
+      }
+    }
   });
 });

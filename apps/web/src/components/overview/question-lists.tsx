@@ -1,3 +1,4 @@
+import { cn } from 'cn';
 import { ArrowUpRight, BookOpen } from 'lucide-react';
 import Link from 'next/link';
 
@@ -19,6 +20,12 @@ const Empty = ({ children }: { children: React.ReactNode }) => (
   <p className="text-muted-foreground px-(--card-spacing) py-8 text-center text-sm">{children}</p>
 );
 
+/**
+ * Every row takes the list's column tracks through subgrid, so the count and time columns are as
+ * wide as their widest cell and line up on every row, whether it reads "3 days ago" or a full date.
+ */
+const ROW = 'col-span-full grid grid-cols-subgrid items-center px-(--card-spacing) py-2 text-sm';
+
 const Row = ({
   question,
   asks,
@@ -34,32 +41,29 @@ const Row = ({
 }) => {
   const body = (
     <>
-      <span className="min-w-0 flex-1 truncate" title={question}>
+      <span className="min-w-0 truncate" title={question}>
         {question}
       </span>
       <span
-        className="text-muted-foreground w-14 shrink-0 text-right text-xs tabular-nums"
+        className="text-muted-foreground text-right text-xs whitespace-nowrap tabular-nums"
         title={`Asked ${formatCount(asks)} ${asks === 1 ? 'time' : 'times'}`}
       >
         {formatCount(asks)}
         {asks === 1 ? ' time' : ' times'}
       </span>
-      <LocalTime value={lastAskedAt} now={now} className="text-muted-foreground min-w-16 shrink-0 text-right text-xs whitespace-nowrap" />
+      <LocalTime value={lastAskedAt} now={now} className="text-muted-foreground text-right text-xs whitespace-nowrap" />
     </>
   );
 
   return (
-    <li className="border-b last:border-0">
+    <li className="col-span-full grid grid-cols-subgrid border-b last:border-0">
       {href ? (
-        <Link
-          href={href}
-          className="hover:bg-muted/60 flex items-center gap-3 px-(--card-spacing) py-2 text-sm transition-colors"
-        >
+        <Link href={href} className={cn(ROW, 'hover:bg-muted/60 transition-colors')}>
           {body}
-          <ArrowUpRight aria-hidden="true" className="text-muted-foreground size-3.5 shrink-0" />
+          <ArrowUpRight aria-hidden="true" className="text-muted-foreground size-3.5" />
         </Link>
       ) : (
-        <div className="flex items-center gap-3 px-(--card-spacing) py-2 text-sm">{body}</div>
+        <div className={ROW}>{body}</div>
       )}
     </li>
   );
@@ -75,7 +79,7 @@ export const TopQuestions = ({ rows, now }: { rows: TopQuestion[]; now: number }
       {rows.length === 0 ? (
         <Empty>No questions in this period.</Empty>
       ) : (
-        <ul>
+        <ul className="grid grid-cols-[minmax(0,1fr)_auto_auto] gap-x-3">
           {rows.map((row) => (
             <Row key={row.question} question={row.question} asks={row.asks} lastAskedAt={row.last_asked_at} now={now} />
           ))}
@@ -104,7 +108,8 @@ export const UnansweredQuestions = ({
         <Empty>Nothing unanswered in this period.</Empty>
       ) : (
         <>
-          <ul>
+          {/* One more track than Top questions, for the arrow. */}
+          <ul className="grid grid-cols-[minmax(0,1fr)_auto_auto_auto] gap-x-3">
             {rows.map((row) => (
               <Row
                 key={`${row.question}-${row.conversation_id}`}
