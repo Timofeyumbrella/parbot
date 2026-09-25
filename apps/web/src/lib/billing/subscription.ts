@@ -3,6 +3,7 @@ import type Stripe from 'stripe';
 import type { Enums } from '@/lib/db';
 
 import { planForPriceId } from './catalog';
+import { isEntitled } from './entitlement';
 import type { SubscriptionPatch } from './store';
 
 /** The parts of a Stripe subscription the account row is derived from. */
@@ -65,7 +66,12 @@ export type PatchOptions = {
   log?: (message: string) => void;
 };
 
-/** Everything the subscriptions row should hold for this Stripe subscription. Pure and idempotent. */
+/**
+ * Everything the subscriptions row should hold for this Stripe subscription. Pure and idempotent.
+ * The row only carries the paid plan while the status entitles the account to it, so an
+ * `incomplete` subscription (first payment not made) is stored as Hobby until Stripe reports it
+ * active; the ids and period end are kept so the next event still finds the row.
+ */
 export const patchFromSnapshot = (
   snapshot: SubscriptionSnapshot,
   { env = process.env, log = console.warn }: PatchOptions = {},
@@ -79,12 +85,12 @@ export const patchFromSnapshot = (
   }
 
   const status = mapSubscriptionStatus(snapshot.status);
-  const ended = status === 'canceled';
+  const entitled = isEntitled(status);
 
   return {
-    plan_id: ended ? 'hobby' : (catalog?.planId ?? 'hobby'),
+    plan_id: entitled ? (catalog?.planId ?? 'hobby') : 'hobby',
     status,
-    billing_interval: ended ? null : (catalog?.interval ?? null),
+    billing_interval: entitled ? (catalog?.interval ?? null) : null,
     stripe_subscription_id: snapshot.id,
     ...(snapshot.customerId ? { stripe_customer_id: snapshot.customerId } : {}),
     current_period_end: snapshot.currentPeriodEnd

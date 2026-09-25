@@ -9,8 +9,9 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import type { AccountPlan } from '@/lib/account';
-import { formatPeriodEnd, priceLabel } from '@/lib/billing/pricing';
+import { priceLabel } from '@/lib/billing/pricing';
 import type { BillingProviderName } from '@/lib/billing/types';
+import { formatDate } from '@/lib/format';
 
 import { ManageSubscriptionButton } from './manage-subscription-button';
 
@@ -39,10 +40,15 @@ const statusBadge = (account: AccountPlan) => {
 
 /** One sentence about what happens next with the subscription. */
 export const renewalLine = (account: AccountPlan) => {
-  const date = formatPeriodEnd(account.currentPeriodEnd);
+  const date = account.currentPeriodEnd ? formatDate(account.currentPeriodEnd) : null;
 
   if (account.status === 'canceled') {
     return 'Your paid subscription ended. You are on Hobby.';
+  }
+
+  // An unpaid first payment leaves the account on Hobby, so this comes before the Hobby sentence.
+  if (account.status === 'incomplete') {
+    return 'The first payment has not gone through yet, so you are on Hobby. Finish it in the portal.';
   }
 
   if (account.plan.id === 'hobby') {
@@ -51,10 +57,6 @@ export const renewalLine = (account: AccountPlan) => {
 
   if (account.status === 'past_due') {
     return 'The last payment failed. Update your card in the portal to keep the plan.';
-  }
-
-  if (account.status === 'incomplete') {
-    return 'The first payment has not gone through yet. Finish it in the portal.';
   }
 
   if (account.status === 'trialing') {
@@ -79,7 +81,7 @@ export const CurrentPlanCard = ({ account, providerName, className }: CurrentPla
     account.billingInterval && isPaid ? priceLabel(account.plan, account.billingInterval) : 'Free';
 
   return (
-    <Card className={className}>
+    <Card className={className} data-testid="current-plan">
       <CardHeader>
         <CardTitle>Current plan</CardTitle>
         <CardDescription>{account.plan.tagline}</CardDescription>

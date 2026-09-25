@@ -196,6 +196,52 @@ describe('POST /api/stripe/webhook', () => {
     expect(memory.rows.get(ACCOUNT)).toMatchObject({ plan_id: 'starter', status: 'past_due' });
   });
 
+  it('keeps the account on Hobby until an incomplete first payment goes through', async () => {
+    retrieveSubscription.mockResolvedValue(subscriptionFixture({ status: 'incomplete' }));
+    await post(eventFixture('checkout.session.completed', checkoutSession()));
+
+    expect(memory.rows.get(ACCOUNT)).toMatchObject({
+      plan_id: 'hobby',
+      status: 'incomplete',
+      billing_interval: null,
+      stripe_customer_id: 'cus_1',
+      stripe_subscription_id: 'sub_1',
+    });
+
+    await post(
+      eventFixture(
+        'customer.subscription.updated',
+        subscriptionFixture({ status: 'active' }),
+        'evt_2',
+      ),
+    );
+
+    expect(memory.rows.get(ACCOUNT)).toMatchObject({
+      plan_id: 'starter',
+      status: 'active',
+      billing_interval: 'monthly',
+    });
+  });
+
+  it('ends an incomplete subscription that expired unpaid', async () => {
+    retrieveSubscription.mockResolvedValue(subscriptionFixture({ status: 'incomplete' }));
+    await post(eventFixture('checkout.session.completed', checkoutSession()));
+
+    await post(
+      eventFixture(
+        'customer.subscription.updated',
+        subscriptionFixture({ status: 'incomplete_expired' }),
+        'evt_2',
+      ),
+    );
+
+    expect(memory.rows.get(ACCOUNT)).toMatchObject({
+      plan_id: 'hobby',
+      status: 'canceled',
+      billing_interval: null,
+    });
+  });
+
   it('copies cancel_at_period_end and a new period end', async () => {
     retrieveSubscription.mockResolvedValue(subscriptionFixture());
     await post(eventFixture('checkout.session.completed', checkoutSession()));

@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 import type { AiProvider, EmbedInput } from '@/lib/ai';
+import { entitledPlanId } from '@/lib/billing/entitlement';
 import type { Database, Source } from '@/lib/db';
 import { checkCapacity } from '@/lib/plans';
 import { STORAGE_BUCKET, uploadTypeFor } from '@/lib/uploads';
@@ -125,7 +126,7 @@ const remainingPages = async (service: ServiceClient, source: Pick<Source, 'id' 
     service.from('documents').select('id', { count: 'exact', head: true }).eq('owner_id', source.owner_id),
     service.from('documents').select('id', { count: 'exact', head: true }).eq('source_id', source.id),
   ]);
-  const planId = subscription?.status === 'canceled' ? 'hobby' : (subscription?.plan_id ?? 'hobby');
+  const planId = entitledPlanId(subscription);
   const used = Math.max((account.count ?? 0) - (own.count ?? 0), 0);
 
   return checkCapacity(planId, used, 'pages');

@@ -25,6 +25,7 @@ import {
 } from '@parbot/shared';
 import { z } from 'zod';
 
+import { entitledPlanId } from '@/lib/billing/entitlement';
 import type { Assistant } from '@/lib/db';
 import type { ServiceClient } from '@/lib/engine';
 import { rateLimit } from '@/lib/engine/rate-limit';
@@ -341,7 +342,7 @@ export const findAssistantByKey = async (
   return data ?? null;
 };
 
-/** The owner's plan as the answer engine sees it: a cancelled subscription behaves like Hobby. */
+/** The owner's plan as the answer engine sees it: an ended or unpaid subscription behaves like Hobby. */
 export const loadOwnerPlan = async (service: ServiceClient, ownerId: string): Promise<Plan> => {
   const { data } = await service
     .from('subscriptions')
@@ -349,7 +350,7 @@ export const loadOwnerPlan = async (service: ServiceClient, ownerId: string): Pr
     .eq('account_id', ownerId)
     .maybeSingle();
 
-  return planFor(data?.status === 'canceled' ? 'hobby' : data?.plan_id);
+  return planFor(entitledPlanId(data));
 };
 
 /** What the widget may show, with every gated setting folded back to its free-plan value. */
