@@ -1,16 +1,16 @@
 'use client';
 
-import type { Citation } from '@parbot/shared';
 import { cn } from 'cn';
-import { AlertCircle, BookOpen, ExternalLink, RotateCcw, ThumbsDown, ThumbsUp } from 'lucide-react';
+import { AlertCircle, BookOpen, RotateCcw, ThumbsDown, ThumbsUp } from 'lucide-react';
 import Link from 'next/link';
 import { memo } from 'react';
 
 import { AnswerMarkdown } from '@/components/chat/answer-markdown';
 import { CopyButton } from '@/components/chat/code-block';
+import { Sources } from '@/components/chat/sources';
 import { Button } from '@/components/ui/button';
 import { canRetry, errorAction } from '@/lib/chat/errors';
-import { formatLatency, hostnameOf } from '@/lib/chat/format';
+import { formatLatency } from '@/lib/chat/format';
 import type { ThreadMessage } from '@/lib/chat/thread';
 
 export type MessageBubbleProps = {
@@ -76,44 +76,6 @@ const Thinking = () => (
     <span className="bg-muted-foreground/70 size-1.5 animate-pulse rounded-full [animation-delay:-0.4s]" />
     <span className="bg-muted-foreground/70 size-1.5 animate-pulse rounded-full [animation-delay:-0.2s]" />
     <span className="bg-muted-foreground/70 size-1.5 animate-pulse rounded-full" />
-  </div>
-);
-
-const Sources = ({ citations, id }: { citations: Citation[]; id: string }) => (
-  <div id={id} className="flex flex-wrap items-center gap-1.5 pt-1" data-testid="sources">
-    <span className="text-muted-foreground mr-0.5 text-xs">Sources</span>
-    {citations.map((citation) => {
-      const host = hostnameOf(citation.url);
-      const inner = (
-        <>
-          <span className="bg-accent text-accent-foreground inline-flex h-4 min-w-4 items-center justify-center rounded-sm px-1 font-mono text-[10px] font-medium">
-            {citation.index}
-          </span>
-          <span className="max-w-48 truncate">{citation.title}</span>
-          {host ? <span className="text-muted-foreground max-w-32 truncate">{host}</span> : null}
-          {citation.url ? <ExternalLink className="text-muted-foreground size-3 shrink-0" /> : null}
-        </>
-      );
-      const className =
-        'bg-card hover:bg-muted inline-flex h-7 max-w-full items-center gap-1.5 rounded-md border px-2 text-xs transition-colors';
-
-      return citation.url ? (
-        <a
-          key={citation.index}
-          href={citation.url}
-          target="_blank"
-          rel="noreferrer"
-          title={citation.snippet}
-          className={className}
-        >
-          {inner}
-        </a>
-      ) : (
-        <span key={citation.index} title={citation.snippet} className={className}>
-          {inner}
-        </span>
-      );
-    })}
   </div>
 );
 

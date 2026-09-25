@@ -1,9 +1,10 @@
+import type { Citation } from '@parbot/shared';
 import { cn } from 'cn';
 import { Bot, ThumbsDown, ThumbsUp, UserRound } from 'lucide-react';
-import Markdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
 import { z } from 'zod';
 
+import { AnswerMarkdown } from '@/components/chat/answer-markdown';
+import { Sources } from '@/components/chat/sources';
 import { UnansweredBadge } from '@/components/inbox/channel-badge';
 import { LocalTime } from '@/components/inbox/local-time';
 import type { Message } from '@/lib/db';
@@ -16,34 +17,13 @@ const citationSchema = z.object({
   snippet: z.string().optional(),
 });
 
-export type TranscriptCitation = z.infer<typeof citationSchema>;
-
 /** Citations are stored as JSON; anything malformed is dropped rather than shown broken. */
-export const parseCitations = (value: unknown): TranscriptCitation[] => {
+export const parseCitations = (value: unknown): Citation[] => {
   const parsed = z.array(citationSchema).safeParse(value);
 
-  return parsed.success ? parsed.data : [];
-};
-
-const CITE_PREFIX = 'cite';
-
-/**
- * Turns the answer's `[n]` markers into links to the entries of its Sources list. Markers that
- * point at nothing stay as they were, so a stray bracket is never turned into a broken link.
- */
-export const linkCitations = (content: string, messageId: string, citations: TranscriptCitation[]) => {
-  if (citations.length === 0) {
-    return content;
-  }
-
-  const known = new Set(citations.map((citation) => citation.index));
-
-  // A marker already followed by "(" is a Markdown link of its own and is left alone.
-  return content.replace(/\[(\d{1,2})\](?!\()/g, (marker, digits: string) => {
-    const index = Number(digits);
-
-    return known.has(index) ? `[${index}](#${CITE_PREFIX}-${messageId}-${index})` : marker;
-  });
+  return parsed.success
+    ? parsed.data.map((citation) => ({ ...citation, url: citation.url ?? null, snippet: citation.snippet ?? '' }))
+    : [];
 };
 
 export type TranscriptMessageProps = {
@@ -51,53 +31,17 @@ export type TranscriptMessageProps = {
   now: number;
 };
 
-const components = {
-  a: ({ href, children }: { href?: string; children?: React.ReactNode }) =>
-    href?.startsWith(`#${CITE_PREFIX}-`) ? (
-      <a
-        href={href}
-        className="bg-primary/15 text-foreground hover:bg-primary/30 mx-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded px-1 align-text-top text-[10px] font-medium tabular-nums no-underline transition-colors"
-        aria-label={`Source ${String(children)}`}
-      >
-        {children}
-      </a>
-    ) : (
-      <a href={href} target="_blank" rel="noreferrer" className="underline underline-offset-4">
-        {children}
-      </a>
-    ),
-  p: ({ children }: { children?: React.ReactNode }) => <p className="my-2 first:mt-0 last:mb-0">{children}</p>,
-  ul: ({ children }: { children?: React.ReactNode }) => <ul className="my-2 list-disc pl-5">{children}</ul>,
-  ol: ({ children }: { children?: React.ReactNode }) => <ol className="my-2 list-decimal pl-5">{children}</ol>,
-  li: ({ children }: { children?: React.ReactNode }) => <li className="my-0.5">{children}</li>,
-  h1: ({ children }: { children?: React.ReactNode }) => <p className="my-2 font-semibold">{children}</p>,
-  h2: ({ children }: { children?: React.ReactNode }) => <p className="my-2 font-semibold">{children}</p>,
-  h3: ({ children }: { children?: React.ReactNode }) => <p className="my-2 font-semibold">{children}</p>,
-  blockquote: ({ children }: { children?: React.ReactNode }) => (
-    <blockquote className="text-muted-foreground my-2 border-l-2 pl-3">{children}</blockquote>
-  ),
-  pre: ({ children }: { children?: React.ReactNode }) => (
-    <pre className="bg-muted my-2 overflow-x-auto rounded-md p-3 font-mono text-xs [&>code]:bg-transparent [&>code]:p-0">
-      {children}
-    </pre>
-  ),
-  code: ({ children }: { children?: React.ReactNode }) => (
-    <code className="bg-muted rounded px-1 py-0.5 font-mono text-[0.85em]">{children}</code>
-  ),
-  table: ({ children }: { children?: React.ReactNode }) => (
-    <div className="my-2 overflow-x-auto">
-      <table className="w-full text-left text-xs [&_td]:border-b [&_td]:px-2 [&_td]:py-1 [&_th]:border-b [&_th]:px-2 [&_th]:py-1 [&_th]:font-medium">
-        {children}
-      </table>
-    </div>
-  ),
-};
-
-/** One turn of a transcript, read-only: Markdown body, sources, feedback and the answered flag. */
+/**
+ * One turn of a transcript, read-only: the answer and its sources render through the chat's own
+ * components, so an answer reads the same in the Inbox as it did in the chat, plus feedback and the
+ * answered flag.
+ */
 export const TranscriptMessage = ({ message, now }: TranscriptMessageProps) => {
   const isUser = message.role === 'user';
   const citations = isUser ? [] : parseCitations(message.citations);
   const unanswered = !isUser && message.answered === false;
+  // The chat's id for the same row, where an inline marker without a url points.
+  const sourcesId = `sources-${message.id}`;
 
   return (
     <article
@@ -127,40 +71,12 @@ export const TranscriptMessage = ({ message, now }: TranscriptMessageProps) => {
           {isUser ? (
             <p className="whitespace-pre-wrap">{message.content}</p>
           ) : (
-            <Markdown remarkPlugins={[remarkGfm]} components={components}>
-              {linkCitations(message.content, message.id, citations)}
-            </Markdown>
+            <AnswerMarkdown content={message.content} citations={citations} sourcesId={sourcesId} />
           )}
 
           {citations.length > 0 ? (
-            <div className="mt-2 border-t pt-2">
-              <p className="text-muted-foreground mb-1 text-xs font-medium">Sources</p>
-              <ol className="flex flex-col gap-0.5 text-xs">
-                {citations.map((citation) => (
-                  <li
-                    key={`${citation.index}-${citation.documentId}`}
-                    id={`${CITE_PREFIX}-${message.id}-${citation.index}`}
-                    className="flex gap-1.5 scroll-mt-16"
-                  >
-                    <span className="text-muted-foreground shrink-0 tabular-nums">[{citation.index}]</span>
-                    {citation.url ? (
-                      <a
-                        href={citation.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="truncate underline underline-offset-4"
-                        title={citation.snippet}
-                      >
-                        {citation.title}
-                      </a>
-                    ) : (
-                      <span className="truncate" title={citation.snippet}>
-                        {citation.title}
-                      </span>
-                    )}
-                  </li>
-                ))}
-              </ol>
+            <div className="mt-2">
+              <Sources citations={citations} id={sourcesId} />
             </div>
           ) : null}
         </div>

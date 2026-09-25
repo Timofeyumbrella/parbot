@@ -1,17 +1,20 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
-import { linkCitations, parseCitations, TranscriptMessage } from './transcript-message';
+import { MessageBubble } from '@/components/chat/message-bubble';
+
+import { parseCitations, TranscriptMessage } from './transcript-message';
 
 const NOW = new Date('2026-09-23T12:00:00Z').getTime();
 
 const base = {
   id: 'm1',
   role: 'assistant' as const,
-  content: 'Create the key in **Settings** [1].\n\n```bash\nparbot keys create\n```',
+  content: 'Create the key in **Settings** [1]. Rotate it monthly [2]. Scopes limit it [4].\n\n```bash\nparbot keys create\n```',
   citations: [
     { index: 1, documentId: 'd1', title: 'Authentication', url: 'https://docs.example.com/auth', snippet: 'API keys…' },
     { index: 2, documentId: 'd2', title: 'Offline doc', url: null, snippet: 'No link' },
+    { index: 4, documentId: 'd1', title: 'Authentication', url: 'https://docs.example.com/auth', snippet: 'Scopes…' },
   ],
   answered: true,
   feedback: null,
@@ -19,23 +22,47 @@ const base = {
 };
 
 describe('TranscriptMessage', () => {
-  it('renders markdown, citation chips, a sources list and the time', () => {
-    render(<TranscriptMessage message={base} now={NOW} />);
+  it('renders markdown, citation chips, the sources row and the time', () => {
+    const { container } = render(<TranscriptMessage message={base} now={NOW} />);
 
     expect(screen.getByText('Settings').tagName).toBe('STRONG');
     expect(screen.getByText('parbot keys create').closest('pre')).not.toBeNull();
-    expect(screen.getByText('Sources')).toBeInTheDocument();
 
-    const chip = screen.getByRole('link', { name: 'Source 1' });
-    expect(chip).toHaveAttribute('href', '#cite-m1-1');
-    expect(document.getElementById('cite-m1-1')).not.toBeNull();
+    // Every marker is a chip, 4 included although only three passages were cited.
+    const chips = [...container.querySelectorAll('sup[data-citation] a')];
 
-    const link = screen.getByRole('link', { name: 'Authentication' });
-    expect(link).toHaveAttribute('href', 'https://docs.example.com/auth');
-    expect(link).toHaveAttribute('target', '_blank');
-    expect(screen.getByText('Offline doc').tagName).toBe('SPAN');
+    expect(chips.map((chip) => chip.textContent)).toEqual(['1', '2', '4']);
+    expect(chips[0]).toHaveAttribute('href', 'https://docs.example.com/auth');
+    expect(chips[1]).toHaveAttribute('href', '#sources-m1');
+
+    // One chip per page, and the markers without a url land on the row.
+    const sources = screen.getByTestId('sources');
+
+    expect(sources).toHaveAttribute('id', 'sources-m1');
+    expect(within(sources).getByRole('link')).toHaveAttribute('href', 'https://docs.example.com/auth');
+    expect(within(sources).getAllByText('Authentication')).toHaveLength(1);
+    expect(within(sources).getByText('Offline doc').parentElement!.tagName).toBe('SPAN');
     expect(screen.getByText('5 min ago')).toBeInTheDocument();
     expect(screen.queryByText('Unanswered')).toBeNull();
+  });
+
+  it('shows an answer exactly as the chat does', () => {
+    const transcript = render(<TranscriptMessage message={base} now={NOW} />);
+    const transcriptSources = transcript.getByTestId('sources').outerHTML;
+    const transcriptAnswer = transcript.container.querySelector('.answer-prose')!.outerHTML;
+
+    transcript.unmount();
+
+    const chat = render(
+      <MessageBubble
+        message={{ ...base, citations: parseCitations(base.citations), latency_ms: null, status: 'complete' }}
+        assistantId="asst"
+        assistantName="Acme Docs"
+      />,
+    );
+
+    expect(chat.getByTestId('sources').outerHTML).toBe(transcriptSources);
+    expect(chat.container.querySelector('.answer-prose')!.outerHTML).toBe(transcriptAnswer);
   });
 
   it('marks unanswered answers and shows feedback as an indicator', () => {
@@ -48,7 +75,7 @@ describe('TranscriptMessage', () => {
 
     expect(screen.getByText('Unanswered')).toBeInTheDocument();
     expect(screen.getByText('Not helpful')).toBeInTheDocument();
-    expect(screen.queryByText('Sources')).toBeNull();
+    expect(screen.queryByTestId('sources')).toBeNull();
   });
 
   it('shows helpful feedback and keeps user messages as plain text', () => {
@@ -66,21 +93,13 @@ describe('TranscriptMessage', () => {
   });
 });
 
-describe('linkCitations', () => {
-  const citations = [{ index: 1, documentId: 'd1', title: 'A' }];
-
-  it('links known markers, leaves unknown ones and existing links alone', () => {
-    expect(linkCitations('See [1] and [2].', 'm', citations)).toBe('See [1](#cite-m-1) and [2].');
-    expect(linkCitations('A [1](https://x.y) link', 'm', citations)).toBe('A [1](https://x.y) link');
-    expect(linkCitations('Nothing to cite [1]', 'm', [])).toBe('Nothing to cite [1]');
-  });
-});
-
 describe('parseCitations', () => {
-  it('drops malformed payloads instead of rendering them broken', () => {
+  it('drops malformed payloads and fills what older rows left out', () => {
     expect(parseCitations(null)).toEqual([]);
     expect(parseCitations('nope')).toEqual([]);
     expect(parseCitations([{ index: 'x' }])).toEqual([]);
-    expect(parseCitations([{ index: 1, documentId: 'd', title: 'T' }])).toEqual([{ index: 1, documentId: 'd', title: 'T' }]);
+    expect(parseCitations([{ index: 1, documentId: 'd', title: 'T' }])).toEqual([
+      { index: 1, documentId: 'd', title: 'T', url: null, snippet: '' },
+    ]);
   });
 });

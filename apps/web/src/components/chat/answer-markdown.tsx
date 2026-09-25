@@ -106,7 +106,9 @@ export const AnswerMarkdown = memo(function AnswerMarkdown({
   streaming = false,
   className,
 }: AnswerMarkdownProps) {
-  const max = citations.length;
+  // Indexes are the passages' places in the prompt and only cited ones are kept, so an answer
+  // citing [2] and [5] has two citations; counting them would leave the [5] marker as plain text.
+  const max = citations.reduce((highest, citation) => Math.max(highest, citation.index), 0);
 
   const rehypePlugins = useMemo(() => {
     const plugins: NonNullable<React.ComponentProps<typeof ReactMarkdown>['rehypePlugins']> = [
