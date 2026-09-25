@@ -33,7 +33,9 @@ describe.skipIf(!serviceKey || !anonKey)('row level security against the local d
     leadId: string;
   };
 
-  const accounts: Account[] = [];
+  /** Recorded as soon as each user exists, so a failed setup still cleans up. */
+  const userIds: string[] = [];
+  const clients: Client[] = [];
   let owner: Account;
   let intruder: Account;
 
@@ -52,8 +54,7 @@ describe.skipIf(!serviceKey || !anonKey)('row level security against the local d
     }
 
     const id = created.user.id;
-    const account: Partial<Account> = { id };
-    accounts.push(account as Account);
+    userIds.push(id);
 
     const { data: assistant } = await service
       .from('assistants')
@@ -128,20 +129,22 @@ describe.skipIf(!serviceKey || !anonKey)('row level security against the local d
     await service.rpc('increment_usage', { owner: id, usage: 'messages', delta: 3 });
 
     const client = createClient<Database>(url, anonKey ?? 'missing', clientOptions);
+    clients.push(client);
     const { error: signInError } = await client.auth.signInWithPassword({ email, password });
 
     if (signInError) {
       throw new Error(signInError.message);
     }
 
-    return Object.assign(account, {
+    return {
+      id,
       client,
       assistantId,
       conversationId,
       messageId: message!.id,
       sourceId: source!.id,
       leadId: lead!.id,
-    });
+    };
   };
 
   beforeAll(async () => {
@@ -150,13 +153,11 @@ describe.skipIf(!serviceKey || !anonKey)('row level security against the local d
   });
 
   afterAll(async () => {
-    for (const account of accounts) {
-      if (account.client) {
-        await account.client.auth.signOut();
-      }
+    await Promise.all(clients.map((client) => client.auth.signOut()));
 
+    for (const id of userIds) {
       // Cascades through every row created above.
-      await service.auth.admin.deleteUser(account.id);
+      await service.auth.admin.deleteUser(id);
     }
   });
 
@@ -178,24 +179,28 @@ describe.skipIf(!serviceKey || !anonKey)('row level security against the local d
     expect(subscription.data).toEqual([{ account_id: id }]);
   });
 
-  it.each([
-    'assistants',
-    'sources',
-    'documents',
-    'chunks',
-    'conversations',
-    'messages',
-    'leads',
-  ] as const)("hides another account's %s", async (table) => {
-    const column = table === 'assistants' ? 'id' : 'assistant_id';
+  it("hides another account's assistant", async () => {
     const { data, error } = await intruder.client
-      .from(table)
+      .from('assistants')
       .select('id')
-      .eq(column, owner.assistantId);
+      .eq('id', owner.assistantId);
 
     expect(error).toBeNull();
     expect(data).toEqual([]);
   });
+
+  it.each(['sources', 'documents', 'chunks', 'conversations', 'messages', 'leads'] as const)(
+    "hides another account's %s",
+    async (table) => {
+      const { data, error } = await intruder.client
+        .from(table)
+        .select('id')
+        .eq('assistant_id', owner.assistantId);
+
+      expect(error).toBeNull();
+      expect(data).toEqual([]);
+    },
+  );
 
   it("hides another account's profile, subscription and usage", async () => {
     const [profiles, subscriptions, usage] = await Promise.all([
