@@ -127,6 +127,50 @@ describe('AddSourceDialog', () => {
     expect(addSource).not.toHaveBeenCalled();
   });
 
+  it('says what is missing under the field, not in a browser bubble', async () => {
+    const user = userEvent.setup();
+    const { onPending } = renderDialog('url');
+    const field = within(dialog()).getByLabelText('Start page');
+
+    // The browser's own check would stop the submit before the form could say anything itself.
+    expect(field.closest('form')).toHaveAttribute('novalidate');
+
+    await user.click(within(dialog()).getByRole('button', { name: 'Add website' }));
+
+    const error = within(dialog()).getByRole('alert');
+
+    expect(error).toHaveTextContent('Enter a web address.');
+    expect(field).toHaveAttribute('aria-invalid', 'true');
+    expect(field.getAttribute('aria-describedby')).toContain(error.id);
+
+    await user.type(field, 'docs.example.com');
+    await user.click(within(dialog()).getByRole('button', { name: 'Add website' }));
+
+    expect(within(dialog()).getByRole('alert')).toHaveTextContent('Enter a full address that starts with http:// or https://.');
+    expect(onPending).not.toHaveBeenCalled();
+    expect(addSource).not.toHaveBeenCalled();
+  });
+
+  it('marks each empty field of pasted text on its own', async () => {
+    const user = userEvent.setup();
+    const { onPending } = renderDialog('text');
+
+    await user.click(within(dialog()).getByRole('button', { name: 'Add text' }));
+
+    const alerts = within(dialog()).getAllByRole('alert');
+
+    expect(alerts.map((alert) => alert.textContent)).toEqual(['Give the source a title.', 'Paste some text.']);
+    expect(within(dialog()).getByLabelText('Title')).toHaveAttribute('aria-invalid', 'true');
+    expect(within(dialog()).getByLabelText('Text')).toHaveAttribute('aria-invalid', 'true');
+
+    await user.type(within(dialog()).getByLabelText('Title'), 'Refunds');
+    await user.click(within(dialog()).getByRole('button', { name: 'Add text' }));
+
+    expect(within(dialog()).getByRole('alert')).toHaveTextContent('Paste some text.');
+    expect(within(dialog()).getByLabelText('Title')).not.toHaveAttribute('aria-invalid');
+    expect(onPending).not.toHaveBeenCalled();
+  });
+
   it('keeps what was typed while the dialog is closed', async () => {
     const user = userEvent.setup();
     const { rerender } = renderDialog('url');

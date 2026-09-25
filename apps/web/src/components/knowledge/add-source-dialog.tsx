@@ -5,13 +5,14 @@ import { FileText, Globe, type LucideIcon, Map, TextAlignStart, Upload } from 'l
 import { useId, useRef, useState } from 'react';
 
 import { addSource } from '@/actions/sources';
+import { FormField, FormMessage } from '@/components/auth/form-field';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import type { Source } from '@/lib/db';
+import { fieldErrorsOf } from '@/lib/form';
 import { labelForUrl } from '@/lib/ingest/label';
 import { firstIssue, sourceInputSchema } from '@/lib/ingest/schema';
 import { formatBytes, MAX_UPLOAD_BYTES, UPLOAD_ACCEPT, UPLOAD_TYPES, UPLOAD_TYPES_LABEL, uploadTypeFor } from '@/lib/uploads';
@@ -45,130 +46,136 @@ export type AddSourceDialogProps = {
 /** What has been typed on each tab. Kept while the dialog is closed so nothing is lost. */
 type Drafts = { url: string; sitemap: string; textTitle: string; text: string; uploadTitle: string; file: File | null };
 
-type Errors = Partial<Record<AddSourceTab, string>>;
+type Field = 'url' | 'title' | 'text' | 'file';
+
+/**
+ * What went wrong on one tab: a field the person can fix shows its message under that field, the
+ * way every other form in the app does; a refusal from the server is about the whole form.
+ */
+type TabErrors = { form?: string; fields?: Partial<Record<Field, string>> };
+
+type Errors = Partial<Record<AddSourceTab, TabErrors>>;
 
 const EMPTY_DRAFTS: Drafts = { url: '', sitemap: '', textTitle: '', text: '', uploadTitle: '', file: null };
 
 export const UPLOAD_FAILED_OFFLINE = 'The upload did not go through. Check your connection and try again.';
-
-const FormError = ({ message }: { message?: string }) =>
-  message ? (
-    <p role="alert" className="text-destructive text-sm">
-      {message}
-    </p>
-  ) : null;
 
 const submitLabel: Record<RemoteOrTextKind, string> = { url: 'Add website', sitemap: 'Add sitemap', text: 'Add text' };
 
 type RemoteOrTextFormProps = {
   kind: RemoteOrTextKind;
   drafts: Drafts;
-  error?: string;
+  errors?: TabErrors;
   onDraft: (patch: Partial<Drafts>) => void;
   onSubmit: (kind: RemoteOrTextKind) => void;
 };
 
-/** Website, sitemap and pasted text share one server action; the fields differ by kind. */
-const RemoteOrTextForm = ({ kind, drafts, error, onDraft, onSubmit }: RemoteOrTextFormProps) => {
-  const id = useId();
-
-  return (
-    <form
-      onSubmit={(event) => {
-        event.preventDefault();
-        onSubmit(kind);
-      }}
-      className="flex flex-col gap-4"
-    >
-      {kind === 'text' ? (
-        <>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor={`${id}-title`}>Title</Label>
+/**
+ * Website, sitemap and pasted text share one server action; the fields differ by kind. The browser's
+ * own validation is off: its bubbles ignore the theme, and the schema says the same thing inline.
+ */
+const RemoteOrTextForm = ({ kind, drafts, errors, onDraft, onSubmit }: RemoteOrTextFormProps) => (
+  <form
+    noValidate
+    onSubmit={(event) => {
+      event.preventDefault();
+      onSubmit(kind);
+    }}
+    className="flex flex-col gap-4"
+  >
+    {kind === 'text' ? (
+      <>
+        <FormField label="Title" error={errors?.fields?.title}>
+          {(control) => (
             <Input
-              id={`${id}-title`}
+              {...control}
               name="title"
               value={drafts.textTitle}
               onChange={(event) => onDraft({ textTitle: event.target.value })}
               placeholder="Refund policy"
-              required
               maxLength={200}
               autoFocus
             />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor={`${id}-text`}>Text</Label>
+          )}
+        </FormField>
+        <FormField label="Text" error={errors?.fields?.text}>
+          {(control) => (
             <Textarea
-              id={`${id}-text`}
+              {...control}
               name="text"
               value={drafts.text}
               onChange={(event) => onDraft({ text: event.target.value })}
-              required
               rows={10}
               placeholder="Paste the text the assistant should know. Markdown headings are kept as sections."
               className="max-h-72 min-h-40"
             />
-          </div>
-        </>
-      ) : (
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor={`${id}-url`}>{kind === 'url' ? 'Start page' : 'Sitemap address'}</Label>
+          )}
+        </FormField>
+      </>
+    ) : (
+      <FormField
+        label={kind === 'url' ? 'Start page' : 'Sitemap address'}
+        hint={
+          kind === 'url'
+            ? 'We follow links under this path.'
+            : 'Every page the sitemap lists is indexed. A sitemap index is followed one level down.'
+        }
+        error={errors?.fields?.url}
+      >
+        {(control) => (
           <Input
-            id={`${id}-url`}
+            {...control}
             name="url"
             type="url"
             inputMode="url"
             value={drafts[kind]}
             onChange={(event) => onDraft({ [kind]: event.target.value })}
-            required
             autoFocus
             placeholder={kind === 'url' ? 'https://docs.example.com/guide/' : 'https://docs.example.com/sitemap.xml'}
           />
-          <p className="text-muted-foreground text-xs">
-            {kind === 'url'
-              ? 'We follow links under this path.'
-              : 'Every page the sitemap lists is indexed. A sitemap index is followed one level down.'}
-          </p>
-        </div>
-      )}
+        )}
+      </FormField>
+    )}
 
-      <FormError message={error} />
+    {errors?.form ? <FormMessage tone="error">{errors.form}</FormMessage> : null}
 
-      <div className="flex justify-end">
-        <Button type="submit">{submitLabel[kind]}</Button>
-      </div>
-    </form>
-  );
-};
+    <div className="flex justify-end">
+      <Button type="submit">{submitLabel[kind]}</Button>
+    </div>
+  </form>
+);
 
 type UploadFormProps = {
   drafts: Drafts;
-  error?: string;
+  errors?: TabErrors;
   onDraft: (patch: Partial<Drafts>) => void;
-  onError: (message: string | undefined) => void;
+  /** A problem with the picked file, shown under the drop zone; undefined clears it. */
+  onFileError: (message: string | undefined) => void;
   onSubmit: () => void;
 };
 
-const UploadForm = ({ drafts, error, onDraft, onError, onSubmit }: UploadFormProps) => {
+const UploadForm = ({ drafts, errors, onDraft, onFileError, onSubmit }: UploadFormProps) => {
   const id = useId();
+  const fileError = errors?.fields?.file;
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const { file } = drafts;
 
   const pick = (candidate: File | null | undefined) => {
-    onError(undefined);
+    onFileError(undefined);
 
     if (!candidate) {
       return;
     }
 
     if (!uploadTypeFor(candidate.name, candidate.type)) {
-      onError(`That file type is not supported. Upload ${UPLOAD_TYPES_LABEL}.`);
+      onFileError(`That file type is not supported. Upload ${UPLOAD_TYPES_LABEL}.`);
 
       return;
     }
 
     if (candidate.size > MAX_UPLOAD_BYTES) {
-      onError('That file is larger than 25 MB. Split it or pick a smaller one.');
+      onFileError('That file is larger than 25 MB. Split it or pick a smaller one.');
 
       return;
     }
@@ -178,6 +185,7 @@ const UploadForm = ({ drafts, error, onDraft, onError, onSubmit }: UploadFormPro
 
   return (
     <form
+      noValidate
       onSubmit={(event) => {
         event.preventDefault();
         onSubmit();
@@ -187,6 +195,7 @@ const UploadForm = ({ drafts, error, onDraft, onError, onSubmit }: UploadFormPro
       <div
         role="group"
         aria-label="File"
+        aria-describedby={fileError ? `${id}-file-error` : undefined}
         onDragOver={(event) => {
           event.preventDefault();
           setDragging(true);
@@ -199,7 +208,7 @@ const UploadForm = ({ drafts, error, onDraft, onError, onSubmit }: UploadFormPro
         }}
         className={cn(
           'flex flex-col items-center gap-2 rounded-lg border border-dashed px-4 py-6 text-center transition-colors',
-          dragging ? 'border-primary bg-primary/5' : 'border-border',
+          dragging ? 'border-primary bg-primary/5' : fileError ? 'border-destructive' : 'border-border',
         )}
       >
         <Upload className="text-muted-foreground size-5" aria-hidden="true" />
@@ -228,19 +237,25 @@ const UploadForm = ({ drafts, error, onDraft, onError, onSubmit }: UploadFormPro
         />
         <p className="text-muted-foreground text-xs">{UPLOAD_TYPES_LABEL}, up to 25 MB.</p>
       </div>
+      {fileError ? (
+        <p id={`${id}-file-error`} role="alert" className="text-destructive -mt-2.5 text-xs">
+          {fileError}
+        </p>
+      ) : null}
 
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor={`${id}-title`}>Name (optional)</Label>
-        <Input
-          id={`${id}-title`}
-          value={drafts.uploadTitle}
-          onChange={(event) => onDraft({ uploadTitle: event.target.value })}
-          placeholder={file?.name ?? 'Defaults to the file name'}
-          maxLength={200}
-        />
-      </div>
+      <FormField label="Name (optional)">
+        {(control) => (
+          <Input
+            {...control}
+            value={drafts.uploadTitle}
+            onChange={(event) => onDraft({ uploadTitle: event.target.value })}
+            placeholder={file?.name ?? 'Defaults to the file name'}
+            maxLength={200}
+          />
+        )}
+      </FormField>
 
-      <FormError message={error} />
+      {errors?.form ? <FormMessage tone="error">{errors.form}</FormMessage> : null}
 
       <div className="flex justify-end">
         <Button type="submit" disabled={!file}>
@@ -270,13 +285,13 @@ export const AddSourceDialog = ({
   const [errors, setErrors] = useState<Errors>({});
 
   const patchDrafts = (patch: Partial<Drafts>) => setDrafts((current) => ({ ...current, ...patch }));
-  const setError = (kind: AddSourceTab, message: string | undefined) =>
-    setErrors((current) => ({ ...current, [kind]: message }));
+  const setError = (kind: AddSourceTab, error: TabErrors | undefined) =>
+    setErrors((current) => ({ ...current, [kind]: error }));
 
   /** The server said no: take the row back and show the reason where it was typed. */
   const refuse = (kind: AddSourceTab, id: string, message: string) => {
     onSettled(id, null);
-    setError(kind, message);
+    setError(kind, { form: message });
     onTabChange(kind);
     onOpenChange(true);
   };
@@ -290,7 +305,9 @@ export const AddSourceDialog = ({
     const parsed = sourceInputSchema.safeParse(input);
 
     if (!parsed.success) {
-      setError(kind, firstIssue(parsed.error));
+      const { url, title, text } = fieldErrorsOf<string>(parsed.error);
+
+      setError(kind, url || title || text ? { fields: { url, title, text } } : { form: firstIssue(parsed.error) });
 
       return;
     }
@@ -349,7 +366,7 @@ export const AddSourceDialog = ({
     const type = file ? uploadTypeFor(file.name, file.type) : null;
 
     if (!file || !type) {
-      setError('upload', 'Choose a file to upload.');
+      setError('upload', { fields: { file: 'Choose a file to upload.' } });
 
       return;
     }
@@ -422,7 +439,7 @@ export const AddSourceDialog = ({
               <RemoteOrTextForm
                 kind={kind}
                 drafts={drafts}
-                error={errors[kind]}
+                errors={errors[kind]}
                 onDraft={patchDrafts}
                 onSubmit={(submitted) => void submitRemoteOrText(submitted)}
               />
@@ -431,9 +448,9 @@ export const AddSourceDialog = ({
           <TabsContent value="upload" className="pt-2">
             <UploadForm
               drafts={drafts}
-              error={errors.upload}
+              errors={errors.upload}
               onDraft={patchDrafts}
-              onError={(message) => setError('upload', message)}
+              onFileError={(message) => setError('upload', message ? { fields: { file: message } } : undefined)}
               onSubmit={() => void submitUpload()}
             />
           </TabsContent>

@@ -268,6 +268,34 @@ describe('widget', () => {
     });
   });
 
+  it('checks the lead email in its own hint instead of a browser bubble', async () => {
+    const fetchMock = installFetch({ leadCapture: true }, false);
+    const widget = await boot(mountScript());
+    const shadow = shadowOf(widget!);
+
+    widget!.ask('Something the docs do not cover');
+
+    await vi.waitFor(() => {
+      expect(shadow.querySelector('form.pb-lead')).not.toBeNull();
+    });
+
+    const form = shadow.querySelector<HTMLFormElement>('form.pb-lead')!;
+    const email = form.elements.namedItem('email') as HTMLInputElement;
+    const hint = form.querySelector('.pb-hint')!;
+    const send = form.querySelector<HTMLButtonElement>('button[type="submit"]')!;
+
+    // With the browser's check on, a click on Send would stop at its bubble and never reach the form.
+    expect(form.noValidate).toBe(true);
+
+    send.click();
+    expect(hint.textContent).toBe('Enter an email address.');
+
+    email.value = 'not-an-email';
+    send.click();
+    expect(hint.textContent).toBe('Check the email address and retry.');
+    expect(fetchMock.mock.calls.some(([url]) => String(url) === `${API}/api/widget/lead`)).toBe(false);
+  });
+
   it('shows an error with retry when the api refuses, and retries', async () => {
     let attempts = 0;
     const mock = vi.fn<typeof fetch>(async (input) => {
