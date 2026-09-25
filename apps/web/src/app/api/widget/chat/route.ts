@@ -11,7 +11,10 @@ import {
   preflight,
   readJson,
   requestOrigin,
+  retryAfter,
+  WIDGET_ASSISTANT_LIMIT,
   WIDGET_IP_LIMIT,
+  WIDGET_OWNER_LIMIT,
   WIDGET_VISITOR_LIMIT,
   widgetChatSchema,
 } from '@/lib/widget-api';
@@ -43,19 +46,33 @@ export async function POST(request: Request) {
   }
 
   if (!originAllowed(origin, assistant.allowed_origins)) {
-    return jsonError(403, 'origin_not_allowed', 'This site is not allowed to use the assistant.', cors);
+    return jsonError(
+      403,
+      'origin_not_allowed',
+      'This site is not allowed to use the assistant.',
+      cors,
+    );
   }
 
-  const perIp = rateLimit(`widget:ip:${clientIp(request)}`, WIDGET_IP_LIMIT);
-  const perVisitor = rateLimit(`widget:visitor:${assistant.id}:${visitorId}`, WIDGET_VISITOR_LIMIT);
+  // Every bucket is charged, refused or not, so a flood that trips one limit still counts
+  // against the others instead of getting a free retry against them.
+  const wait = retryAfter([
+    rateLimit(`widget:ip:${clientIp(request)}`, WIDGET_IP_LIMIT),
+    rateLimit(`widget:assistant:${assistant.id}`, WIDGET_ASSISTANT_LIMIT),
+    rateLimit(`widget:owner:${assistant.owner_id}`, WIDGET_OWNER_LIMIT),
+    rateLimit(`widget:visitor:${assistant.id}:${visitorId}`, WIDGET_VISITOR_LIMIT),
+  ]);
 
-  if (!perIp.allowed || !perVisitor.allowed) {
-    const retryAfterMs = Math.max(perIp.retryAfterMs, perVisitor.retryAfterMs);
-
-    return jsonError(429, 'rate_limited', 'Too many messages in a short time. Wait a moment and try again.', {
-      ...cors,
-      'retry-after': String(Math.max(1, Math.ceil(retryAfterMs / 1000))),
-    });
+  if (wait) {
+    return jsonError(
+      429,
+      'rate_limited',
+      'Too many messages in a short time. Wait a moment and try again.',
+      {
+        ...cors,
+        'retry-after': wait,
+      },
+    );
   }
 
   return streamResponse(
