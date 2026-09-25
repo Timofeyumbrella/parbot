@@ -16,8 +16,8 @@ export type MessageStatus =
   /** An assistant placeholder that is still receiving tokens. */
   | 'streaming'
   /**
-   * The reader pressed Stop. The assistant's text is partial and the server discards the whole
-   * exchange, so both sides carry it: the pair survives a refetch but not a reload.
+   * The reader pressed Stop. The assistant's text is partial; the server keeps the question and
+   * that text (with `answered` null), so a refetch replaces the pair with the stored rows.
    */
   | 'stopped'
   /** A user message the server refused; it can be retried. */

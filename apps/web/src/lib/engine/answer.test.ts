@@ -1,9 +1,12 @@
 // @vitest-environment node
-import { describe, expect, it, vi } from 'vitest';
+import type { ChatStreamEvent } from '@parbot/shared';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { type AiProvider, type GenerateChunk, type GenerateResult, ModelBusyError } from '@/lib/ai';
+import { PLANS } from '@/lib/plans';
 
-import { ANSWER_ERROR_COPY, streamAnswer } from './answer';
+import { ANSWER_ERROR_COPY, historyTurns, streamAnswer } from './answer';
+import { UNANSWERED_TEXT } from './prompt';
 import type { ServiceClient } from './retrieval';
 
 /**
@@ -16,30 +19,45 @@ type Row = Record<string, unknown>;
 type Call = { table: string; op: string; payload?: unknown; filters: Record<string, unknown> };
 
 type FakeOptions = {
-  conversation?: Row | null;
+  /** What successive reads of the conversation return; the last entry repeats. */
+  conversationReads?: (Row | null)[];
   history?: Row[];
   chunks?: Row[];
   reserved?: boolean;
   conversationInsertError?: { code: string; message: string } | null;
+  assistantInsertError?: { code: string; message: string } | null;
 };
 
 const fakeService = (options: FakeOptions = {}) => {
   const calls: Call[] = [];
   const rpcCalls: { fn: string; args: Row }[] = [];
+  const reads = options.conversationReads ?? [null];
+  let conversationReadCount = 0;
   let inserted = 0;
 
   const resolve = (call: Call) => {
     switch (`${call.table}/${call.op}`) {
-      case 'conversations/select':
-        return { data: options.conversation ?? null, error: null };
+      case 'conversations/select': {
+        const row = reads[Math.min(conversationReadCount, reads.length - 1)] ?? null;
+        conversationReadCount += 1;
+
+        return { data: row, error: null };
+      }
       case 'conversations/insert':
         return { data: null, error: options.conversationInsertError ?? null };
       case 'messages/select':
         return { data: options.history ?? [], error: null };
-      case 'messages/insert':
+      case 'messages/insert': {
+        const payload = call.payload as Row;
+
+        if (payload.role === 'assistant' && options.assistantInsertError) {
+          return { data: null, error: options.assistantInsertError };
+        }
+
         inserted += 1;
 
         return { data: { id: `m${inserted}` }, error: null };
+      }
       default:
         return { data: null, error: null };
     }
@@ -93,11 +111,24 @@ const fakeService = (options: FakeOptions = {}) => {
       case 'reserve_message':
         return Promise.resolve({ data: options.reserved ?? true, error: null });
       default:
-        return Promise.resolve({ data: 1, error: null });
+        return Promise.resolve({ data: null, error: null });
     }
   };
 
-  return { service: { from, rpc } as unknown as ServiceClient, calls, rpcCalls };
+  const find = (table: string, op: string) =>
+    calls.filter((call) => call.table === table && call.op === op);
+  const rpcNames = () =>
+    rpcCalls
+      .map((call) => call.fn)
+      .filter((fn) => fn !== 'match_chunks' && fn !== 'reserve_message');
+
+  return {
+    service: { from, rpc } as unknown as ServiceClient,
+    calls,
+    rpcCalls,
+    find,
+    rpcNames,
+  };
 };
 
 const chunk = (content: string): Row => ({
@@ -115,17 +146,30 @@ type ProviderOptions = {
   failWith?: Error;
 };
 
-/** Records the embedding queries it was asked for and answers with a fixed text. */
+/**
+ * Records the embedding queries it was asked for and answers with a fixed text, a word at a time.
+ * Like the real providers, it throws once the request's signal is aborted.
+ */
 const fakeProvider = (options: ProviderOptions = {}) => {
   const embedded: string[] = [];
-  const answer = options.answer ?? 'Pick the palette mode in Settings. [1]';
+  const answer =
+    options.answer ??
+    'Pick the palette mode in Settings, then choose a shortcut for opening it from any page. [1]';
 
-  const stream = async function* (): AsyncGenerator<GenerateChunk, GenerateResult> {
+  const stream = async function* (input: {
+    signal?: AbortSignal;
+  }): AsyncGenerator<GenerateChunk, GenerateResult> {
     if (options.failWith) {
       throw options.failWith;
     }
 
     for (const word of answer.split(' ')) {
+      await Promise.resolve();
+
+      if (input.signal?.aborted) {
+        throw new DOMException('The answer was stopped.', 'AbortError');
+      }
+
       yield { text: `${word} ` };
     }
 
@@ -133,7 +177,7 @@ const fakeProvider = (options: ProviderOptions = {}) => {
   };
 
   const provider: AiProvider = {
-    name: 'fake',
+    name: 'stub',
     embed: (inputs) => {
       embedded.push(...inputs.map((input) => input.text));
 
@@ -147,9 +191,16 @@ const fakeProvider = (options: ProviderOptions = {}) => {
 };
 
 const assistant = { id: 'a1', owner_id: 'o1', name: 'Docs', instructions: null };
+const ownConversation = {
+  id: 'c1',
+  assistant_id: 'a1',
+  channel: 'app',
+  visitor_id: null,
+  title: 'T',
+};
 
-const collect = async (events: AsyncGenerator<unknown>) => {
-  const list: unknown[] = [];
+const collect = async (events: AsyncGenerator<ChatStreamEvent>) => {
+  const list: ChatStreamEvent[] = [];
 
   for await (const event of events) {
     list.push(event);
@@ -157,6 +208,46 @@ const collect = async (events: AsyncGenerator<unknown>) => {
 
   return list;
 };
+
+const tokenText = (events: ChatStreamEvent[]) =>
+  events.map((event) => (event.type === 'token' ? event.text : '')).join('');
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
+describe('historyTurns', () => {
+  it('orders the rows oldest first', () => {
+    expect(
+      historyTurns([
+        { role: 'assistant', content: 'A2' },
+        { role: 'user', content: 'Q2' },
+        { role: 'assistant', content: 'A1' },
+        { role: 'user', content: 'Q1' },
+      ]),
+    ).toEqual([
+      { role: 'user', text: 'Q1' },
+      { role: 'model', text: 'A1' },
+      { role: 'user', text: 'Q2' },
+      { role: 'model', text: 'A2' },
+    ]);
+  });
+
+  it('leaves out a question that was stopped before any answer, and a leading answer', () => {
+    expect(
+      historyTurns([
+        { role: 'user', content: 'Stopped before text' },
+        { role: 'assistant', content: 'A2' },
+        { role: 'user', content: 'Q2' },
+        { role: 'user', content: 'Also stopped' },
+        { role: 'assistant', content: 'A1, cut by the window' },
+      ]),
+    ).toEqual([
+      { role: 'user', text: 'Q2' },
+      { role: 'model', text: 'A2' },
+    ]);
+  });
+});
 
 describe('streamAnswer follow-up retrieval', () => {
   it('folds the latest question, not the oldest, into a short follow-up', async () => {
@@ -168,13 +259,7 @@ describe('streamAnswer follow-up retrieval', () => {
       { role: 'user', content: 'What does the Hobby plan cost' },
     ];
     const { service } = fakeService({
-      conversation: {
-        id: 'c1',
-        assistant_id: 'a1',
-        channel: 'app',
-        visitor_id: null,
-        title: 'Plans',
-      },
+      conversationReads: [{ ...ownConversation, title: 'Plans' }],
       history,
       chunks: [chunk('Pick the palette mode in Settings.')],
     });
@@ -201,7 +286,7 @@ describe('streamAnswer follow-up retrieval', () => {
       { role: 'user', content: 'Q1' },
     ];
     const { service } = fakeService({
-      conversation: { id: 'c1', assistant_id: 'a1', channel: 'app', visitor_id: null, title: 'T' },
+      conversationReads: [ownConversation],
       history,
       chunks: [chunk('Something relevant.')],
     });
@@ -233,14 +318,10 @@ describe('streamAnswer error copy', () => {
   it('never sends the provider or database text; the code carries the meaning', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    const conversation = {
-      id: 'c1',
-      assistant_id: 'a1',
-      channel: 'app',
-      visitor_id: null,
-      title: 'T',
-    };
-    const { service } = fakeService({ conversation, chunks: [chunk('Relevant.')] });
+    const { service } = fakeService({
+      conversationReads: [ownConversation],
+      chunks: [chunk('Relevant.')],
+    });
     const { provider } = fakeProvider();
 
     provider.embed = () => Promise.reject(new Error('relation "public.chunks" does not exist'));
@@ -264,14 +345,10 @@ describe('streamAnswer error copy', () => {
   });
 
   it('maps a busy model to its own code and sentence', async () => {
-    const conversation = {
-      id: 'c1',
-      assistant_id: 'a1',
-      channel: 'app',
-      visitor_id: null,
-      title: 'T',
-    };
-    const { service } = fakeService({ conversation, chunks: [chunk('Relevant.')] });
+    const { service } = fakeService({
+      conversationReads: [ownConversation],
+      chunks: [chunk('Relevant.')],
+    });
     const { provider } = fakeProvider({ failWith: new ModelBusyError(['gemini-3.8-flash']) });
 
     const events = await collect(
@@ -290,5 +367,347 @@ describe('streamAnswer error copy', () => {
       message: ANSWER_ERROR_COPY.model_busy,
     });
     expect(JSON.stringify(events)).not.toMatch(/gemini/);
+  });
+});
+
+describe('streamAnswer metering', () => {
+  it('reserves a slot against the plan limit and keeps it when the answer is saved', async () => {
+    const fake = fakeService({
+      conversationReads: [ownConversation],
+      chunks: [chunk('Relevant.')],
+    });
+    const { provider } = fakeProvider();
+
+    const events = await collect(
+      streamAnswer({
+        service: fake.service,
+        provider,
+        assistant,
+        conversation: { id: 'c1', channel: 'app' },
+        message: 'Where is the palette?',
+      }),
+    );
+
+    expect(events.at(-1)).toMatchObject({ type: 'done', answered: true });
+    expect(fake.rpcCalls.find((call) => call.fn === 'reserve_message')?.args).toEqual({
+      owner: 'o1',
+      max_allowed: PLANS.hobby.messagesPerMonth,
+    });
+    expect(fake.rpcNames()).toEqual([]);
+  });
+
+  it('refuses without writing anything when no slot is left', async () => {
+    const fake = fakeService({ conversationReads: [null], reserved: false });
+    const { provider } = fakeProvider();
+
+    const events = await collect(
+      streamAnswer({
+        service: fake.service,
+        provider,
+        assistant,
+        conversation: { id: 'c1', channel: 'app' },
+        message: 'Where is the palette?',
+      }),
+    );
+
+    expect(events).toEqual([
+      { type: 'error', code: 'quota_exceeded', message: expect.stringContaining('200 answers') },
+    ]);
+    expect(fake.find('conversations', 'insert')).toHaveLength(0);
+    expect(fake.find('messages', 'insert')).toHaveLength(0);
+    expect(fake.rpcNames()).toEqual([]);
+  });
+
+  it('checks the conversation before it takes a slot', async () => {
+    const fake = fakeService({
+      conversationReads: [{ ...ownConversation, assistant_id: 'someone-else' }],
+    });
+    const { provider } = fakeProvider();
+
+    const events = await collect(
+      streamAnswer({
+        service: fake.service,
+        provider,
+        assistant,
+        conversation: { id: 'c1', channel: 'app' },
+        message: 'Where is the palette?',
+      }),
+    );
+
+    expect(events).toEqual([{ type: 'error', code: 'not_found', message: expect.any(String) }]);
+    expect(fake.rpcCalls).toEqual([]);
+  });
+});
+
+describe('streamAnswer rollback', () => {
+  it('removes the question and the conversation it created when the model fails before any text', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const fake = fakeService({ conversationReads: [null], chunks: [chunk('Relevant.')] });
+    const { provider } = fakeProvider({ failWith: new Error('upstream exploded') });
+
+    const events = await collect(
+      streamAnswer({
+        service: fake.service,
+        provider,
+        assistant,
+        conversation: { id: 'c-new', channel: 'app' },
+        message: 'Where is the palette?',
+      }),
+    );
+
+    expect(events.at(-1)).toMatchObject({ type: 'error', code: 'internal' });
+    expect(fake.find('messages', 'delete').map((call) => call.filters)).toEqual([{ id: 'm1' }]);
+    // The trigger moved message_count back to zero; a conversation someone else wrote to stays.
+    expect(fake.find('conversations', 'delete').map((call) => call.filters)).toEqual([
+      { id: 'c-new', message_count: 0 },
+    ]);
+    expect(fake.rpcNames()).toEqual(['release_message']);
+  });
+
+  it('keeps an existing conversation and only removes the failed question', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const fake = fakeService({
+      conversationReads: [ownConversation],
+      chunks: [chunk('Relevant.')],
+    });
+    const { provider } = fakeProvider({ failWith: new Error('upstream exploded') });
+
+    await collect(
+      streamAnswer({
+        service: fake.service,
+        provider,
+        assistant,
+        conversation: { id: 'c1', channel: 'app' },
+        message: 'Where is the palette?',
+      }),
+    );
+
+    expect(fake.find('messages', 'delete')).toHaveLength(1);
+    expect(fake.find('conversations', 'delete')).toHaveLength(0);
+    expect(fake.rpcNames()).toEqual(['release_message']);
+  });
+
+  it('rolls back when the answer cannot be saved', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const fake = fakeService({
+      conversationReads: [ownConversation],
+      chunks: [chunk('Relevant.')],
+      assistantInsertError: { code: '42501', message: 'permission denied for table messages' },
+    });
+    const { provider } = fakeProvider();
+
+    const events = await collect(
+      streamAnswer({
+        service: fake.service,
+        provider,
+        assistant,
+        conversation: { id: 'c1', channel: 'app' },
+        message: 'Where is the palette?',
+      }),
+    );
+
+    expect(events.at(-1)).toEqual({
+      type: 'error',
+      code: 'internal',
+      message: 'The answer could not be saved.',
+    });
+    expect(fake.find('messages', 'delete')).toHaveLength(1);
+    expect(fake.rpcNames()).toEqual(['release_message']);
+  });
+});
+
+describe('streamAnswer stop', () => {
+  const assistantInsert = (fake: ReturnType<typeof fakeService>) =>
+    fake.find('messages', 'insert').find((call) => (call.payload as Row).role === 'assistant')
+      ?.payload as Row | undefined;
+
+  it('keeps the question and the text that arrived when the reader presses Stop', async () => {
+    const fake = fakeService({ conversationReads: [null], chunks: [chunk('Relevant.')] });
+    const { provider } = fakeProvider();
+    const controller = new AbortController();
+    const events: ChatStreamEvent[] = [];
+
+    for await (const event of streamAnswer({
+      service: fake.service,
+      provider,
+      assistant,
+      conversation: { id: 'c-new', channel: 'app' },
+      message: 'Where is the palette?',
+      signal: controller.signal,
+    })) {
+      events.push(event);
+
+      if (event.type === 'token') {
+        controller.abort();
+      }
+    }
+
+    const shown = tokenText(events).trim();
+
+    expect(shown.length).toBeGreaterThan(0);
+    expect(events.map((event) => event.type)).not.toContain('error');
+    expect(fake.find('messages', 'delete')).toHaveLength(0);
+    expect(fake.find('conversations', 'delete')).toHaveLength(0);
+    expect(assistantInsert(fake)).toMatchObject({ content: shown, answered: null });
+    expect(fake.rpcNames()).toEqual(['release_message']);
+  });
+
+  it('does the same when the transport stops pulling events', async () => {
+    const fake = fakeService({
+      conversationReads: [ownConversation],
+      chunks: [chunk('Relevant.')],
+    });
+    const { provider } = fakeProvider();
+    const events = streamAnswer({
+      service: fake.service,
+      provider,
+      assistant,
+      conversation: { id: 'c1', channel: 'app' },
+      message: 'Where is the palette?',
+    });
+    const seen: ChatStreamEvent[] = [];
+
+    while (true) {
+      const next = await events.next();
+
+      if (next.done) {
+        break;
+      }
+
+      seen.push(next.value);
+
+      if (next.value.type === 'token') {
+        await events.return(undefined);
+        break;
+      }
+    }
+
+    expect(assistantInsert(fake)).toMatchObject({
+      content: tokenText(seen).trim(),
+      answered: null,
+    });
+    expect(fake.find('messages', 'delete')).toHaveLength(0);
+    expect(fake.rpcNames()).toEqual(['release_message']);
+  });
+
+  it('keeps only the question when the reader stops before any text', async () => {
+    const fake = fakeService({ conversationReads: [null], chunks: [chunk('Relevant.')] });
+    const { provider } = fakeProvider();
+    const controller = new AbortController();
+
+    for await (const event of streamAnswer({
+      service: fake.service,
+      provider,
+      assistant,
+      conversation: { id: 'c-new', channel: 'app' },
+      message: 'Where is the palette?',
+      signal: controller.signal,
+    })) {
+      if (event.type === 'meta') {
+        controller.abort();
+      }
+    }
+
+    expect(fake.find('messages', 'insert').map((call) => (call.payload as Row).role)).toEqual([
+      'user',
+    ]);
+    expect(fake.find('messages', 'delete')).toHaveLength(0);
+    expect(fake.find('conversations', 'delete')).toHaveLength(0);
+    expect(fake.rpcNames()).toEqual(['release_message']);
+  });
+});
+
+describe('streamAnswer conversation race', () => {
+  it('joins a conversation another request created a moment earlier', async () => {
+    const fake = fakeService({
+      conversationReads: [null, { ...ownConversation, id: 'c-new' }],
+      conversationInsertError: { code: '23505', message: 'duplicate key value' },
+      chunks: [chunk('Relevant.')],
+    });
+    const { provider } = fakeProvider();
+
+    const events = await collect(
+      streamAnswer({
+        service: fake.service,
+        provider,
+        assistant,
+        conversation: { id: 'c-new', channel: 'app' },
+        message: 'Where is the palette?',
+      }),
+    );
+
+    expect(events[0]).toMatchObject({ type: 'meta', conversationId: 'c-new' });
+    expect(events.at(-1)).toMatchObject({ type: 'done', answered: true });
+  });
+
+  it('still refuses when the row that won belongs to someone else', async () => {
+    const fake = fakeService({
+      conversationReads: [null, { ...ownConversation, id: 'c-new', channel: 'widget' }],
+      conversationInsertError: { code: '23505', message: 'duplicate key value' },
+    });
+    const { provider } = fakeProvider();
+
+    const events = await collect(
+      streamAnswer({
+        service: fake.service,
+        provider,
+        assistant,
+        conversation: { id: 'c-new', channel: 'app' },
+        message: 'Where is the palette?',
+      }),
+    );
+
+    expect(events).toEqual([{ type: 'error', code: 'not_found', message: expect.any(String) }]);
+    expect(fake.find('messages', 'insert')).toHaveLength(0);
+    expect(fake.rpcNames()).toEqual(['release_message']);
+  });
+
+  it('reports any other insert failure as a sentence', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const fake = fakeService({
+      conversationReads: [null],
+      conversationInsertError: { code: '42501', message: 'new row violates row-level security' },
+    });
+    const { provider } = fakeProvider();
+
+    const events = await collect(
+      streamAnswer({
+        service: fake.service,
+        provider,
+        assistant,
+        conversation: { id: 'c-new', channel: 'app' },
+        message: 'Where is the palette?',
+      }),
+    );
+
+    expect(events).toEqual([
+      { type: 'error', code: 'internal', message: 'The conversation could not be started.' },
+    ]);
+    expect(fake.rpcNames()).toEqual(['release_message']);
+  });
+});
+
+describe('streamAnswer unanswered', () => {
+  it('meters an unanswered reply like any other answer', async () => {
+    const fake = fakeService({ conversationReads: [ownConversation], chunks: [] });
+    const { provider } = fakeProvider();
+
+    const events = await collect(
+      streamAnswer({
+        service: fake.service,
+        provider,
+        assistant,
+        conversation: { id: 'c1', channel: 'app' },
+        message: 'Something the docs do not cover',
+      }),
+    );
+
+    expect(tokenText(events)).toBe(UNANSWERED_TEXT);
+    expect(events.at(-1)).toMatchObject({ type: 'done', answered: false });
+    expect(fake.rpcNames()).toEqual([]);
   });
 });
