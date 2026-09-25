@@ -150,9 +150,7 @@ const SidebarBody = ({
               : 'text-muted-foreground hover:bg-sidebar-accent/60 hover:text-foreground',
           )}
         >
-          <LayoutGrid
-            className={cn('size-4', pending.href === '/dashboard' && 'animate-pulse')}
-          />
+          <LayoutGrid className={cn('size-4', pending.href === '/dashboard' && 'animate-pulse')} />
           All assistants
         </Link>
         {active

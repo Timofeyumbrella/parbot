@@ -14,7 +14,8 @@ const eslintConfig = defineConfig([
       'no-restricted-syntax': [
         'error',
         {
-          selector: "JSXOpeningElement[name.name='Link'] > JSXAttribute[name.name='prefetch'][value=null]",
+          selector:
+            "JSXOpeningElement[name.name='Link'] > JSXAttribute[name.name='prefetch'][value=null]",
           message: FULL_PREFETCH,
         },
         {

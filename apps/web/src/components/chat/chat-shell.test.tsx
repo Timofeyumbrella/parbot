@@ -90,7 +90,9 @@ const Shell = ({ page }: { page: React.ReactNode }) => (
 const list = () => within(screen.getAllByRole('navigation', { name: 'Conversations' })[0]!);
 
 beforeEach(() => {
-  queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
+  queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false, staleTime: Infinity } },
+  });
   navigation.params.conversationId = 'c1';
   resetAppliedSnapshots();
 });

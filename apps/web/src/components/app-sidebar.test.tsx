@@ -108,9 +108,7 @@ describe('AppSidebar', () => {
     await user.click(assistantNav().getByRole('link', { name: 'Inbox' }));
     await user.keyboard('{/Meta}');
 
-    expect(assistantNav().getByRole('link', { name: 'Inbox' })).not.toHaveAttribute(
-      'aria-current',
-    );
+    expect(assistantNav().getByRole('link', { name: 'Inbox' })).not.toHaveAttribute('aria-current');
     expect(screen.getByRole('main')).not.toHaveAttribute('aria-busy');
 
     await user.click(assistantNav().getByRole('link', { name: 'Overview' }));

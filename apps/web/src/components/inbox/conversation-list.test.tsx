@@ -161,7 +161,9 @@ describe('ConversationList rows', () => {
 
     expect(clicked.querySelector('[data-pending]')).not.toBeNull();
     expect(clicked).toHaveClass('has-data-pending:bg-muted');
-    expect(screen.getByRole('link', { name: /Rotate keys/ }).querySelector('[data-pending]')).toBeNull();
+    expect(
+      screen.getByRole('link', { name: /Rotate keys/ }).querySelector('[data-pending]'),
+    ).toBeNull();
   });
 });
 

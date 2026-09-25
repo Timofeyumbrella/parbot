@@ -211,13 +211,14 @@ export const ConversationList = ({ assistantId, snapshot }: ConversationListProp
   const rows = useMemo(() => filterConversations(data ?? [], query), [data, query]);
   const base = `/a/${assistantId}/chat`;
 
-  const follow = (conversationId: string | null) => (event: React.MouseEvent<HTMLAnchorElement>) => {
-    if (isPlainLeftClick(event)) {
-      selection?.select(conversationId);
-    }
+  const follow =
+    (conversationId: string | null) => (event: React.MouseEvent<HTMLAnchorElement>) => {
+      if (isPlainLeftClick(event)) {
+        selection?.select(conversationId);
+      }
 
-    onNavigate?.();
-  };
+      onNavigate?.();
+    };
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
