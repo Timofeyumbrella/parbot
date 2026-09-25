@@ -82,6 +82,7 @@ export const InboxTabs = ({
           <li key={key}>
             <SegmentedLink
               href={inboxHref(assistantId, key)}
+              group="tab"
               active={key === tab}
               className="group flex h-9 items-center gap-2 border-b-2 text-sm font-medium transition-colors"
               activeClassName="border-foreground text-foreground"
@@ -118,6 +119,7 @@ export const ConversationFilters = ({
       <SegmentedLink
         key={key}
         href={inboxHref(assistantId, 'conversations', key)}
+        group="filter"
         active={key === filter}
         className={pillLinkClass}
         activeClassName={pillActiveClass}
