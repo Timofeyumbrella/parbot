@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 import type { Database } from '@/lib/db';
-import { STORAGE_BUCKET } from '@/lib/ingest';
+import { STORAGE_BUCKET } from '@/lib/uploads';
 
 /** More than any assistant or account holds; a listing this size means the loop must stop. */
 const PAGE_SIZE = 1000;

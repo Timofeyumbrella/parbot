@@ -3,7 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { AiProvider, EmbedInput } from '@/lib/ai';
 import type { Database, Source } from '@/lib/db';
 import { checkCapacity } from '@/lib/plans';
-import { uploadTypeFor } from '@/lib/uploads';
+import { STORAGE_BUCKET, uploadTypeFor } from '@/lib/uploads';
 
 import { type Chunk, chunkMarkdown, estimateTokens } from './chunk';
 import { crawlPages, crawlScope, normalizeUrl } from './crawl';
@@ -36,7 +36,8 @@ export const MAX_PAGES_PER_RUN = 300;
 export const EMBED_BATCH_SIZE = 32;
 /** Ids per request: the local gateway answers 414 once a filter carries a few hundred. */
 export const ID_BATCH_SIZE = 100;
-export const STORAGE_BUCKET = 'sources';
+// Defined beside the upload rules so the delete actions can name the bucket without loading the pipeline.
+export { STORAGE_BUCKET };
 export const PAGE_LIMIT_MESSAGE =
   "Your plan's page limit is reached. Upgrade on the Billing page or remove a source.";
 /** A run that has not touched its row for this long is treated as dead and may be started over. */

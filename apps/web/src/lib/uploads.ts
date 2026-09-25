@@ -19,6 +19,9 @@ export const UPLOAD_TYPES: Record<UploadType, { mime: string; extensions: string
 
 export const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
 
+/** The Storage bucket every uploaded or pasted source lives in, under `<owner_id>/<assistant_id>/`. */
+export const STORAGE_BUCKET = 'sources';
+
 /** The `accept` attribute for the file picker. */
 export const UPLOAD_ACCEPT = Object.values(UPLOAD_TYPES)
   .flatMap((type) => type.extensions.map((extension) => `.${extension}`))

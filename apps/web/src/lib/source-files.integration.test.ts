@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { afterAll, describe, expect, it } from 'vitest';
 
 import type { Database } from '@/lib/db';
-import { STORAGE_BUCKET } from '@/lib/ingest';
+import { STORAGE_BUCKET } from '@/lib/uploads';
 
 import { removeStoredFiles } from './source-files';
 
