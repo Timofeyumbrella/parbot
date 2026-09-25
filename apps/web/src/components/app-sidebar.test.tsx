@@ -85,6 +85,19 @@ describe('AppSidebar', () => {
       'page',
     );
     expect(screen.getByRole('main')).not.toHaveAttribute('aria-busy');
+
+    // Back to the Overview through the browser: the earlier click does not come back.
+    navigation.pathname = '/a/asst';
+    rerender(<Frame />);
+
+    expect(assistantNav().getByRole('link', { name: 'Overview' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    expect(assistantNav().getByRole('link', { name: 'Knowledge' })).not.toHaveAttribute(
+      'aria-current',
+    );
+    expect(screen.getByRole('main')).not.toHaveAttribute('aria-busy');
   });
 
   it('leaves a modified click to the browser and ignores a click on the open screen', async () => {

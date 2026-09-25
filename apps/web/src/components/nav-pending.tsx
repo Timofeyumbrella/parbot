@@ -25,13 +25,18 @@ export const isPlainLeftClick = (event: React.MouseEvent<HTMLAnchorElement>) =>
  */
 export const NavPendingProvider = ({ children }: { children: React.ReactNode }) => {
   const pathname = usePathname();
-  const [pending, setPending] = useState<{ href: string; from: string } | null>(null);
-  // Tied to the pathname it started on, so arriving (or going anywhere else) clears it.
-  const href = pending && pending.from === pathname ? pending.href : null;
+  const [href, setHref] = useState<string | null>(null);
+  const [seen, setSeen] = useState(pathname);
+
+  // Arriving, or going anywhere else (a back button included), ends the pending click.
+  if (seen !== pathname) {
+    setSeen(pathname);
+    setHref(null);
+  }
 
   const start = useCallback(
     (next: string) => {
-      setPending(next === pathname ? null : { href: next, from: pathname });
+      setHref(next === pathname ? null : next);
     },
     [pathname],
   );
