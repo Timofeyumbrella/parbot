@@ -1,50 +1,23 @@
 import { expect, type Page, test } from '@playwright/test';
-<<<<<<< HEAD
-=======
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
->>>>>>> worktree-wf_7dd47107-b4c-5
+import type { SupabaseClient } from '@supabase/supabase-js';
 
-import { priceLabel } from '../src/lib/billing/pricing';
-import { PLANS } from '../src/lib/plans';
-
-<<<<<<< HEAD
-import { trackAccounts } from './support/accounts';
+import { adminClient, trackAccounts } from './support/accounts';
 
 const accounts = trackAccounts();
 
+// A failed assertion must not leave its account behind in the shared database.
 test.afterEach(accounts.cleanup);
 
-/** The "Current plan" card: the plan's name also appears in the picker, so it is read from here. */
-const currentPlanCard = (page: Page) =>
-  page
-    .locator('[data-slot="card"]')
-    .filter({ has: page.locator('[data-slot="card-title"]', { hasText: /^Current plan$/ }) });
-
-test.describe('billing in test mode', () => {
-  test('a new account moves from Hobby to Starter and back', async ({ page }) => {
-    const email = accounts.email('e2e-billing');
-
-    await page.goto('/signup');
-    await page.getByLabel(/full name/i).fill('Billing Tester');
-    await page.getByLabel(/email/i).fill(email);
-    await page.getByLabel(/^password/i).fill('correct-horse-battery');
-    await page.getByRole('button', { name: /create account/i }).click();
-    await expect(page).toHaveURL(/\/onboarding/);
-
-    await page.goto('/billing');
-    await expect(page.getByText(/test mode/i).first()).toBeVisible();
-=======
 const admin = (): SupabaseClient => {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const client = adminClient();
 
-  if (!url || !key) {
+  if (!client) {
     throw new Error(
       'NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are needed to run the billing spec.',
     );
   }
 
-  return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+  return client;
 };
 
 const accountIdOf = async (service: SupabaseClient, email: string) => {
@@ -70,14 +43,6 @@ const storedPlan = async (service: SupabaseClient, email: string) => {
   return data?.plan_id ?? null;
 };
 
-const removeAccount = async (service: SupabaseClient, email: string) => {
-  const id = await accountIdOf(service, email);
-
-  if (id) {
-    await service.auth.admin.deleteUser(id);
-  }
-};
-
 const signUp = async (page: Page, email: string) => {
   await page.goto('/signup');
   await page.getByLabel(/full name/i).fill('Billing Tester');
@@ -90,118 +55,87 @@ const signUp = async (page: Page, email: string) => {
 test.describe('billing in test mode', () => {
   test('a new account moves from Hobby to Starter and back', async ({ page }) => {
     const service = admin();
-    const email = `e2e-billing-${unique()}@parbot.test`;
+    const email = accounts.email('e2e-billing');
     // The plan picker lists every plan by name and price, so only this card proves the current one.
     const currentPlan = page.getByTestId('current-plan');
 
-    try {
-      await signUp(page, email);
+    await signUp(page, email);
 
-      await page.goto('/billing');
-      await expect(page.getByText(/test mode/i).first()).toBeVisible();
-      await expect(currentPlan).toContainText('Hobby');
-      await expect(currentPlan).toContainText('Free');
-      await expect(page.getByTestId('plan-hobby')).toHaveAttribute('data-current', 'true');
->>>>>>> worktree-wf_7dd47107-b4c-5
-
-    const card = currentPlanCard(page);
-
-<<<<<<< HEAD
-    await expect(card).toHaveCount(1);
-    await expect(card).toContainText(PLANS.hobby.name);
-    await expect(card).toContainText('Free');
+    await page.goto('/billing');
+    await expect(page.getByText(/test mode/i).first()).toBeVisible();
+    await expect(currentPlan).toContainText('Hobby');
+    await expect(currentPlan).toContainText('Free');
+    await expect(page.getByTestId('plan-hobby')).toHaveAttribute('data-current', 'true');
 
     await page.getByRole('button', { name: /choose starter/i }).click();
     await expect(page).toHaveURL(/mock_plan=starter/);
     await page.getByRole('button', { name: /apply/i }).click();
 
     await expect(page).toHaveURL(/checkout=success/);
-    await expect(card).toContainText(PLANS.starter.name);
-    await expect(card).toContainText(priceLabel(PLANS.starter, 'monthly'));
+    await expect(currentPlan).toContainText('Starter');
+    await expect(currentPlan).toContainText('$29 a month');
+    await expect(currentPlan).toContainText(/Renews on [A-Z][a-z]{2} \d{1,2}, \d{4}\./);
+    await expect(page.getByTestId('plan-starter')).toHaveAttribute('data-current', 'true');
+    await expect(page.getByTestId('plan-hobby')).not.toHaveAttribute('data-current', 'true');
+    await expect.poll(() => storedPlan(service, email)).toBe('starter');
 
+    // The Account page describes the same subscription, with the date in the same shape.
+    const renewal = (await currentPlan.getByText(/Renews on/).textContent())?.trim();
+    await page.goto('/account');
+    await expect(page.getByText(`Starter, $29 a month. ${renewal}`)).toBeVisible();
+
+    await page.goto('/billing');
     await page.getByRole('button', { name: /manage subscription/i }).click();
     await expect(page).toHaveURL(/mock_portal=1/);
     await page
+      .getByTestId('mock-portal-card')
       .getByRole('button', { name: /switch to hobby/i })
-      .first()
       .click();
 
-    await expect(card).toContainText(PLANS.hobby.name);
-    await expect(card).not.toContainText(PLANS.starter.name);
-=======
-      await expect(page).toHaveURL(/checkout=success/);
-      await expect(currentPlan).toContainText('Starter');
-      await expect(currentPlan).toContainText('$29 a month');
-      await expect(currentPlan).toContainText(/Renews on [A-Z][a-z]{2} \d{1,2}, \d{4}\./);
-      await expect(page.getByTestId('plan-starter')).toHaveAttribute('data-current', 'true');
-      await expect(page.getByTestId('plan-hobby')).not.toHaveAttribute('data-current', 'true');
-      await expect.poll(() => storedPlan(service, email)).toBe('starter');
-
-      // The Account page describes the same subscription, with the date in the same shape.
-      const renewal = (await currentPlan.getByText(/Renews on/).textContent())?.trim();
-      await page.goto('/account');
-      await expect(page.getByText(`Starter, $29 a month. ${renewal}`)).toBeVisible();
-
-      await page.goto('/billing');
-      await page.getByRole('button', { name: /manage subscription/i }).click();
-      await expect(page).toHaveURL(/mock_portal=1/);
-      await page
-        .getByTestId('mock-portal-card')
-        .getByRole('button', { name: /switch to hobby/i })
-        .click();
-
-      await expect(page).toHaveURL(/checkout=success/);
-      await expect(currentPlan).toContainText('Hobby');
-      await expect(currentPlan).not.toContainText('Starter');
-      await expect(page.getByTestId('plan-hobby')).toHaveAttribute('data-current', 'true');
-      await expect(page.getByTestId('plan-starter')).not.toHaveAttribute('data-current', 'true');
-      await expect.poll(() => storedPlan(service, email)).toBe('hobby');
-    } finally {
-      await removeAccount(service, email);
-    }
+    await expect(page).toHaveURL(/checkout=success/);
+    await expect(currentPlan).toContainText('Hobby');
+    await expect(currentPlan).not.toContainText('Starter');
+    await expect(page.getByTestId('plan-hobby')).toHaveAttribute('data-current', 'true');
+    await expect(page.getByTestId('plan-starter')).not.toHaveAttribute('data-current', 'true');
+    await expect.poll(() => storedPlan(service, email)).toBe('hobby');
   });
 
   test('an unpaid first payment leaves every screen on Hobby', async ({ page }) => {
     const service = admin();
-    const email = `e2e-billing-unpaid-${unique()}@parbot.test`;
+    const email = accounts.email('e2e-billing-unpaid');
     const currentPlan = page.getByTestId('current-plan');
 
-    try {
-      await signUp(page, email);
-      const id = await accountIdOf(service, email);
+    await signUp(page, email);
+    const id = await accountIdOf(service, email);
 
-      if (!id) {
-        throw new Error(`Signing up ${email} did not create a profile.`);
-      }
-
-      // A row as Stripe's 'incomplete' status would leave it if the paid plan were written with it.
-      const { error } = await service
-        .from('subscriptions')
-        .update({
-          plan_id: 'starter',
-          billing_interval: 'monthly',
-          status: 'incomplete',
-          stripe_customer_id: `cus_e2e_${unique()}`,
-          current_period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-        })
-        .eq('account_id', id);
-      expect(error).toBeNull();
-
-      await page.goto('/billing');
-      await expect(currentPlan).toContainText('Hobby');
-      await expect(currentPlan).toContainText('Payment pending');
-      await expect(currentPlan).toContainText('so you are on Hobby');
-      await expect(currentPlan).not.toContainText('Starter');
-      await expect(page.getByTestId('plan-hobby')).toHaveAttribute('data-current', 'true');
-      await expect(page.getByRole('link', { name: /^Billing/ })).toContainText('Hobby');
-
-      await page.goto('/account');
-      await expect(
-        page.getByText('Hobby, Free. Upgrade for more assistants, pages and answers.'),
-      ).toBeVisible();
-    } finally {
-      await removeAccount(service, email);
+    if (!id) {
+      throw new Error(`Signing up ${email} did not create a profile.`);
     }
->>>>>>> worktree-wf_7dd47107-b4c-5
+
+    // A row as Stripe's 'incomplete' status would leave it if the paid plan were written with it.
+    const { error } = await service
+      .from('subscriptions')
+      .update({
+        plan_id: 'starter',
+        billing_interval: 'monthly',
+        status: 'incomplete',
+        stripe_customer_id: `cus_e2e_${id.slice(0, 8)}`,
+        current_period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      })
+      .eq('account_id', id);
+    expect(error).toBeNull();
+
+    await page.goto('/billing');
+    await expect(currentPlan).toContainText('Hobby');
+    await expect(currentPlan).toContainText('Payment pending');
+    await expect(currentPlan).toContainText('so you are on Hobby');
+    await expect(currentPlan).not.toContainText('Starter');
+    await expect(page.getByTestId('plan-hobby')).toHaveAttribute('data-current', 'true');
+    await expect(page.getByRole('link', { name: /^Billing/ })).toContainText('Hobby');
+
+    await page.goto('/account');
+    await expect(
+      page.getByText('Hobby, Free. Upgrade for more assistants, pages and answers.'),
+    ).toBeVisible();
   });
 });
