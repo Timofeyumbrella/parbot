@@ -185,14 +185,16 @@ describe('updateAssistant', () => {
     slug: 'acme',
     description: '',
     instructions: '',
-    welcomeMessage: 'Hi.',
-    suggestedQuestions: 'One\nTwo',
   };
 
-  it('writes the row and reports success', async () => {
+  it('writes the row and reports success, leaving the Widget page columns alone', async () => {
     queue.push({ data: { id: ASSISTANT_ID }, error: null });
 
-    const state = await updateAssistant(idle, form(fields));
+    // A stale form that still posts the old fields must not overwrite what the Widget page saved.
+    const state = await updateAssistant(
+      idle,
+      form({ ...fields, welcomeMessage: 'Stale.', suggestedQuestions: 'Old question' }),
+    );
 
     expect(state).toMatchObject({ status: 'success', message: 'Settings saved.' });
 
@@ -203,8 +205,6 @@ describe('updateAssistant', () => {
       slug: 'acme',
       description: null,
       instructions: null,
-      welcome_message: 'Hi.',
-      suggested_questions: ['One', 'Two'],
     });
     expect(revalidatePath).toHaveBeenCalledWith(`/a/${ASSISTANT_ID}/settings`);
   });

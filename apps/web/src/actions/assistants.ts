@@ -105,8 +105,9 @@ export const updateAssistant = async (
   }
 
   const { supabase } = await requireUser();
-  const { assistantId, name, slug, description, instructions, welcomeMessage, suggestedQuestions } =
-    parsed.data;
+  // The welcome message and suggested questions are saved from the Widget page only, next to the
+  // preview readers see them in, so this action leaves both columns alone.
+  const { assistantId, name, slug, description, instructions } = parsed.data;
 
   // Row level security limits the update to the visitor's own rows: a foreign id updates nothing.
   const { data, error } = await supabase
@@ -116,8 +117,6 @@ export const updateAssistant = async (
       slug,
       description: description || null,
       instructions: instructions || null,
-      welcome_message: welcomeMessage,
-      suggested_questions: suggestedQuestions,
     })
     .eq('id', assistantId)
     .select('id')
@@ -146,15 +145,7 @@ export const updateAssistant = async (
   return {
     status: 'success',
     message: 'Settings saved.',
-    values: {
-      ...values,
-      name,
-      slug,
-      description,
-      instructions,
-      welcomeMessage,
-      suggestedQuestions: suggestedQuestions.join('\n'),
-    },
+    values: { ...values, name, slug, description, instructions },
   };
 };
 

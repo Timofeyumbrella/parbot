@@ -1,6 +1,6 @@
 import { Skeleton } from '@/components/ui/skeleton';
 
-/** Header, the settings card with its fields, the key card and the danger zone. */
+/** Header, the settings card with its fields and the Widget note, the key card and the danger zone. */
 export default function SettingsLoading() {
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-4 sm:p-6 lg:p-8">
@@ -19,8 +19,7 @@ export default function SettingsLoading() {
         </div>
         <Skeleton className="h-16 w-full" />
         <Skeleton className="h-28 w-full" />
-        <Skeleton className="h-8 w-full" />
-        <Skeleton className="h-24 w-full" />
+        <Skeleton className="h-14 w-full" />
         <div className="flex justify-end">
           <Skeleton className="h-8 w-28" />
         </div>

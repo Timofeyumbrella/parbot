@@ -1,13 +1,21 @@
 'use client';
 
-import { Loader2 } from 'lucide-react';
+import { ArrowRight, Loader2 } from 'lucide-react';
+import Link from 'next/link';
 import { useActionState, useEffect } from 'react';
 import { toast } from 'sonner';
 
 import { updateAssistant } from '@/actions/assistants';
 import { FormField, FormMessage } from '@/components/auth/form-field';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { type FormState, idleState } from '@/lib/form';
@@ -17,10 +25,7 @@ import {
   INSTRUCTIONS_MAX_LENGTH,
   NAME_MAX_LENGTH,
   SLUG_HELP,
-  SUGGESTED_QUESTION_MAX_LENGTH,
-  SUGGESTED_QUESTIONS_MAX,
   type UpdateField,
-  WELCOME_MAX_LENGTH,
 } from './schema';
 
 export type SettingsAssistant = {
@@ -29,12 +34,13 @@ export type SettingsAssistant = {
   slug: string;
   description: string | null;
   instructions: string | null;
-  welcome_message: string;
-  suggested_questions: string[];
 };
 
 export const AssistantSettingsForm = ({ assistant }: { assistant: SettingsAssistant }) => {
-  const [state, action, pending] = useActionState(updateAssistant, idleState as FormState<UpdateField>);
+  const [state, action, pending] = useActionState(
+    updateAssistant,
+    idleState as FormState<UpdateField>,
+  );
 
   useEffect(() => {
     if (state.status === 'success' && state.message) {
@@ -43,7 +49,8 @@ export const AssistantSettingsForm = ({ assistant }: { assistant: SettingsAssist
   }, [state]);
 
   // After a failed submit the visitor's edits win; otherwise the saved row does.
-  const value = (field: Exclude<UpdateField, 'assistantId'>, saved: string) => state.values?.[field] ?? saved;
+  const value = (field: Exclude<UpdateField, 'assistantId'>, saved: string) =>
+    state.values?.[field] ?? saved;
 
   return (
     <form action={action} noValidate>
@@ -52,7 +59,7 @@ export const AssistantSettingsForm = ({ assistant }: { assistant: SettingsAssist
         <CardHeader>
           <CardTitle>Assistant</CardTitle>
           <CardDescription>
-            What visitors see and how the assistant behaves. Appearance and allowed origins live on the widget page.
+            The name and slug identify it. The instructions shape every answer it gives.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-5">
@@ -62,7 +69,12 @@ export const AssistantSettingsForm = ({ assistant }: { assistant: SettingsAssist
           <div className="grid gap-5 sm:grid-cols-2">
             <FormField label="Name" error={state.fieldErrors?.name}>
               {(control) => (
-                <Input {...control} name="name" maxLength={NAME_MAX_LENGTH} defaultValue={value('name', assistant.name)} />
+                <Input
+                  {...control}
+                  name="name"
+                  maxLength={NAME_MAX_LENGTH}
+                  defaultValue={value('name', assistant.name)}
+                />
               )}
             </FormField>
             <FormField label="Slug" hint={SLUG_HELP} error={state.fieldErrors?.slug}>
@@ -77,7 +89,11 @@ export const AssistantSettingsForm = ({ assistant }: { assistant: SettingsAssist
               )}
             </FormField>
           </div>
-          <FormField label="Description" hint="A note for you. Visitors never see it." error={state.fieldErrors?.description}>
+          <FormField
+            label="Description"
+            hint="A note for you. Visitors never see it."
+            error={state.fieldErrors?.description}
+          >
             {(control) => (
               <Textarea
                 {...control}
@@ -104,35 +120,21 @@ export const AssistantSettingsForm = ({ assistant }: { assistant: SettingsAssist
               />
             )}
           </FormField>
-          <FormField
-            label="Welcome message"
-            hint="The first thing the widget says when it opens."
-            error={state.fieldErrors?.welcomeMessage}
-          >
-            {(control) => (
-              <Input
-                {...control}
-                name="welcomeMessage"
-                maxLength={WELCOME_MAX_LENGTH}
-                defaultValue={value('welcomeMessage', assistant.welcome_message)}
-              />
-            )}
-          </FormField>
-          <FormField
-            label="Suggested questions"
-            hint={`One per line, up to ${SUGGESTED_QUESTIONS_MAX}, each under ${SUGGESTED_QUESTION_MAX_LENGTH} characters. Shown before the first message.`}
-            error={state.fieldErrors?.suggestedQuestions}
-          >
-            {(control) => (
-              <Textarea
-                {...control}
-                name="suggestedQuestions"
-                rows={4}
-                defaultValue={value('suggestedQuestions', assistant.suggested_questions.join('\n'))}
-                placeholder={'How do I create an API key?\nWhat does the free plan include?'}
-              />
-            )}
-          </FormField>
+          <div className="flex flex-col gap-3 rounded-lg border px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex min-w-0 flex-col gap-0.5">
+              <p className="text-sm font-medium">Welcome message and suggested questions</p>
+              <p className="text-muted-foreground text-xs">
+                Readers see them in the widget, so they are edited on the Widget page next to its
+                live preview.
+              </p>
+            </div>
+            <Button asChild variant="outline" size="sm" className="self-start sm:self-auto">
+              <Link href={`/a/${assistant.id}/widget`}>
+                Edit on Widget
+                <ArrowRight data-icon="inline-end" />
+              </Link>
+            </Button>
+          </div>
         </CardContent>
         <CardFooter className="justify-end">
           <Button type="submit" disabled={pending}>
