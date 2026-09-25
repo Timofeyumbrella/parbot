@@ -34,9 +34,10 @@ export const AssistantCard = ({ assistant }: { assistant: AssistantCardData }) =
       </div>
     </CardHeader>
     <CardContent className="flex flex-col gap-3">
+      {/* Top-aligned so both numbers share a line even when one label wraps to two. */}
       <dl className="grid grid-cols-2 gap-3 text-sm">
-        <div className="flex items-center gap-2">
-          <FileText className="text-muted-foreground size-4 shrink-0" />
+        <div className="flex items-start gap-2">
+          <FileText className="text-muted-foreground mt-0.5 size-4 shrink-0" />
           <div className="flex flex-col">
             <dd className="font-medium tabular-nums">{formatCount(assistant.pagesIndexed)}</dd>
             <dt className="text-muted-foreground text-xs">
@@ -44,8 +45,8 @@ export const AssistantCard = ({ assistant }: { assistant: AssistantCardData }) =
             </dt>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <MessageSquare className="text-muted-foreground size-4 shrink-0" />
+        <div className="flex items-start gap-2">
+          <MessageSquare className="text-muted-foreground mt-0.5 size-4 shrink-0" />
           <div className="flex flex-col">
             <dd className="font-medium tabular-nums">
               {formatCount(assistant.conversationsLast30Days)}

@@ -21,9 +21,19 @@ const removeAccount = async (email: string) => {
 };
 
 test.describe('signing up and creating the first assistant', () => {
+  const created: string[] = [];
+
+  // A failed assertion must not leave its account behind in the shared database.
+  test.afterEach(async () => {
+    for (const email of created.splice(0)) {
+      await removeAccount(email);
+    }
+  });
+
   test('a new visitor lands on onboarding, creates an assistant and sees the dashboard', async ({ page }) => {
     const email = `e2e-${unique()}@parbot.test`;
     test.info().annotations.push({ type: 'account', description: email });
+    created.push(email);
 
     await page.goto('/signup');
     await expect(page.getByText('Create your account')).toBeVisible();
@@ -43,7 +53,14 @@ test.describe('signing up and creating the first assistant', () => {
     await page.goto('/dashboard');
     await expect(page.getByText('Acme Docs').first()).toBeVisible();
 
-    await removeAccount(email);
+    // At three cards a row "conversations in 30 days" wraps; both numbers still share one line.
+    const [pages, conversations] = await page
+      .getByRole('list', { name: 'Your assistants' })
+      .locator('dd')
+      .all();
+    const top = async (locator: typeof pages) => (await locator!.boundingBox())!.y;
+
+    expect(Math.abs((await top(pages)) - (await top(conversations)))).toBeLessThan(1);
   });
 
   test('guarded routes bounce to login and keep the destination', async ({ page }) => {
