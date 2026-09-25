@@ -636,6 +636,11 @@ export type Database = {
         }[]
       }
       owns_assistant: { Args: { assistant: string }; Returns: boolean }
+      release_message: { Args: { owner: string }; Returns: undefined }
+      reserve_message: {
+        Args: { max_allowed: number; owner: string }
+        Returns: boolean
+      }
       top_questions: {
         Args: { assistant: string; max_rows?: number; since: string }
         Returns: {
