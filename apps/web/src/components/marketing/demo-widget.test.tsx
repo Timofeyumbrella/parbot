@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ThemeToggle } from '@/components/theme-toggle';
 
-import { DemoWidget } from './demo-widget';
+import { DemoWidget, WIDE_HERO_QUERY } from './demo-widget';
 
 type WidgetWindow = Window & { Parbot?: { setScheme: (scheme: string) => void } };
 
@@ -21,14 +21,17 @@ const renderLanding = () =>
 const widgetScripts = () => document.querySelectorAll<HTMLScriptElement>('script[data-parbot]');
 
 describe('DemoWidget', () => {
+  let wide = false;
+
   beforeEach(() => {
+    wide = false;
     window.localStorage.clear();
     // A visitor whose OS prefers light: the case where the widget's own "auto" went white.
     vi.stubGlobal(
       'matchMedia',
       vi.fn((media: string) => ({
         media,
-        matches: false,
+        matches: media === WIDE_HERO_QUERY && wide,
         addListener: vi.fn(),
         removeListener: vi.fn(),
         addEventListener: vi.fn(),
@@ -61,6 +64,16 @@ describe('DemoWidget', () => {
       mode: 'palette',
       scheme: 'dark',
     });
+  });
+
+  it('keeps the pill off where the hero stacks, so it cannot cover the demo panel', () => {
+    renderLanding().unmount();
+    expect(widgetScripts()[0]?.dataset.launcher).toBe('false');
+
+    widgetScripts()[0]?.remove();
+    wide = true;
+    renderLanding();
+    expect(widgetScripts()[0]?.dataset.launcher).toBe('true');
   });
 
   it('follows the header toggle, whether or not the widget has started', async () => {
