@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/card';
 import { priceLabel } from '@/lib/billing/pricing';
 import type { BillingInterval, PaidPlanId } from '@/lib/billing/types';
+import { formatCount } from '@/lib/format';
 import { PLANS } from '@/lib/plans';
 
 type MockPlanConfirmProps = {
@@ -45,8 +46,8 @@ export const MockPlanConfirm = ({ planId, interval }: MockPlanConfirmProps) => {
       <CardContent>
         <p className="text-muted-foreground text-sm">
           This is what Stripe Checkout would do: your account moves to {plan.name} with{' '}
-          {plan.assistants} assistants, {plan.pages.toLocaleString('en-US')} indexed pages and{' '}
-          {plan.messagesPerMonth.toLocaleString('en-US')} answers a month.
+          {plan.assistants} assistants, {formatCount(plan.pages)} indexed pages and{' '}
+          {formatCount(plan.messagesPerMonth)} answers a month.
         </p>
         {state.error ? (
           <p role="alert" className="text-destructive mt-3 text-sm">
