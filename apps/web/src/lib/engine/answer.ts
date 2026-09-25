@@ -1,10 +1,27 @@
-import { type ChatStreamEvent, type Citation, citedIndexes, MAX_MESSAGE_LENGTH } from '@parbot/shared';
+import {
+  type ChatStreamEvent,
+  type Citation,
+  citedIndexes,
+  MAX_MESSAGE_LENGTH,
+} from '@parbot/shared';
 
 import { type AiProvider, type ChatTurn, ModelBusyError } from '@/lib/ai';
 import { checkCapacity, usagePeriodStart } from '@/lib/plans';
 
-import { buildSystemPrompt, conversationTitle, isRefusal, NO_ANSWER, renderQuestion, UNANSWERED_TEXT } from './prompt';
-import { retrievalQuery, retrieveChunks, type RetrievedChunk, type ServiceClient } from './retrieval';
+import {
+  buildSystemPrompt,
+  conversationTitle,
+  isRefusal,
+  NO_ANSWER,
+  renderQuestion,
+  UNANSWERED_TEXT,
+} from './prompt';
+import {
+  retrievalQuery,
+  retrieveChunks,
+  type RetrievedChunk,
+  type ServiceClient,
+} from './retrieval';
 
 export type AnswerAssistant = {
   id: string;
@@ -97,7 +114,11 @@ export async function* streamAnswer(params: AnswerParams): AsyncGenerator<ChatSt
   const message = params.message.trim();
 
   if (!message || message.length > MAX_MESSAGE_LENGTH) {
-    yield { type: 'error', code: 'bad_request', message: 'Ask something between 1 and 2000 characters.' };
+    yield {
+      type: 'error',
+      code: 'bad_request',
+      message: 'Ask something between 1 and 2000 characters.',
+    };
 
     return;
   }
@@ -167,10 +188,13 @@ export async function* streamAnswer(params: AnswerParams): AsyncGenerator<ChatSt
     .order('created_at', { ascending: false })
     .limit(HISTORY_TURNS);
 
-  const priorTurns: ChatTurn[] = (history ?? [])
+  // The rows arrive newest first. The model wants them in order, so a copy is reversed; the
+  // original stays newest first so the follow-up query folds in the latest question.
+  const newestFirst = history ?? [];
+  const priorTurns: ChatTurn[] = [...newestFirst]
     .reverse()
     .map((row) => ({ role: row.role === 'user' ? 'user' : 'model', text: row.content }));
-  const previousQuestion = [...(history ?? [])].find((row) => row.role === 'user')?.content ?? null;
+  const previousQuestion = newestFirst.find((row) => row.role === 'user')?.content ?? null;
 
   const { data: userMessage, error: userError } = await service
     .from('messages')
@@ -226,7 +250,10 @@ export async function* streamAnswer(params: AnswerParams): AsyncGenerator<ChatSt
   let refused = chunks.length === 0;
 
   if (!refused) {
-    const turns: ChatTurn[] = [...priorTurns, { role: 'user', text: renderQuestion(message, chunks) }];
+    const turns: ChatTurn[] = [
+      ...priorTurns,
+      { role: 'user', text: renderQuestion(message, chunks) },
+    ];
     const generator = provider.stream({
       system: buildSystemPrompt(assistant),
       turns,
