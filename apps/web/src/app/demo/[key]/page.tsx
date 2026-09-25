@@ -8,6 +8,7 @@ import { createSupabaseServiceClient } from '@/lib/supabase/service';
 import { findAssistantByKey, loadOwnerPlan, widgetConfigFor } from '@/lib/widget-api';
 
 import { demoNames, resolveDemoMode, resolveDemoPreview } from './demo-mode';
+import { SchemeSync } from './scheme-sync';
 
 export const dynamic = 'force-dynamic';
 
@@ -174,6 +175,7 @@ export default async function DemoPage({ params, searchParams }: PageProps<'/dem
         </main>
       </div>
 
+      <SchemeSync enabled={config.theme.scheme === 'auto'} />
       <Script
         src="/widget.js"
         strategy="afterInteractive"

@@ -3,6 +3,7 @@
 import {
   DEFAULT_WIDGET_THEME,
   MAX_ALLOWED_ORIGINS,
+  MAX_SUGGESTED_QUESTION_LENGTH,
   MAX_SUGGESTED_QUESTIONS,
   MAX_WELCOME_MESSAGE_LENGTH,
   WIDGET_ACCENT_PRESETS,
@@ -232,8 +233,8 @@ export const WidgetSettingsForm = ({
               placeholder={'How do I create an API key?\nWhat does the free plan include?'}
             />
             <p className="text-muted-foreground text-xs">
-              One per line, up to {MAX_SUGGESTED_QUESTIONS}. Shown as chips until the first
-              question.
+              One per line, up to {MAX_SUGGESTED_QUESTIONS}, each under{' '}
+              {MAX_SUGGESTED_QUESTION_LENGTH} characters. Shown as chips until the first question.
             </p>
           </div>
         </CardContent>

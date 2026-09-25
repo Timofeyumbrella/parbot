@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { hostnameOf } from '@/lib/analytics';
 import type { Conversation, Lead } from '@/lib/db';
 import { formatCount } from '@/lib/format';
+import { safeHttpUrl } from '@parbot/shared';
 
 export type PanelLead = Pick<Lead, 'id' | 'email' | 'status'>;
 
@@ -29,6 +30,8 @@ export const ConversationPanel = ({
   now: number;
 }) => {
   const host = hostnameOf(conversation.page_url);
+  // Widget visitors send this value; only an http(s) address becomes a link.
+  const pageHref = safeHttpUrl(conversation.page_url);
 
   return (
     <Card size="sm" className="gap-3" data-testid="conversation-panel">
@@ -48,9 +51,9 @@ export const ConversationPanel = ({
             )}
           </Row>
           <Row label="Page">
-            {conversation.page_url ? (
+            {conversation.page_url && pageHref ? (
               <a
-                href={conversation.page_url}
+                href={pageHref}
                 target="_blank"
                 rel="noreferrer"
                 title={conversation.page_url}

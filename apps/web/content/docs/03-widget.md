@@ -14,7 +14,7 @@ Find your public key and the exact snippet on the Widget page of your assistant.
 
 **Palette.** No launcher in the way. Readers press ⌘K (Ctrl+K on Windows and Linux) and a command-palette style dialog opens with the question box on top. Built for documentation sites where readers already expect ⌘K. Available on Starter and Growth.
 
-You can force a mode on a specific page with `data-mode="bubble"` or `data-mode="palette"`, and hide the small palette launcher with `data-launcher="false"`.
+You can force a mode on a specific page with `data-mode="bubble"` or `data-mode="palette"`, and hide the small palette launcher with `data-launcher="false"`. If your site has its own light and dark theme, set `data-scheme="light"` or `data-scheme="dark"` so the widget matches the page instead of the reader's operating system.
 
 ## Allowed origins
 
@@ -32,4 +32,4 @@ A random visitor id and the id of the current conversation, in local storage, so
 
 ## Programmatic control
 
-The script exposes `window.Parbot` with `open()`, `close()`, `toggle()`, `setMode(mode)` and `ask(question)`, so a "Ask AI" button of your own can open the assistant with a prefilled question.
+The script exposes `window.Parbot` with `open()`, `close()`, `toggle()`, `setMode(mode)` and `ask(question)`, so an "Ask AI" button of your own can open the assistant with a prefilled question. Call `setScheme('light' | 'dark' | 'auto')` from your own theme toggle to keep the widget in step, and `destroy()` to remove it from the page, for example when a single-page app leaves the docs section.

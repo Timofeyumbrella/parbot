@@ -289,7 +289,7 @@ test.describe('the in-app chat', () => {
     await page.getByRole('button', { name: 'Stop' }).click();
 
     await expect(page.getByRole('button', { name: 'Send' })).toBeVisible();
-    await expect(page.locator('[data-role="user"][data-status="stopped"]')).toContainText('Stopped before an answer was saved');
+    await expect(page.locator('[data-role="user"][data-status="stopped"]')).toBeVisible();
     await expect(assistantBubble(page, 'stopped')).toContainText('Stopped');
     await releaseRoutes(page);
   });

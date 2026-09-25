@@ -28,11 +28,7 @@ const UserBubble = ({ message }: { message: ThreadMessage }) => (
     <div className="bg-muted text-foreground max-w-[85%] rounded-2xl rounded-br-md px-3.5 py-2 text-sm leading-relaxed break-words whitespace-pre-wrap">
       {message.content}
     </div>
-    {message.status === 'failed' ? (
-      <span className="text-destructive text-xs">Not sent</span>
-    ) : message.status === 'stopped' ? (
-      <span className="text-muted-foreground text-xs">Stopped before an answer was saved</span>
-    ) : null}
+    {message.status === 'failed' ? <span className="text-destructive text-xs">Not sent</span> : null}
   </div>
 );
 

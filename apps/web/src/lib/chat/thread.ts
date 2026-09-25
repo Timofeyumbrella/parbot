@@ -81,7 +81,9 @@ export const messageFromRow = (row: MessageRow): ThreadMessage => ({
   feedback: row.feedback,
   created_at: row.created_at,
   latency_ms: row.latency_ms,
-  status: 'complete',
+  // The engine saves what the reader saw before pressing Stop with answered = null, so a reload
+  // shows it as stopped, not as a finished answer.
+  status: row.role === 'assistant' && row.answered === null ? 'stopped' : 'complete',
 });
 
 export const threadFromRows = (rows: MessageRow[]): Thread => ({

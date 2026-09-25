@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { hostnameOf, LEAD_STATUSES, type LeadStatus } from '@/lib/analytics';
 import type { Lead } from '@/lib/db';
+import { safeHttpUrl } from '@parbot/shared';
 
 export type LeadRow = Pick<Lead, 'id' | 'email' | 'note' | 'page_url' | 'status' | 'created_at' | 'conversation_id'>;
 
@@ -135,9 +136,9 @@ export const LeadsTable = ({ rows, assistantId, now }: { rows: LeadRow[]; assist
                   <span className="min-w-0 text-right sm:text-left">{lead.note || <span aria-label="No note">–</span>}</span>
                 </TableCell>
                 <TableCell data-label="Page" className={cn(cell, label, 'text-muted-foreground max-sm:p-0')}>
-                  {lead.page_url ? (
+                  {lead.page_url && safeHttpUrl(lead.page_url) ? (
                     <a
-                      href={lead.page_url}
+                      href={safeHttpUrl(lead.page_url)!}
                       target="_blank"
                       rel="noreferrer"
                       title={lead.page_url}

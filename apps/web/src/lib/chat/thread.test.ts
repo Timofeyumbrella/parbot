@@ -223,6 +223,14 @@ describe('mergeThread', () => {
     expect(thread.active).toBeNull();
   });
 
+  it('shows an answer saved when the reader pressed Stop as stopped after a reload', () => {
+    const stopped: MessageRow = { ...rows[1]!, id: 'a2', content: 'Half an', citations: [], answered: null, feedback: null };
+    const thread = threadFromRows([rows[0]!, stopped]);
+
+    expect(thread.messages.map((message) => message.status)).toEqual(['complete', 'stopped']);
+    expect(thread.messages[1]).toMatchObject({ content: 'Half an' });
+  });
+
   it('keeps in-flight and stopped messages the server does not know yet', () => {
     const cached = beginExchange(threadFromRows(rows), { userId: 'tmp_u', assistantId: 'tmp_a', content: 'more' });
     const thread = mergeThread(cached, rows);
