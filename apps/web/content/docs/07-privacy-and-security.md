@@ -16,7 +16,7 @@ Readers are identified by a random id stored in their browser. No cookies are se
 
 ## Rate limits
 
-The widget accepts twelve questions a minute per reader and sixty a minute per network address. The in-app chat accepts thirty a minute per account. These protect your monthly answer allowance from abuse.
+The widget accepts twelve questions a minute per reader, thirty a minute per network address, sixty a minute per assistant and a hundred and twenty a minute across all of an account's assistants. The in-app chat accepts thirty a minute per account. These protect your monthly answer allowance from abuse.
 
 ## Deleting data
 

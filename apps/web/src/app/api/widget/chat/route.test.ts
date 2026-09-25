@@ -218,10 +218,10 @@ describe('POST /api/widget/chat', () => {
     expect(other.status).toBe(200);
   });
 
-  it('limits one address to 60 messages a minute across visitors and assistants', async () => {
+  it('limits one address to 30 messages a minute across visitors and assistants', async () => {
     holder.service = manyAssistants();
 
-    for (let index = 0; index < 60; index += 1) {
+    for (let index = 0; index < 30; index += 1) {
       const key = index % 2 === 0 ? PUBLIC_KEY : OTHER_KEY;
       const response = await post(body({ key, visitorId: visitor(index) }), {
         'x-forwarded-for': '203.0.113.9',
@@ -243,7 +243,7 @@ describe('POST /api/widget/chat', () => {
   it('takes the address from the proxy, so a client cannot dodge the cap by rewriting x-forwarded-for', async () => {
     holder.service = manyAssistants();
 
-    for (let index = 0; index < 60; index += 1) {
+    for (let index = 0; index < 30; index += 1) {
       // The leftmost entry is the client's to write; the one the proxy appended is what counts.
       const key = index % 2 === 0 ? PUBLIC_KEY : OTHER_KEY;
       const response = await post(body({ key, visitorId: visitor(index) }), {
@@ -258,6 +258,36 @@ describe('POST /api/widget/chat', () => {
           'x-forwarded-for': '10.9.9.9, 203.0.113.9',
         })
       ).status,
+    ).toBe(429);
+  });
+
+  it('keeps a runaway visitor or a busy address from using up the assistant for everyone else', async () => {
+    // One tab stuck in a loop: only its first 12 messages count against the assistant.
+    for (let index = 0; index < 40; index += 1) {
+      await (await post(body(), { 'x-forwarded-for': '203.0.113.1' })).text();
+    }
+
+    // One address rotating visitor ids: only its first 30 count, 18 of them now refused.
+    for (let index = 0; index < 60; index += 1) {
+      await (
+        await post(body({ visitorId: visitor(index) }), { 'x-forwarded-for': '203.0.113.2' })
+      ).text();
+    }
+
+    expect(holder.answers).toHaveLength(42);
+
+    // The assistant still has room for 18 more visitors elsewhere.
+    for (let index = 0; index < 18; index += 1) {
+      const response = await post(body({ visitorId: visitor(100 + index) }), {
+        'x-forwarded-for': `198.51.100.${index}`,
+      });
+      expect(response.status).toBe(200);
+      await response.text();
+    }
+
+    expect(
+      (await post(body({ visitorId: visitor(999) }), { 'x-forwarded-for': '198.51.100.200' }))
+        .status,
     ).toBe(429);
   });
 

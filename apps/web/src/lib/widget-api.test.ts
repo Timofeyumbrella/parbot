@@ -2,6 +2,7 @@ import { DEFAULT_WIDGET_THEME, safeHttpUrl } from '@parbot/shared';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
+import { resetRateLimits } from '@/lib/engine/rate-limit';
 import { PLANS } from '@/lib/plans';
 
 import {
@@ -18,8 +19,8 @@ import {
   originAllowed,
   parseWidgetSettings,
   requestOrigin,
-  retryAfter,
   selfOrigin,
+  takeRateLimits,
   widgetChatSchema,
   widgetConfigFor,
   widgetLeadSchema,
@@ -187,18 +188,31 @@ describe('corsHeaders and clientIp', () => {
     expect(clientIp(new Request('http://x'))).toBe('unknown');
   });
 
-  it('announces the longest wait among the full buckets, in whole seconds, never zero', () => {
-    const open = { allowed: true, remaining: 3, retryAfterMs: 0 };
+  it('charges the buckets narrowest first and stops at the first that is full', () => {
+    resetRateLimits();
+    const tight = { limit: 1, windowMs: 60_000 };
+    const wide = { limit: 5, windowMs: 60_000 };
 
-    expect(retryAfter([open, open])).toBeNull();
     expect(
-      retryAfter([
-        open,
-        { allowed: false, remaining: 0, retryAfterMs: 1400 },
-        { allowed: false, remaining: 0, retryAfterMs: 30_500 },
+      takeRateLimits([
+        ['test:narrow', tight],
+        ['test:wide', wide],
       ]),
-    ).toBe('31');
-    expect(retryAfter([{ allowed: false, remaining: 0, retryAfterMs: 0 }])).toBe('1');
+    ).toBeNull();
+
+    // Refused by the narrow bucket, with the wait in whole seconds, and not charged to the wide one.
+    expect(
+      takeRateLimits([
+        ['test:narrow', tight],
+        ['test:wide', wide],
+      ]),
+    ).toBe('60');
+
+    for (let index = 0; index < 4; index += 1) {
+      expect(takeRateLimits([['test:wide', wide]])).toBeNull();
+    }
+
+    expect(takeRateLimits([['test:wide', wide]])).toBe('60');
   });
 });
 

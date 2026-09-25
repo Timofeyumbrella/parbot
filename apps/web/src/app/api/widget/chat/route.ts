@@ -1,5 +1,5 @@
 import { getAiProvider } from '@/lib/ai';
-import { rateLimit, streamAnswer, streamResponse } from '@/lib/engine';
+import { streamAnswer, streamResponse } from '@/lib/engine';
 import { createSupabaseServiceClient } from '@/lib/supabase/service';
 import {
   clientIp,
@@ -11,8 +11,8 @@ import {
   preflight,
   readJson,
   requestOrigin,
-  retryAfter,
   selfOrigin,
+  takeRateLimits,
   WIDGET_ASSISTANT_LIMIT,
   WIDGET_IP_LIMIT,
   WIDGET_OWNER_LIMIT,
@@ -55,13 +55,11 @@ export async function POST(request: Request) {
     );
   }
 
-  // Every bucket is charged, refused or not, so a flood that trips one limit still counts
-  // against the others instead of getting a free retry against them.
-  const wait = retryAfter([
-    rateLimit(`widget:ip:${clientIp(request)}`, WIDGET_IP_LIMIT),
-    rateLimit(`widget:assistant:${assistant.id}`, WIDGET_ASSISTANT_LIMIT),
-    rateLimit(`widget:owner:${assistant.owner_id}`, WIDGET_OWNER_LIMIT),
-    rateLimit(`widget:visitor:${assistant.id}:${visitorId}`, WIDGET_VISITOR_LIMIT),
+  const wait = takeRateLimits([
+    [`widget:visitor:${assistant.id}:${visitorId}`, WIDGET_VISITOR_LIMIT],
+    [`widget:ip:${clientIp(request)}`, WIDGET_IP_LIMIT],
+    [`widget:assistant:${assistant.id}`, WIDGET_ASSISTANT_LIMIT],
+    [`widget:owner:${assistant.owner_id}`, WIDGET_OWNER_LIMIT],
   ]);
 
   if (wait) {

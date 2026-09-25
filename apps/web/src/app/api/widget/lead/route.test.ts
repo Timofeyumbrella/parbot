@@ -208,6 +208,21 @@ describe('POST /api/widget/lead', () => {
     expect((holder.service as FakeService).inserted.leads).toHaveLength(30);
   });
 
+  it('does not let a visitor over its limit use up the assistant for everyone else', async () => {
+    for (let index = 0; index < 40; index += 1) {
+      await post(body({ conversationId: undefined }), { 'x-forwarded-for': '203.0.113.1' });
+    }
+
+    expect((holder.service as FakeService).inserted.leads).toHaveLength(5);
+
+    for (let index = 0; index < 25; index += 1) {
+      const response = await post(body({ conversationId: undefined, visitorId: visitor(index) }), {
+        'x-forwarded-for': `198.51.100.${index}`,
+      });
+      expect(response.status).toBe(201);
+    }
+  });
+
   it('answers preflight requests', async () => {
     const response = await OPTIONS(
       new Request('http://localhost:3000/api/widget/lead', { method: 'OPTIONS' }),
