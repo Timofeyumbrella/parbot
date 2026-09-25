@@ -1,6 +1,6 @@
 import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { FAQ_ITEMS } from '@/components/marketing/faq';
 import { FEATURES } from '@/components/marketing/features';
@@ -22,6 +22,11 @@ const section = (headingId: string) => {
 };
 
 describe('landing page', () => {
+  // The developer's .env may carry a real demo key; each case says which demo it wants.
+  beforeEach(() => {
+    vi.stubEnv('NEXT_PUBLIC_DEMO_ASSISTANT_KEY', '');
+  });
+
   afterEach(() => {
     cleanup();
     vi.unstubAllEnvs();
