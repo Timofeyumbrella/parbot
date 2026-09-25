@@ -81,7 +81,7 @@ export const CurrentPlanCard = ({ account, providerName, className }: CurrentPla
     account.billingInterval && isPaid ? priceLabel(account.plan, account.billingInterval) : 'Free';
 
   return (
-    <Card className={className}>
+    <Card className={className} data-testid="current-plan">
       <CardHeader>
         <CardTitle>Current plan</CardTitle>
         <CardDescription>{account.plan.tagline}</CardDescription>
