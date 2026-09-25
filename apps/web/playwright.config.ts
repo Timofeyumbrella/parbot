@@ -19,6 +19,9 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   retries: 0,
+  // Removes the throwaway accounts a failed or interrupted spec left in the shared database.
+  globalSetup: './e2e/global-setup.ts',
+  globalTeardown: './e2e/global-teardown.ts',
   reporter: [['list'], ['html', { open: 'never' }]],
   use: {
     baseURL: `http://localhost:${port}`,
