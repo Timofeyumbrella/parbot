@@ -45,16 +45,17 @@ export const renewalLine = (account: AccountPlan) => {
     return 'Your paid subscription ended. You are on Hobby.';
   }
 
+  // An unpaid first payment leaves the account on Hobby, so this comes before the Hobby sentence.
+  if (account.status === 'incomplete') {
+    return 'The first payment has not gone through yet, so you are on Hobby. Finish it in the portal.';
+  }
+
   if (account.plan.id === 'hobby') {
     return 'Free, with no card on file. Choose a plan below to raise the limits.';
   }
 
   if (account.status === 'past_due') {
     return 'The last payment failed. Update your card in the portal to keep the plan.';
-  }
-
-  if (account.status === 'incomplete') {
-    return 'The first payment has not gone through yet. Finish it in the portal.';
   }
 
   if (account.status === 'trialing') {

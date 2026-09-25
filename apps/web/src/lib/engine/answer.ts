@@ -1,6 +1,7 @@
 import { type ChatStreamEvent, type Citation, citedIndexes, MAX_MESSAGE_LENGTH } from '@parbot/shared';
 
 import { type AiProvider, type ChatTurn, ModelBusyError } from '@/lib/ai';
+import { entitledPlanId } from '@/lib/billing/entitlement';
 import { checkCapacity, usagePeriodStart } from '@/lib/plans';
 
 import { buildSystemPrompt, conversationTitle, isRefusal, NO_ANSWER, renderQuestion, UNANSWERED_TEXT } from './prompt';
@@ -71,7 +72,7 @@ const loadPlan = async (service: ServiceClient, ownerId: string) => {
     .eq('account_id', ownerId)
     .maybeSingle();
 
-  return data?.status === 'canceled' ? 'hobby' : (data?.plan_id ?? 'hobby');
+  return entitledPlanId(data);
 };
 
 const loadUsage = async (service: ServiceClient, ownerId: string) => {

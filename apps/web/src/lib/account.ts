@@ -1,5 +1,6 @@
 import { cache } from 'react';
 
+import { entitledPlanId } from '@/lib/billing/entitlement';
 import { type Plan, planFor, usagePeriodStart } from '@/lib/plans';
 import { getSession } from '@/lib/session';
 
@@ -12,7 +13,7 @@ export type AccountPlan = {
   hasStripeCustomer: boolean;
 };
 
-/** The signed-in account's plan. A cancelled subscription behaves like Hobby. */
+/** The signed-in account's plan. A subscription that has ended or never been paid behaves like Hobby. */
 export const getAccountPlan = cache(async (): Promise<AccountPlan> => {
   const { supabase, user } = await getSession();
   const fallback: AccountPlan = {
@@ -30,7 +31,9 @@ export const getAccountPlan = cache(async (): Promise<AccountPlan> => {
 
   const { data } = await supabase
     .from('subscriptions')
-    .select('plan_id, status, billing_interval, current_period_end, cancel_at_period_end, stripe_customer_id')
+    .select(
+      'plan_id, status, billing_interval, current_period_end, cancel_at_period_end, stripe_customer_id',
+    )
     .eq('account_id', user.id)
     .maybeSingle();
 
@@ -39,7 +42,7 @@ export const getAccountPlan = cache(async (): Promise<AccountPlan> => {
   }
 
   return {
-    plan: planFor(data.status === 'canceled' ? 'hobby' : data.plan_id),
+    plan: planFor(entitledPlanId(data)),
     status: data.status,
     billingInterval: data.billing_interval,
     currentPeriodEnd: data.current_period_end,

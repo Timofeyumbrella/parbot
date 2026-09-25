@@ -103,6 +103,42 @@ describe('patchFromSnapshot', () => {
     });
   });
 
+  it('stores Hobby while the first payment is incomplete, keeping the ids for the next event', () => {
+    const patch = patchFromSnapshot(
+      snapshotSubscription(subscriptionFixture({ status: 'incomplete' })),
+      { env },
+    );
+
+    expect(patch).toEqual({
+      plan_id: 'hobby',
+      status: 'incomplete',
+      billing_interval: null,
+      stripe_subscription_id: 'sub_1',
+      stripe_customer_id: 'cus_1',
+      current_period_end: new Date(PERIOD_END * 1000).toISOString(),
+      cancel_at_period_end: false,
+    });
+  });
+
+  it('grants the plan once an incomplete subscription becomes active or trialing', () => {
+    for (const status of ['active', 'trialing']) {
+      const patch = patchFromSnapshot(snapshotSubscription(subscriptionFixture({ status })), {
+        env,
+      });
+
+      expect(patch).toMatchObject({ plan_id: 'starter', status, billing_interval: 'monthly' });
+    }
+  });
+
+  it('ends an incomplete subscription whose payment window expired', () => {
+    const patch = patchFromSnapshot(
+      snapshotSubscription(subscriptionFixture({ status: 'incomplete_expired' })),
+      { env },
+    );
+
+    expect(patch).toMatchObject({ plan_id: 'hobby', status: 'canceled', billing_interval: null });
+  });
+
   it('drops to Hobby when the subscription ends', () => {
     for (const status of ['canceled', 'unpaid', 'incomplete_expired']) {
       const patch = patchFromSnapshot(snapshotSubscription(subscriptionFixture({ status })), {
