@@ -24,7 +24,15 @@ const answerEvents = (conversationId: string, answered = true): ChatStreamEvent[
   {
     type: 'citations',
     citations: answered
-      ? [{ index: 1, documentId: 'd1', title: 'Authentication', url: 'https://docs.example.com/auth', snippet: 'API keys' }]
+      ? [
+          {
+            index: 1,
+            documentId: 'd1',
+            title: 'Authentication',
+            url: 'https://docs.example.com/auth',
+            snippet: 'API keys',
+          },
+        ]
       : [],
   },
   { type: 'done', answered, latencyMs: 12 },
@@ -92,7 +100,9 @@ const mountScript = (attributes: Record<string, string> = {}) => {
 const shadowOf = (widget: { shadow: ShadowRoot }) => widget.shadow;
 
 const press = (target: Element | Document, key: string, init: KeyboardEventInit = {}) =>
-  target.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, composed: true, cancelable: true, ...init }));
+  target.dispatchEvent(
+    new KeyboardEvent('keydown', { key, bubbles: true, composed: true, cancelable: true, ...init }),
+  );
 
 describe('widget', () => {
   beforeEach(() => {
@@ -111,11 +121,19 @@ describe('widget', () => {
     const widget = await boot(mountScript());
 
     expect(widget).not.toBeNull();
-    expect(fetchMock).toHaveBeenCalledWith(`${API}/api/widget/config?key=${KEY}`, expect.anything());
+    expect(fetchMock).toHaveBeenCalledWith(
+      `${API}/api/widget/config?key=${KEY}`,
+      expect.anything(),
+    );
 
     const shadow = shadowOf(widget!);
     const root = shadow.querySelector<HTMLElement>('.pb-root')!;
-    expect(root.dataset).toMatchObject({ mode: 'bubble', scheme: 'dark', position: 'left', radius: 'lg' });
+    expect(root.dataset).toMatchObject({
+      mode: 'bubble',
+      scheme: 'dark',
+      position: 'left',
+      radius: 'lg',
+    });
     expect(root.style.getPropertyValue('--pb-accent')).toBe('#2563eb');
 
     const launcher = shadow.querySelector<HTMLButtonElement>('.pb-launcher')!;
@@ -133,7 +151,9 @@ describe('widget', () => {
 
     const input = shadow.querySelector<HTMLTextAreaElement>('textarea')!;
     expect(shadow.activeElement).toBe(input);
-    expect(shadow.querySelector('.pb-welcome')?.textContent).toContain('Hi, ask me about the docs.');
+    expect(shadow.querySelector('.pb-welcome')?.textContent).toContain(
+      'Hi, ask me about the docs.',
+    );
     expect(shadow.querySelectorAll('.pb-chip')).toHaveLength(2);
 
     input.value = 'Where do I create an API key?';
@@ -141,7 +161,9 @@ describe('widget', () => {
 
     // The visitor's bubble and the answer placeholder appear before the network answers.
     expect(shadow.querySelector('.pb-user')?.textContent).toBe('Where do I create an API key?');
-    expect(shadow.querySelector('.pb-item-assistant .pb-msg')?.classList.contains('pb-caret')).toBe(true);
+    expect(shadow.querySelector('.pb-item-assistant .pb-msg')?.classList.contains('pb-caret')).toBe(
+      true,
+    );
     expect(input.value).toBe('');
     expect(shadow.querySelector('.pb-chips')).toBeNull();
 
@@ -149,7 +171,9 @@ describe('widget', () => {
       expect(shadow.querySelector('.pb-item-assistant .pb-body')?.innerHTML).toBe(
         '<p>API keys are created in <strong>Settings</strong> <sup class="pb-cite" data-cite="1">1</sup>.</p>',
       );
-      expect(shadow.querySelector('.pb-item-assistant .pb-msg')?.classList.contains('pb-caret')).toBe(false);
+      expect(
+        shadow.querySelector('.pb-item-assistant .pb-msg')?.classList.contains('pb-caret'),
+      ).toBe(false);
     });
 
     const source = shadow.querySelector<HTMLAnchorElement>('.pb-sources a')!;
@@ -157,14 +181,18 @@ describe('widget', () => {
     expect(source.href).toBe('https://docs.example.com/auth');
     expect(source.target).toBe('_blank');
 
-    const chatCall = fetchMock.mock.calls.find(([url]) => String(url) === `${API}/api/widget/chat`)!;
+    const chatCall = fetchMock.mock.calls.find(
+      ([url]) => String(url) === `${API}/api/widget/chat`,
+    )!;
     const body = JSON.parse(String(chatCall[1]?.body)) as Record<string, unknown>;
     expect(body).toMatchObject({ key: KEY, message: 'Where do I create an API key?' });
     expect(body.visitorId).toMatch(/^v_[0-9a-f]{32}$/);
     expect(window.localStorage.getItem(`parbot:${KEY}:conversation`)).toBe(body.conversationId);
 
     // The transcript survives a reload.
-    expect(JSON.parse(window.localStorage.getItem(`parbot:${KEY}:messages`) ?? '[]')).toHaveLength(2);
+    expect(JSON.parse(window.localStorage.getItem(`parbot:${KEY}:messages`) ?? '[]')).toHaveLength(
+      2,
+    );
 
     expect(shadow.querySelector('.pb-footer a')?.textContent).toBe('Powered by Parbot');
   });
@@ -197,15 +225,20 @@ describe('widget', () => {
     press(document, 'k', { metaKey: true });
     expect(shadow.querySelector('.pb-panel')?.classList.contains('pb-open')).toBe(true);
     expect(shadow.querySelector('.pb-panel')?.getAttribute('aria-modal')).toBe('true');
+    // The modal has its own close button; the pill does not float beside it.
+    expect(shadow.querySelector<HTMLElement>('.pb-launcher')?.style.display).toBe('none');
 
     press(document, 'k', { ctrlKey: true });
     expect(shadow.querySelector('.pb-panel')?.classList.contains('pb-open')).toBe(false);
+    expect(shadow.querySelector<HTMLElement>('.pb-launcher')?.style.display).toBe('');
 
     resetForTests();
     document.head.innerHTML = '';
 
     const hidden = await boot(mountScript({ 'data-launcher': 'false', 'data-mode': 'palette' }));
-    expect(shadowOf(hidden!).querySelector<HTMLElement>('.pb-launcher')?.style.display).toBe('none');
+    expect(shadowOf(hidden!).querySelector<HTMLElement>('.pb-launcher')?.style.display).toBe(
+      'none',
+    );
   });
 
   it('ignores a data-mode override and setMode outside the modes the plan allows', async () => {
@@ -225,6 +258,41 @@ describe('widget', () => {
     installFetch({ mode: 'bubble', modes: undefined });
     const open = await boot(mountScript({ 'data-mode': 'palette' }));
     expect(open!.currentMode).toBe('palette');
+  });
+
+  it('hides the pill while the palette is open and hands focus back to it on close', async () => {
+    installFetch({ mode: 'palette' });
+    const widget = await boot(mountScript());
+    const shadow = shadowOf(widget!);
+    const pill = shadow.querySelector<HTMLButtonElement>('.pb-launcher')!;
+
+    pill.focus();
+    pill.click();
+    expect(widget!.opened).toBe(true);
+    expect(pill.style.display).toBe('none');
+
+    press(document, 'Escape');
+    expect(widget!.opened).toBe(false);
+    expect(pill.style.display).toBe('');
+    expect(pill.textContent).toContain('Ask AI');
+    expect(shadow.activeElement).toBe(pill);
+
+    // Switching an open bubble to the palette hides the launcher too, and back shows the close icon.
+    resetForTests();
+    document.head.innerHTML = '';
+    installFetch({ mode: 'bubble' });
+    const bubble = await boot(mountScript());
+    const launcher = shadowOf(bubble!).querySelector<HTMLButtonElement>('.pb-launcher')!;
+
+    bubble!.open();
+    expect(launcher.style.display).toBe('');
+    bubble!.setMode('palette');
+    expect(launcher.style.display).toBe('none');
+    bubble!.setMode('bubble');
+    expect(launcher.style.display).toBe('');
+    expect(launcher.className).toContain('pb-round');
+    bubble!.close();
+    expect(launcher.className).toContain('pb-round');
   });
 
   it('gives focus to the launcher when the panel was opened from it', async () => {
@@ -257,10 +325,14 @@ describe('widget', () => {
     form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
 
     await vi.waitFor(() => {
-      expect(shadow.querySelector('.pb-thanks')?.textContent).toBe('Thanks. The team will reply to ada@example.com.');
+      expect(shadow.querySelector('.pb-thanks')?.textContent).toBe(
+        'Thanks. The team will reply to ada@example.com.',
+      );
     });
 
-    const leadCall = fetchMock.mock.calls.find(([url]) => String(url) === `${API}/api/widget/lead`)!;
+    const leadCall = fetchMock.mock.calls.find(
+      ([url]) => String(url) === `${API}/api/widget/lead`,
+    )!;
     expect(JSON.parse(String(leadCall[1]?.body))).toMatchObject({
       key: KEY,
       email: 'ada@example.com',
@@ -324,7 +396,9 @@ describe('widget', () => {
     shadow.querySelector<HTMLButtonElement>('.pb-error button')!.click();
 
     await vi.waitFor(() => {
-      expect(shadow.querySelector('.pb-item-assistant .pb-body')?.textContent).toContain('API keys are created');
+      expect(shadow.querySelector('.pb-item-assistant .pb-body')?.textContent).toContain(
+        'API keys are created',
+      );
     });
     expect(shadow.querySelectorAll('.pb-user')).toHaveLength(1);
     expect(shadow.querySelector('.pb-error')).toBeNull();
@@ -404,7 +478,13 @@ describe('widget', () => {
         attempt += 1;
 
         if (attempt === 1) {
-          return sse([{ type: 'error', code: 'quota_exceeded', message: 'This account has used its 200 answers for the month.' }]);
+          return sse([
+            {
+              type: 'error',
+              code: 'quota_exceeded',
+              message: 'This account has used its 200 answers for the month.',
+            },
+          ]);
         }
 
         throw new TypeError('Failed to fetch');
@@ -422,7 +502,9 @@ describe('widget', () => {
 
     shadow.querySelector<HTMLButtonElement>('.pb-error button')!.click();
     await vi.waitFor(() => {
-      expect(shadow.querySelector('.pb-error')?.textContent).toContain('Could not reach the assistant');
+      expect(shadow.querySelector('.pb-error')?.textContent).toContain(
+        'Could not reach the assistant',
+      );
     });
     expect(shadow.querySelector('.pb-error')?.textContent).not.toContain('Failed to fetch');
   });
@@ -438,13 +520,30 @@ describe('widget', () => {
         const body = JSON.parse(String(init?.body)) as { conversationId: string };
 
         return sse([
-          { type: 'meta', conversationId: body.conversationId, userMessageId: 'u1', assistantMessageId: 'a1' },
+          {
+            type: 'meta',
+            conversationId: body.conversationId,
+            userMessageId: 'u1',
+            assistantMessageId: 'a1',
+          },
           { type: 'token', text: 'See the guide [1] and the page [2].' },
           {
             type: 'citations',
             citations: [
-              { index: 1, documentId: 'd1', title: 'Guide', url: 'javascript:alert(1)', snippet: '' },
-              { index: 2, documentId: 'd2', title: 'Page', url: 'https://docs.example.com/page', snippet: '' },
+              {
+                index: 1,
+                documentId: 'd1',
+                title: 'Guide',
+                url: 'javascript:alert(1)',
+                snippet: '',
+              },
+              {
+                index: 2,
+                documentId: 'd2',
+                title: 'Page',
+                url: 'https://docs.example.com/page',
+                snippet: '',
+              },
             ],
           },
           { type: 'done', answered: true, latencyMs: 1 },
@@ -470,14 +569,20 @@ describe('widget', () => {
     const fetchMock = installFetch();
     const widget = await boot(mountScript({ 'data-version': '4', 'data-open': 'true' }));
 
-    expect(fetchMock).toHaveBeenCalledWith(`${API}/api/widget/config?key=${KEY}&v=4`, expect.objectContaining({ cache: 'no-store' }));
+    expect(fetchMock).toHaveBeenCalledWith(
+      `${API}/api/widget/config?key=${KEY}&v=4`,
+      expect.objectContaining({ cache: 'no-store' }),
+    );
     expect(widget!.opened).toBe(true);
     expect(shadowOf(widget!).activeElement).toBeNull();
   });
 
   it('does nothing without a key and warns when the config cannot load', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    vi.stubGlobal('fetch', vi.fn(async () => new Response('nope', { status: 404 })));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('nope', { status: 404 })),
+    );
 
     expect(await boot(null)).toBeNull();
 

@@ -39,11 +39,14 @@ type Message = StoredMessage & {
 
 const ICONS = {
   chat: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-8 8H7l-4 3V12a8 8 0 0 1 8-8h2a8 8 0 0 1 8 8z"/></svg>',
-  close: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>',
+  close:
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>',
   more: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>',
   send: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg>',
-  search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>',
-  spark: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M5.6 18.4l2.8-2.8M15.6 8.4l2.8-2.8"/></svg>',
+  search:
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>',
+  spark:
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M5.6 18.4l2.8-2.8M15.6 8.4l2.8-2.8"/></svg>',
 };
 
 /**
@@ -63,7 +66,8 @@ const ERROR_COPY: Record<ChatErrorCode, string> = {
 
 const NETWORK_ERROR = 'Could not reach the assistant. Check your connection and retry.';
 
-const errorCopy = (code: ChatErrorCode | 'network') => (code === 'network' ? NETWORK_ERROR : ERROR_COPY[code]);
+const errorCopy = (code: ChatErrorCode | 'network') =>
+  code === 'network' ? NETWORK_ERROR : ERROR_COPY[code];
 
 const LEAD_FAILED = 'The message could not be sent. Try again.';
 const LEAD_BAD_EMAIL = 'Check the email address and retry.';
@@ -78,12 +82,16 @@ const LEAD_ERROR_COPY: Partial<Record<ChatErrorCode, string>> = {
 /** A first check before the request; the lead route validates the address properly. */
 const LOOKS_LIKE_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-const isErrorCode = (value: unknown): value is ChatErrorCode => typeof value === 'string' && value in ERROR_COPY;
+const isErrorCode = (value: unknown): value is ChatErrorCode =>
+  typeof value === 'string' && value in ERROR_COPY;
 
 const FOCUSABLE =
   'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
-const isMac = () => /Mac|iPhone|iPad/.test(typeof navigator === 'undefined' ? '' : navigator.platform || navigator.userAgent);
+const isMac = () =>
+  /Mac|iPhone|iPad/.test(
+    typeof navigator === 'undefined' ? '' : navigator.platform || navigator.userAgent,
+  );
 
 const el = <K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -114,7 +122,8 @@ const toStored = (message: Message): StoredMessage => ({
 });
 
 const prefersDark = () =>
-  typeof window.matchMedia === 'function' && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  typeof window.matchMedia === 'function' &&
+  window.matchMedia('(prefers-color-scheme: dark)').matches;
 
 /**
  * One mounted widget: a launcher and a panel inside a shadow root, holding the conversation
@@ -207,10 +216,7 @@ export class ParbotWidget {
     this.panel.classList.add('pb-open');
     this.launcher.setAttribute('aria-expanded', 'true');
     this.launcher.setAttribute('aria-label', `Close ${this.config.name}`);
-
-    if (this.mode === 'bubble') {
-      this.launcher.innerHTML = ICONS.close;
-    }
+    this.renderLauncher();
 
     if (options.focus !== false) {
       this.input.focus();
@@ -230,10 +236,7 @@ export class ParbotWidget {
     this.panel.classList.remove('pb-open');
     this.launcher.setAttribute('aria-expanded', 'false');
     this.launcher.setAttribute('aria-label', `Open ${this.config.name}`);
-
-    if (this.mode === 'bubble') {
-      this.launcher.innerHTML = ICONS.chat;
-    }
+    this.renderLauncher();
 
     // Opening from the launcher leaves the host as the active element, which cannot take focus
     // back; the launcher is the visible control the visitor came from.
@@ -395,13 +398,18 @@ export class ParbotWidget {
 
     if (theme.scheme === 'auto' && typeof window.matchMedia === 'function') {
       window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (event) => {
-        this.root.style.setProperty('--pb-accent-text', accentText(theme.accent, event.matches ? 'dark' : 'light'));
+        this.root.style.setProperty(
+          '--pb-accent-text',
+          accentText(theme.accent, event.matches ? 'dark' : 'light'),
+        );
       });
     }
   }
 
   private renderLauncher() {
-    if (!this.showLauncher) {
+    // The open palette is a modal with its own close button; the pill left floating beside it
+    // would be a second control competing with that button and with Send.
+    if (!this.showLauncher || (this.mode === 'palette' && this.isOpen)) {
       this.launcher.style.display = 'none';
 
       return;
@@ -419,7 +427,11 @@ export class ParbotWidget {
   }
 
   private readonly onDocumentKeydown = (event: KeyboardEvent) => {
-    if (this.mode === 'palette' && (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+    if (
+      this.mode === 'palette' &&
+      (event.metaKey || event.ctrlKey) &&
+      event.key.toLowerCase() === 'k'
+    ) {
       event.preventDefault();
       this.toggle();
 
@@ -547,7 +559,13 @@ export class ParbotWidget {
     }
 
     const user: Message = { id: nextId(), role: 'user', text, citations: [] };
-    const answer: Message = { id: nextId(), role: 'assistant', text: '', citations: [], streaming: true };
+    const answer: Message = {
+      id: nextId(),
+      role: 'assistant',
+      text: '',
+      citations: [],
+      streaming: true,
+    };
     this.messages.push(user, answer);
     this.renderItem(user);
     this.renderItem(answer);
@@ -584,7 +602,11 @@ export class ParbotWidget {
             this.renderItem(answer);
             this.scrollToBottom(false);
           } else if (event.type === 'citations') {
-            answer.citations = event.citations.map(({ index, title, url }) => ({ index, title, url }));
+            answer.citations = event.citations.map(({ index, title, url }) => ({
+              index,
+              title,
+              url,
+            }));
           } else if (event.type === 'done') {
             answer.answered = event.answered;
 
@@ -725,7 +747,9 @@ export class ParbotWidget {
     const welcome = el('div', 'pb-item pb-welcome');
     const bubble = el('div', 'pb-msg pb-assistant');
     const body = el('div', 'pb-body');
-    body.innerHTML = renderMarkdown(this.config.welcomeMessage || `Ask me anything about ${this.config.name}.`);
+    body.innerHTML = renderMarkdown(
+      this.config.welcomeMessage || `Ask me anything about ${this.config.name}.`,
+    );
     bubble.append(body);
     welcome.append(bubble);
     this.list.append(welcome);

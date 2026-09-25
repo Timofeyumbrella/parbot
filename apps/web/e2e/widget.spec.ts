@@ -12,7 +12,13 @@ import { stubEmbedding } from '../src/lib/ai/stub';
 const unique = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 const PASSWORD = 'e2e-widget-pass-1';
 
-type Seeded = { admin: SupabaseClient; userId: string; email: string; assistantId: string; publicKey: string };
+type Seeded = {
+  admin: SupabaseClient;
+  userId: string;
+  email: string;
+  assistantId: string;
+  publicKey: string;
+};
 
 const seed = async (): Promise<Seeded | null> => {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -22,7 +28,9 @@ const seed = async (): Promise<Seeded | null> => {
     return null;
   }
 
-  const admin = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+  const admin = createClient(url, key, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
   const tag = unique();
   const email = `e2e-widget-${tag}@parbot.test`;
   const { data: created, error: userError } = await admin.auth.admin.createUser({
@@ -128,7 +136,11 @@ test.describe('widget on the demo page', () => {
     test.skip(!seeded, 'Needs the Supabase service role key from apps/web/.env');
 
     await page.goto(`/demo/${seeded!.publicKey}`);
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Example docs for Northwind docs');
+    // The assistant is already named after its docs, so the stand-in site says "docs" once.
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Example docs for Northwind');
+    await expect(page.getByRole('banner')).toContainText('Northwind docs');
+    await expect(page.getByRole('banner')).not.toContainText(/docs docs/i);
+    await expect(page).toHaveTitle(/Example docs for Northwind\b(?! docs)/);
 
     const launcher = widget(page, '.pb-launcher');
     await expect(launcher).toHaveAttribute('aria-label', 'Open Northwind docs');
@@ -140,7 +152,9 @@ test.describe('widget on the demo page', () => {
 
     await widget(page, '.pb-chip').first().click();
     await expect(widget(page, '.pb-user')).toHaveText('What is the rate limit?');
-    await expect(widget(page, '.pb-item-assistant .pb-body')).toContainText('600', { timeout: 15_000 });
+    await expect(widget(page, '.pb-item-assistant .pb-body')).toContainText('600', {
+      timeout: 15_000,
+    });
 
     const source = widget(page, '.pb-sources a').first();
     await expect(source).toHaveAttribute('href', 'https://docs.northwind.dev/rate-limits');
@@ -150,7 +164,9 @@ test.describe('widget on the demo page', () => {
     await expect(panel).not.toHaveClass(/pb-open/);
   });
 
-  test('the palette opens on Cmd+K and offers a lead form when the docs fall short', async ({ page }) => {
+  test('the palette opens on Cmd+K and offers a lead form when the docs fall short', async ({
+    page,
+  }) => {
     test.skip(!seeded, 'Needs the Supabase service role key from apps/web/.env');
 
     await page.goto(`/demo/${seeded!.publicKey}?mode=palette`);
@@ -160,6 +176,8 @@ test.describe('widget on the demo page', () => {
     const panel = widget(page, '.pb-panel');
     await expect(panel).toHaveClass(/pb-open/);
     await expect(panel).toHaveAttribute('aria-modal', 'true');
+    // The modal has its own close button, so the pill does not float beside it.
+    await expect(widget(page, '.pb-launcher')).toBeHidden();
 
     const input = widget(page, 'textarea');
     await input.fill('Could you tell me about the weather forecast for Mars next week please');
@@ -173,7 +191,9 @@ test.describe('widget on the demo page', () => {
     await expect(form.locator('.pb-hint')).toHaveText('Check the email address and retry.');
     await form.locator('input[name=email]').fill('ada@example.com');
     await form.locator('button[type=submit]').click();
-    await expect(widget(page, '.pb-thanks')).toHaveText('Thanks. The team will reply to ada@example.com.');
+    await expect(widget(page, '.pb-thanks')).toHaveText(
+      'Thanks. The team will reply to ada@example.com.',
+    );
 
     const { data: leads } = await seeded!.admin
       .from('leads')
@@ -183,6 +203,7 @@ test.describe('widget on the demo page', () => {
 
     await page.keyboard.press('Escape');
     await expect(panel).not.toHaveClass(/pb-open/);
+    await expect(widget(page, '.pb-launcher')).toBeVisible();
   });
 
   test('an unknown key is a real 404 with a way out', async ({ page }) => {
@@ -214,15 +235,21 @@ test.describe('widget on the demo page', () => {
     await expect(page.getByText('Widget settings saved')).toBeVisible();
 
     const frame = page.frameLocator('iframe[title="Widget preview"]');
-    await expect(frame.locator('#parbot-widget .pb-panel.pb-open')).toBeAttached({ timeout: 20_000 });
+    await expect(frame.locator('#parbot-widget .pb-panel.pb-open')).toBeAttached({
+      timeout: 20_000,
+    });
     const preview = page.frames().find((candidate) => candidate.url().includes('v=1'));
     expect(preview).toBeDefined();
     await expect
       .poll(() =>
         preview!.evaluate(() => {
-          const root = document.getElementById('parbot-widget')?.shadowRoot?.querySelector<HTMLElement>('.pb-root');
+          const root = document
+            .getElementById('parbot-widget')
+            ?.shadowRoot?.querySelector<HTMLElement>('.pb-root');
 
-          return root ? { accent: root.style.getPropertyValue('--pb-accent'), scheme: root.dataset.scheme } : null;
+          return root
+            ? { accent: root.style.getPropertyValue('--pb-accent'), scheme: root.dataset.scheme }
+            : null;
         }),
       )
       .toEqual({ accent: '#16a34a', scheme: 'light' });

@@ -9,6 +9,8 @@ export type SegmentedOption<T extends string> = {
 type SegmentedProps<T extends string> = {
   name: string;
   label: string;
+  /** Keeps the label for screen readers only, for a control that sits under a title saying the same. */
+  hideLabel?: boolean;
   options: SegmentedOption<T>[];
   defaultValue: T;
   hint?: React.ReactNode;
@@ -23,6 +25,7 @@ type SegmentedProps<T extends string> = {
 export const Segmented = <T extends string>({
   name,
   label,
+  hideLabel = false,
   options,
   defaultValue,
   hint,
@@ -30,7 +33,12 @@ export const Segmented = <T extends string>({
   className,
 }: SegmentedProps<T>) => (
   <fieldset className={cn('flex min-w-0 flex-col gap-1.5', className)}>
-    <legend className="mb-1.5 flex items-center gap-2 text-sm leading-none font-medium">
+    <legend
+      className={cn(
+        'mb-1.5 flex items-center gap-2 text-sm leading-none font-medium',
+        hideLabel && 'sr-only',
+      )}
+    >
       {label}
       {hint}
     </legend>

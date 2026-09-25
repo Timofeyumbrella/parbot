@@ -14,7 +14,14 @@ import { toast } from 'sonner';
 
 import { saveWidgetSettings, type WidgetFormState } from '@/actions/widget';
 import { Button } from '@/components/ui/button';
-import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
@@ -40,7 +47,12 @@ type WidgetSettingsFormProps = {
 
 const initialState: WidgetFormState = { status: 'idle' };
 
-export const WidgetSettingsForm = ({ assistantId, settings, gates, onSaved }: WidgetSettingsFormProps) => {
+export const WidgetSettingsForm = ({
+  assistantId,
+  settings,
+  gates,
+  onSaved,
+}: WidgetSettingsFormProps) => {
   const [state, formAction, pending] = useActionState(saveWidgetSettings, initialState);
 
   // React resets the form after every action. The uncontrolled fields therefore take their
@@ -82,17 +94,23 @@ export const WidgetSettingsForm = ({ assistantId, settings, gates, onSaved }: Wi
         <CardHeader>
           <CardTitle>Mode</CardTitle>
           <CardDescription>How readers open the assistant on your site.</CardDescription>
+          {gates.palette ? null : (
+            <CardAction>
+              <PlanGate />
+            </CardAction>
+          )}
         </CardHeader>
         <CardContent>
+          {/* The card title already says Mode; the control keeps the name for screen readers. */}
           <Segmented
             name="mode"
             label="Mode"
+            hideLabel
             defaultValue={mode}
             options={[
               { value: 'bubble', label: 'Bubble' },
               { value: 'palette', label: 'Palette (⌘K)', disabled: !gates.palette },
             ]}
-            hint={gates.palette ? null : <PlanGate />}
             description="Bubble is a round launcher in a corner. Palette opens on ⌘K with the question box on top, the way readers of documentation expect."
           />
         </CardContent>
@@ -214,7 +232,8 @@ export const WidgetSettingsForm = ({ assistantId, settings, gates, onSaved }: Wi
               placeholder={'How do I create an API key?\nWhat does the free plan include?'}
             />
             <p className="text-muted-foreground text-xs">
-              One per line, up to {MAX_SUGGESTED_QUESTIONS}. Shown as chips until the first question.
+              One per line, up to {MAX_SUGGESTED_QUESTIONS}. Shown as chips until the first
+              question.
             </p>
           </div>
         </CardContent>
@@ -238,8 +257,8 @@ export const WidgetSettingsForm = ({ assistantId, settings, gates, onSaved }: Wi
             className="font-mono text-xs"
           />
           <p className="text-muted-foreground text-xs">
-            Leave empty to allow any site. One per line, up to {MAX_ALLOWED_ORIGINS}: a hostname, a full origin such
-            as https://docs.example.com, or *.example.com for every subdomain.
+            Leave empty to allow any site. One per line, up to {MAX_ALLOWED_ORIGINS}: a hostname, a
+            full origin such as https://docs.example.com, or *.example.com for every subdomain.
           </p>
         </CardContent>
       </Card>
@@ -256,7 +275,9 @@ export const WidgetSettingsForm = ({ assistantId, settings, gates, onSaved }: Wi
                 Hide “Powered by Parbot”
                 {gates.hideBranding ? null : <PlanGate />}
               </Label>
-              <p className="text-muted-foreground text-xs">Removes the small line under the composer.</p>
+              <p className="text-muted-foreground text-xs">
+                Removes the small line under the composer.
+              </p>
             </div>
             <Switch
               id="hideBranding"
@@ -272,7 +293,8 @@ export const WidgetSettingsForm = ({ assistantId, settings, gates, onSaved }: Wi
                 {gates.leadCapture ? null : <PlanGate />}
               </Label>
               <p className="text-muted-foreground text-xs">
-                When the docs cannot answer, offer to take the reader’s email. Leads land in the Inbox.
+                When the docs cannot answer, offer to take the reader’s email. Leads land in the
+                Inbox.
               </p>
             </div>
             <Switch

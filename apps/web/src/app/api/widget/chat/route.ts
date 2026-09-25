@@ -1,5 +1,5 @@
 import { getAiProvider } from '@/lib/ai';
-import { rateLimit, streamAnswer, streamResponse } from '@/lib/engine';
+import { streamAnswer, streamResponse } from '@/lib/engine';
 import { createSupabaseServiceClient } from '@/lib/supabase/service';
 import {
   clientIp,
@@ -11,7 +11,11 @@ import {
   preflight,
   readJson,
   requestOrigin,
+  selfOrigin,
+  takeRateLimits,
+  WIDGET_ASSISTANT_LIMIT,
   WIDGET_IP_LIMIT,
+  WIDGET_OWNER_LIMIT,
   WIDGET_VISITOR_LIMIT,
   widgetChatSchema,
 } from '@/lib/widget-api';
@@ -42,20 +46,32 @@ export async function POST(request: Request) {
     return jsonError(404, 'not_found', 'No assistant has that key.', cors);
   }
 
-  if (!originAllowed(origin, assistant.allowed_origins)) {
-    return jsonError(403, 'origin_not_allowed', 'This site is not allowed to use the assistant.', cors);
+  if (!originAllowed(origin, assistant.allowed_origins, selfOrigin(request))) {
+    return jsonError(
+      403,
+      'origin_not_allowed',
+      'This site is not allowed to use the assistant.',
+      cors,
+    );
   }
 
-  const perIp = rateLimit(`widget:ip:${clientIp(request)}`, WIDGET_IP_LIMIT);
-  const perVisitor = rateLimit(`widget:visitor:${assistant.id}:${visitorId}`, WIDGET_VISITOR_LIMIT);
+  const wait = takeRateLimits([
+    [`widget:visitor:${assistant.id}:${visitorId}`, WIDGET_VISITOR_LIMIT],
+    [`widget:ip:${clientIp(request)}`, WIDGET_IP_LIMIT],
+    [`widget:assistant:${assistant.id}`, WIDGET_ASSISTANT_LIMIT],
+    [`widget:owner:${assistant.owner_id}`, WIDGET_OWNER_LIMIT],
+  ]);
 
-  if (!perIp.allowed || !perVisitor.allowed) {
-    const retryAfterMs = Math.max(perIp.retryAfterMs, perVisitor.retryAfterMs);
-
-    return jsonError(429, 'rate_limited', 'Too many messages in a short time. Wait a moment and try again.', {
-      ...cors,
-      'retry-after': String(Math.max(1, Math.ceil(retryAfterMs / 1000))),
-    });
+  if (wait) {
+    return jsonError(
+      429,
+      'rate_limited',
+      'Too many messages in a short time. Wait a moment and try again.',
+      {
+        ...cors,
+        'retry-after': wait,
+      },
+    );
   }
 
   return streamResponse(

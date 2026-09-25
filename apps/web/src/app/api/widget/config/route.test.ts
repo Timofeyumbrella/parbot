@@ -2,7 +2,12 @@ import { DEFAULT_WIDGET_THEME } from '@parbot/shared';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { appOrigin } from '@/lib/widget-api';
-import { assistantRow, createFakeService, type FakeService, PUBLIC_KEY } from '@/lib/widget-api.fixtures';
+import {
+  assistantRow,
+  createFakeService,
+  type FakeService,
+  PUBLIC_KEY,
+} from '@/lib/widget-api.fixtures';
 
 import { GET, OPTIONS } from './route';
 
@@ -95,7 +100,10 @@ describe('GET /api/widget/config', () => {
       subscriptions: [{ account_id: OWNER, plan_id: 'growth', status: 'canceled' }],
     });
 
-    await expect((await get(`?key=${PUBLIC_KEY}`)).json()).resolves.toMatchObject({ mode: 'bubble', hideBranding: false });
+    await expect((await get(`?key=${PUBLIC_KEY}`)).json()).resolves.toMatchObject({
+      mode: 'bubble',
+      hideBranding: false,
+    });
   });
 
   it('refuses origins the owner did not allow, but always allows the app itself', async () => {
@@ -108,14 +116,36 @@ describe('GET /api/widget/config', () => {
     await expect(refused.json()).resolves.toMatchObject({ error: { code: 'origin_not_allowed' } });
 
     expect((await get(`?key=${PUBLIC_KEY}`)).status).toBe(403);
-    expect((await get(`?key=${PUBLIC_KEY}`, { origin: 'https://DOCS.example.com' })).status).toBe(200);
+    expect((await get(`?key=${PUBLIC_KEY}`, { origin: 'https://DOCS.example.com' })).status).toBe(
+      200,
+    );
     expect((await get(`?key=${PUBLIC_KEY}`, { origin: 'https://sub.acme.io' })).status).toBe(200);
-    expect((await get(`?key=${PUBLIC_KEY}`, { referer: `${appOrigin()}/demo/${PUBLIC_KEY}` })).status).toBe(200);
+    expect(
+      (await get(`?key=${PUBLIC_KEY}`, { referer: `${appOrigin()}/demo/${PUBLIC_KEY}` })).status,
+    ).toBe(200);
+  });
+
+  it('allows the origin it is served on, so the preview works when the app runs somewhere other than NEXT_PUBLIC_APP_URL', async () => {
+    holder.service = createFakeService({
+      assistants: [assistantRow({ allowed_origins: ['docs.example.com'] })],
+    });
+    const served = 'http://localhost:3400';
+    const at = (headers: Record<string, string>) =>
+      GET(new Request(`${served}/api/widget/config?key=${PUBLIC_KEY}`, { headers }));
+
+    expect(served).not.toBe(appOrigin());
+    expect((await at({ origin: served })).status).toBe(200);
+    expect((await at({ referer: `${served}/demo/${PUBLIC_KEY}?mode=palette` })).status).toBe(200);
+    expect((await at({ origin: 'http://localhost:3401' })).status).toBe(403);
+    expect((await at({})).status).toBe(403);
   });
 
   it('answers preflight requests', async () => {
     const response = await OPTIONS(
-      new Request('http://localhost:3000/api/widget/config', { method: 'OPTIONS', headers: { origin: 'https://a.io' } }),
+      new Request('http://localhost:3000/api/widget/config', {
+        method: 'OPTIONS',
+        headers: { origin: 'https://a.io' },
+      }),
     );
 
     expect(response.status).toBe(204);

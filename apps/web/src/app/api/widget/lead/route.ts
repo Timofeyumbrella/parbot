@@ -1,6 +1,6 @@
-import { rateLimit } from '@/lib/engine';
 import { createSupabaseServiceClient } from '@/lib/supabase/service';
 import {
+  clientIp,
   corsHeaders,
   findAssistantByKey,
   firstIssue,
@@ -10,6 +10,10 @@ import {
   preflight,
   readJson,
   requestOrigin,
+  selfOrigin,
+  takeRateLimits,
+  WIDGET_LEAD_ASSISTANT_LIMIT,
+  WIDGET_LEAD_IP_LIMIT,
   WIDGET_LEAD_LIMIT,
   widgetLeadSchema,
 } from '@/lib/widget-api';
@@ -36,8 +40,13 @@ export async function POST(request: Request) {
     return jsonError(404, 'not_found', 'No assistant has that key.', cors);
   }
 
-  if (!originAllowed(origin, assistant.allowed_origins)) {
-    return jsonError(403, 'origin_not_allowed', 'This site is not allowed to use the assistant.', cors);
+  if (!originAllowed(origin, assistant.allowed_origins, selfOrigin(request))) {
+    return jsonError(
+      403,
+      'origin_not_allowed',
+      'This site is not allowed to use the assistant.',
+      cors,
+    );
   }
 
   const plan = await loadOwnerPlan(service, assistant.owner_id);
@@ -46,13 +55,24 @@ export async function POST(request: Request) {
     return jsonError(403, 'unauthorized', 'This assistant does not collect email addresses.', cors);
   }
 
-  const limit = rateLimit(`widget:lead:${assistant.id}:${visitorId}`, WIDGET_LEAD_LIMIT);
+  // The visitor id is the client's to invent, so the address and the assistant are capped too;
+  // otherwise anyone with the public key could fill the owner's inbox with leads.
+  const wait = takeRateLimits([
+    [`widget:lead:${assistant.id}:${visitorId}`, WIDGET_LEAD_LIMIT],
+    [`widget:lead:ip:${clientIp(request)}`, WIDGET_LEAD_IP_LIMIT],
+    [`widget:lead:assistant:${assistant.id}`, WIDGET_LEAD_ASSISTANT_LIMIT],
+  ]);
 
-  if (!limit.allowed) {
-    return jsonError(429, 'rate_limited', 'Too many requests in a short time. Wait a moment and try again.', {
-      ...cors,
-      'retry-after': String(Math.max(1, Math.ceil(limit.retryAfterMs / 1000))),
-    });
+  if (wait) {
+    return jsonError(
+      429,
+      'rate_limited',
+      'Too many requests in a short time. Wait a moment and try again.',
+      {
+        ...cors,
+        'retry-after': wait,
+      },
+    );
   }
 
   // A conversation is only linked when it really is this visitor's thread with this assistant;
@@ -64,7 +84,11 @@ export async function POST(request: Request) {
       .eq('id', conversationId)
       .maybeSingle();
 
-    if (!conversation || conversation.assistant_id !== assistant.id || conversation.visitor_id !== visitorId) {
+    if (
+      !conversation ||
+      conversation.assistant_id !== assistant.id ||
+      conversation.visitor_id !== visitorId
+    ) {
       return jsonError(404, 'not_found', 'That conversation does not exist.', cors);
     }
   }

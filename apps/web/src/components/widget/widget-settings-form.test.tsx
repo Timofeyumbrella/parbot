@@ -42,11 +42,29 @@ describe('WidgetSettingsForm', () => {
     expect(screen.getByRole('radio', { name: 'Large' })).toBeChecked();
     expect(screen.getByLabelText('Accent colour')).toHaveValue('#2563eb');
     expect(screen.getByLabelText('Welcome message')).toHaveValue('Ask me about Acme.');
-    expect(screen.getByLabelText('Suggested questions')).toHaveValue('How do I start?\nWhat does it cost?');
+    expect(screen.getByLabelText('Suggested questions')).toHaveValue(
+      'How do I start?\nWhat does it cost?',
+    );
     expect(screen.getByLabelText('Allowed origins')).toHaveValue('docs.acme.dev\n*.acme.dev');
     expect(screen.getByRole('switch', { name: /Hide/ })).toBeChecked();
     expect(screen.getByRole('switch', { name: /Lead capture/ })).toBeChecked();
     expect(screen.queryByRole('link', { name: 'Starter and up' })).not.toBeInTheDocument();
+  });
+
+  it('shows Mode once, as the card title, and keeps it as the name of the control', () => {
+    for (const gates of [starter, hobby]) {
+      const { unmount } = render(
+        <WidgetSettingsForm assistantId={ASSISTANT_ID} settings={settings} gates={gates} />,
+      );
+
+      const visible = screen.getAllByText('Mode').filter((node) => !node.closest('.sr-only'));
+      expect(visible).toHaveLength(1);
+      expect(
+        within(screen.getByRole('group', { name: 'Mode' })).getByRole('radio', { name: 'Bubble' }),
+      ).toBeInTheDocument();
+
+      unmount();
+    }
   });
 
   it('disables the gated controls on Hobby, shows the free values and links each gate to billing', () => {
@@ -81,7 +99,14 @@ describe('WidgetSettingsForm', () => {
     const onSaved = vi.fn();
     const user = userEvent.setup();
 
-    render(<WidgetSettingsForm assistantId={ASSISTANT_ID} settings={settings} gates={starter} onSaved={onSaved} />);
+    render(
+      <WidgetSettingsForm
+        assistantId={ASSISTANT_ID}
+        settings={settings}
+        gates={starter}
+        onSaved={onSaved}
+      />,
+    );
 
     await user.clear(screen.getByLabelText('Welcome message'));
     await user.type(screen.getByLabelText('Welcome message'), 'Hello from Acme.');
@@ -131,6 +156,8 @@ describe('WidgetSettingsForm', () => {
     expect(screen.getByRole('radio', { name: 'Bubble' })).toBeChecked();
     expect(screen.getByRole('radio', { name: 'Light' })).toBeChecked();
     expect(screen.getByRole('radio', { name: 'Small' })).toBeChecked();
-    expect(within(screen.getByRole('group', { name: 'Accent presets' })).getAllByRole('button')).toHaveLength(6);
+    expect(
+      within(screen.getByRole('group', { name: 'Accent presets' })).getAllByRole('button'),
+    ).toHaveLength(6);
   });
 });

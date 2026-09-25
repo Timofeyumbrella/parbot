@@ -7,7 +7,7 @@ import { cache } from 'react';
 import { createSupabaseServiceClient } from '@/lib/supabase/service';
 import { findAssistantByKey, loadOwnerPlan, widgetConfigFor } from '@/lib/widget-api';
 
-import { resolveDemoMode, resolveDemoPreview } from './demo-mode';
+import { demoNames, resolveDemoMode, resolveDemoPreview } from './demo-mode';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,7 +34,7 @@ export async function generateMetadata({ params }: PageProps<'/demo/[key]'>): Pr
   const found = await load(key);
 
   return {
-    title: found ? `Example docs for ${found.name}` : 'Demo',
+    title: found ? `Example docs for ${demoNames(found.name).product}` : 'Demo',
     robots: { index: false, follow: false },
   };
 }
@@ -63,7 +63,14 @@ const SECTIONS = [
   },
 ] as const;
 
-const NAV = ['Overview', 'Getting started', 'Configuration', 'Deploying', 'API reference', 'Changelog'] as const;
+const NAV = [
+  'Overview',
+  'Getting started',
+  'Configuration',
+  'Deploying',
+  'API reference',
+  'Changelog',
+] as const;
 
 /**
  * A stand-in for a customer's documentation site, with the real widget loaded against the key
@@ -77,7 +84,8 @@ export default async function DemoPage({ params, searchParams }: PageProps<'/dem
     notFound();
   }
 
-  const { name, config } = found;
+  const { config } = found;
+  const names = demoNames(found.name);
   const { allowed, override, active } = resolveDemoMode(query.mode, config);
   const preview = resolveDemoPreview(query);
 
@@ -85,7 +93,7 @@ export default async function DemoPage({ params, searchParams }: PageProps<'/dem
     <div className="bg-background text-foreground flex min-h-svh flex-col">
       <header className="border-b">
         <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-4 px-4 py-3">
-          <span className="font-semibold tracking-tight">{name} docs</span>
+          <span className="font-semibold tracking-tight">{names.site}</span>
           <nav aria-label="Site" className="text-muted-foreground hidden gap-5 text-sm sm:flex">
             <span>Guides</span>
             <span>API</span>
@@ -100,7 +108,10 @@ export default async function DemoPage({ params, searchParams }: PageProps<'/dem
             {NAV.map((item, index) => (
               <li
                 key={item}
-                className={cn('rounded-md px-2.5 py-1.5', index === 1 ? 'bg-muted font-medium' : 'text-muted-foreground')}
+                className={cn(
+                  'rounded-md px-2.5 py-1.5',
+                  index === 1 ? 'bg-muted font-medium' : 'text-muted-foreground',
+                )}
               >
                 {item}
               </li>
@@ -110,22 +121,38 @@ export default async function DemoPage({ params, searchParams }: PageProps<'/dem
 
         <main className="flex max-w-2xl flex-col gap-8">
           <div className="flex flex-col gap-3">
-            <p className="text-primary text-xs font-medium tracking-widest uppercase">Parbot demo</p>
-            <h1 className="text-3xl font-semibold tracking-tight">Example docs for {name}</h1>
+            <p className="text-primary text-xs font-medium tracking-widest uppercase">
+              Parbot demo
+            </p>
+            <h1 className="text-3xl font-semibold tracking-tight">
+              Example docs for {names.product}
+            </h1>
             <p className="text-muted-foreground">
-              This page stands in for your documentation site. The widget on it is live and answers from the
-              assistant’s sources.{' '}
+              This page stands in for your documentation site. The widget on it is live and answers
+              from the assistant’s sources.{' '}
               {active === 'palette'
                 ? 'Press ⌘K (Ctrl+K on Windows and Linux) or use the pill in the corner to open it.'
                 : 'Use the launcher in the bottom corner to open it.'}
             </p>
             <p className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
               <span>Try it as</span>
-              <a href={`/demo/${key}?mode=bubble`} className={cn('underline underline-offset-4', active === 'bubble' && 'text-foreground font-medium')}>
+              <a
+                href={`/demo/${key}?mode=bubble`}
+                className={cn(
+                  'underline underline-offset-4',
+                  active === 'bubble' && 'text-foreground font-medium',
+                )}
+              >
                 bubble
               </a>
               {allowed.includes('palette') ? (
-                <a href={`/demo/${key}?mode=palette`} className={cn('underline underline-offset-4', active === 'palette' && 'text-foreground font-medium')}>
+                <a
+                  href={`/demo/${key}?mode=palette`}
+                  className={cn(
+                    'underline underline-offset-4',
+                    active === 'palette' && 'text-foreground font-medium',
+                  )}
+                >
                   palette
                 </a>
               ) : (
