@@ -29,6 +29,8 @@ describe('landing page', () => {
   });
 
   it('renders the hero and every section under a main landmark', () => {
+    // The scripted demo is asserted below, so a developer's own demo key must not swap it out.
+    vi.stubEnv('NEXT_PUBLIC_DEMO_ASSISTANT_KEY', '');
     render(<LandingPage />);
 
     expect(screen.getByRole('main')).toHaveAttribute('id', 'main');
