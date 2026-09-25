@@ -1,4 +1,12 @@
-import { Globe, Inbox, type LucideIcon, MessageSquareWarning, Palette, Quote, Zap } from 'lucide-react';
+import {
+  Globe,
+  Inbox,
+  type LucideIcon,
+  MessageSquareWarning,
+  Palette,
+  Quote,
+  Zap,
+} from 'lucide-react';
 
 import { plansWith } from '@/components/marketing/plan-copy';
 import { Reveal } from '@/components/marketing/reveal';
@@ -15,7 +23,7 @@ export const FEATURES: Feature[] = [
   {
     icon: Quote,
     title: 'Cites the page',
-    body: 'Every answer carries numbered citations that link to the page and passage it was drawn from, so a reader can check it in one click.',
+    body: 'Every answer carries numbered citations naming the page and passage it was drawn from, with a link whenever the source is a web page, so a reader can check it.',
   },
   {
     icon: MessageSquareWarning,

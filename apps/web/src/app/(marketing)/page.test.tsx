@@ -68,6 +68,11 @@ describe('landing page', () => {
       expect(features.getByRole('heading', { level: 3, name: feature.title })).toBeInTheDocument();
     }
 
+    // Citations only link when the source is a web page; uploads and pasted text have no URL.
+    expect(FEATURES.find((feature) => feature.title === 'Cites the page')?.body).toMatch(
+      /with a link whenever the source is a web page/,
+    );
+
     expect(document.getElementById('faq')?.querySelectorAll('details')).toHaveLength(6);
   });
 
@@ -87,8 +92,13 @@ describe('landing page', () => {
       }
     }
 
-    expect(within(screen.getByTestId('plan-hobby')).getByRole('link')).toHaveTextContent('Start free');
-    expect(screen.getByText('Recommended').closest('article')).toHaveAttribute('data-testid', 'plan-starter');
+    expect(within(screen.getByTestId('plan-hobby')).getByRole('link')).toHaveTextContent(
+      'Start free',
+    );
+    expect(screen.getByText('Recommended').closest('article')).toHaveAttribute(
+      'data-testid',
+      'plan-starter',
+    );
   });
 
   it('switches the amounts and the signup links when yearly is chosen', async () => {
