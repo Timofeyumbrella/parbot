@@ -11,7 +11,7 @@ import {
   threadFromRows,
 } from '@/lib/chat/thread';
 
-import { useFeedback, useThread } from './use-thread';
+import { useFeedback, usePrefetchThread, useThread } from './use-thread';
 
 const db = vi.hoisted(() => ({
   rows: [] as unknown[],
@@ -121,6 +121,37 @@ describe('useThread', () => {
       expect(result.current.isError).toBe(true);
     });
     expect(result.current.error).toMatchObject({ message: 'permission denied' });
+  });
+});
+
+describe('usePrefetchThread', () => {
+  it('reads a hovered conversation into the cache, once, and leaves a cached one alone', async () => {
+    const { result } = renderHook(() => usePrefetchThread(), { wrapper });
+
+    act(() => {
+      result.current(CONVERSATION);
+      result.current(CONVERSATION);
+    });
+
+    await waitFor(() => {
+      expect(
+        queryClient.getQueryData<Thread>(threadKey(CONVERSATION))?.messages.map((m) => m.id),
+      ).toEqual(['u1', 'a1']);
+    });
+    expect(db.select).toHaveBeenCalledTimes(1);
+
+    const streaming = '33333333-3333-4333-8333-333333333333';
+
+    queryClient.setQueryData<Thread>(
+      threadKey(streaming),
+      beginExchange(emptyThread(), { userId: 'tmp_u', assistantId: 'tmp_a', content: 'q' }),
+    );
+
+    act(() => {
+      result.current(streaming);
+    });
+
+    expect(db.select).toHaveBeenCalledTimes(1);
   });
 });
 

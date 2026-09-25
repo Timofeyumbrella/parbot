@@ -9,6 +9,7 @@ import { TopQuestions, UnansweredQuestions } from '@/components/overview/questio
 import { RecentConversations } from '@/components/overview/recent-conversations';
 import { StatTiles } from '@/components/overview/stat-tiles';
 import { PageContainer, PageHeader } from '@/components/page-header';
+import { RealtimeRefresh } from '@/components/realtime-refresh';
 import { bucketDaily, parseDays, periodStart } from '@/lib/analytics';
 import { getAssistant } from '@/lib/assistants';
 import { requireUser } from '@/lib/session';
@@ -64,6 +65,14 @@ export default async function OverviewPage({
 
   return (
     <PageContainer>
+      {/* Every message bumps its conversation's counters, so this covers questions too. */}
+      <RealtimeRefresh
+        name={`overview:${assistantId}`}
+        watch={[
+          { table: 'conversations', filter: `assistant_id=eq.${assistantId}` },
+          { table: 'leads', filter: `assistant_id=eq.${assistantId}` },
+        ]}
+      />
       <PendingNav>
         <PageHeader
           title="Overview"

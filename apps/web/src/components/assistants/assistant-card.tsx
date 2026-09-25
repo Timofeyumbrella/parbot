@@ -24,7 +24,7 @@ export const AssistantCard = ({ assistant }: { assistant: AssistantCardData }) =
         </span>
         <div className="flex min-w-0 flex-col gap-0.5">
           <CardTitle className="truncate">
-            <Link href={`/a/${assistant.id}`} prefetch className="after:absolute after:inset-0">
+            <Link href={`/a/${assistant.id}`} className="after:absolute after:inset-0">
               {assistant.name}
             </Link>
           </CardTitle>

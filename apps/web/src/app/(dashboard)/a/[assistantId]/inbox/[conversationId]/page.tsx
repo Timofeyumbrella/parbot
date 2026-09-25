@@ -8,6 +8,7 @@ import { ChannelBadge } from '@/components/inbox/channel-badge';
 import { ConversationPanel } from '@/components/inbox/conversation-panel';
 import { TranscriptMessage } from '@/components/inbox/transcript-message';
 import { PageContainer, PageHeader } from '@/components/page-header';
+import { RealtimeRefresh } from '@/components/realtime-refresh';
 import { Button } from '@/components/ui/button';
 import { getAssistant } from '@/lib/assistants';
 import { requireUser } from '@/lib/session';
@@ -71,6 +72,15 @@ export default async function ConversationPage({
 
   return (
     <PageContainer>
+      {/* A visitor may still be asking; the transcript and the panel follow along. */}
+      <RealtimeRefresh
+        name={`inbox:transcript:${conversationId}`}
+        watch={[
+          { table: 'messages', filter: `conversation_id=eq.${conversationId}` },
+          { table: 'conversations', filter: `id=eq.${conversationId}` },
+          { table: 'leads', filter: `conversation_id=eq.${conversationId}` },
+        ]}
+      />
       <div className="flex flex-col gap-3">
         <Link
           href={`/a/${assistantId}/inbox`}

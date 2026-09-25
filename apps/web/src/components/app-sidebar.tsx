@@ -22,6 +22,7 @@ import { useParams, usePathname } from 'next/navigation';
 import { useState, useTransition } from 'react';
 
 import { signOut } from '@/actions/auth';
+import { isPlainLeftClick, useNavPending } from '@/components/nav-pending';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { Button } from '@/components/ui/button';
 import {
@@ -76,11 +77,25 @@ const SidebarBody = ({
   const pathname = usePathname();
   const params = useParams<{ assistantId?: string }>();
   const [, startSignOut] = useTransition();
+  const pending = useNavPending();
   const active =
     assistants.find((assistant) => assistant.id === params.assistantId) ?? assistants[0] ?? null;
 
+  // A clicked item is highlighted from the click on, not from when the router gets there.
   const isActive = (href: string, exact = false) =>
-    exact ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
+    pending.href
+      ? pending.href === href
+      : exact
+        ? pathname === href
+        : pathname === href || pathname.startsWith(`${href}/`);
+
+  const follow = (href: string) => (event: React.MouseEvent<HTMLAnchorElement>) => {
+    if (isPlainLeftClick(event)) {
+      pending.start(href);
+    }
+
+    onNavigate?.();
+  };
 
   return (
     <div className="flex h-full flex-col gap-4 p-3">
@@ -107,7 +122,7 @@ const SidebarBody = ({
           <DropdownMenuLabel>Assistants</DropdownMenuLabel>
           {assistants.map((assistant) => (
             <DropdownMenuItem key={assistant.id} asChild>
-              <Link href={`/a/${assistant.id}`} onClick={onNavigate}>
+              <Link href={`/a/${assistant.id}`} onClick={follow(`/a/${assistant.id}`)}>
                 <Bot />
                 <span className="truncate">{assistant.name}</span>
               </Link>
@@ -115,7 +130,7 @@ const SidebarBody = ({
           ))}
           <DropdownMenuSeparator />
           <DropdownMenuItem asChild>
-            <Link href="/onboarding" onClick={onNavigate}>
+            <Link href="/onboarding" onClick={follow('/onboarding')}>
               <Plus />
               New assistant
             </Link>
@@ -126,7 +141,8 @@ const SidebarBody = ({
       <nav className="flex flex-col gap-0.5" aria-label="Assistant">
         <Link
           href="/dashboard"
-          onClick={onNavigate}
+          onClick={follow('/dashboard')}
+          aria-current={isActive('/dashboard', true) ? 'page' : undefined}
           className={cn(
             'mb-1 flex h-8 items-center gap-2.5 rounded-md px-2.5 text-sm transition-colors',
             isActive('/dashboard', true)
@@ -134,7 +150,7 @@ const SidebarBody = ({
               : 'text-muted-foreground hover:bg-sidebar-accent/60 hover:text-foreground',
           )}
         >
-          <LayoutGrid className="size-4" />
+          <LayoutGrid className={cn('size-4', pending.href === '/dashboard' && 'animate-pulse')} />
           All assistants
         </Link>
         {active
@@ -142,7 +158,8 @@ const SidebarBody = ({
               <Link
                 key={item.href}
                 href={item.href}
-                onClick={onNavigate}
+                onClick={follow(item.href)}
+                aria-current={isActive(item.href, item.exact) ? 'page' : undefined}
                 className={cn(
                   'flex h-8 items-center gap-2.5 rounded-md px-2.5 text-sm transition-colors',
                   isActive(item.href, item.exact)
@@ -150,7 +167,9 @@ const SidebarBody = ({
                     : 'text-muted-foreground hover:bg-sidebar-accent/60 hover:text-foreground',
                 )}
               >
-                <item.icon className="size-4" />
+                <item.icon
+                  className={cn('size-4', pending.href === item.href && 'animate-pulse')}
+                />
                 {item.label}
               </Link>
             ))
@@ -162,7 +181,8 @@ const SidebarBody = ({
           <Link
             key={item.href}
             href={item.href}
-            onClick={onNavigate}
+            onClick={follow(item.href)}
+            aria-current={isActive(item.href) ? 'page' : undefined}
             className={cn(
               'flex h-8 items-center gap-2.5 rounded-md px-2.5 text-sm transition-colors',
               isActive(item.href)
@@ -170,7 +190,7 @@ const SidebarBody = ({
                 : 'text-muted-foreground hover:bg-sidebar-accent/60 hover:text-foreground',
             )}
           >
-            <item.icon className="size-4" />
+            <item.icon className={cn('size-4', pending.href === item.href && 'animate-pulse')} />
             {item.label}
             {item.href === '/billing' ? (
               <span className="bg-muted text-muted-foreground ml-auto rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide">

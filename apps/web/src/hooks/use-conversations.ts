@@ -57,10 +57,19 @@ export const useConversations = (assistantId: string, snapshot?: ConversationSna
       return;
     }
 
+    const listKey = conversationsKey(assistantId);
+    // setQueryData marks the list fresh. A list another screen invalidated (a delete in the
+    // Inbox) must still be read again, because a snapshot never drops rows.
+    const invalidated = queryClient.getQueryState(listKey)?.isInvalidated ?? false;
+
     appliedSnapshots.set(assistantId, snapshot.fetchedAt);
-    queryClient.setQueryData<ConversationRow[]>(conversationsKey(assistantId), (rows) =>
+    queryClient.setQueryData<ConversationRow[]>(listKey, (rows) =>
       mergeSnapshot(rows, snapshot.rows),
     );
+
+    if (invalidated) {
+      void queryClient.invalidateQueries({ queryKey: listKey, exact: true });
+    }
   }, [snapshot, assistantId, queryClient]);
 
   return useQuery({

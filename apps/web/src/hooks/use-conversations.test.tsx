@@ -171,6 +171,25 @@ describe('useConversations', () => {
     expect(result.current.data?.find((item) => item.id === 'old')?.title).toBe('Renamed elsewhere');
   });
 
+  it('still reads the list again when another screen invalidated it before the snapshot lands', async () => {
+    // Regression: a conversation deleted in the Inbox stayed in the Chat list. Folding the layout
+    // snapshot in marked the list fresh, so the refetch the Inbox asked for never happened.
+    queryClient.setQueryData<ConversationRow[]>(conversationsKey('asst'), [
+      row('gone', '2026-09-23T11:00:00Z'),
+      row('kept', '2026-09-23T10:00:00Z'),
+    ]);
+    await queryClient.invalidateQueries({ queryKey: ['chat'] });
+    db.rows = [row('kept', '2026-09-23T10:00:00Z')];
+
+    const snapshot = { rows: [row('kept', '2026-09-23T10:00:00Z')], fetchedAt: 5000 };
+    const { result } = renderHook(() => useConversations('asst', snapshot), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current.data?.map((item) => item.id)).toEqual(['kept']);
+    });
+    expect(db.select).toHaveBeenCalled();
+  });
+
   it('lets a fresh read through the browser client drop rows deleted elsewhere', async () => {
     queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 0 } } });
     queryClient.setQueryData<ConversationRow[]>(conversationsKey('asst'), [

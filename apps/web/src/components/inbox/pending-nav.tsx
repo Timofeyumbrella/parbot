@@ -5,12 +5,20 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createContext, useContext, useState, useTransition } from 'react';
 
+import { isPlainLeftClick } from '@/components/nav-pending';
+
+type PendingTarget = {
+  href: string;
+  /** The switch the link belongs to. Only that switch moves; the others keep their state. */
+  group: string;
+};
+
 type PendingNavValue = {
   /** True while a search-param navigation started here is waiting for the server. */
   pending: boolean;
-  /** The href that was clicked, so the clicked pill can light up before the URL changes. */
-  target: string | null;
-  navigate: (href: string) => void;
+  /** The link that was clicked, so the clicked pill can light up before the URL changes. */
+  target: PendingTarget | null;
+  navigate: (href: string, group: string) => void;
 };
 
 const PendingNavContext = createContext<PendingNavValue>({
@@ -28,10 +36,10 @@ const PendingNavContext = createContext<PendingNavValue>({
 export const PendingNav = ({ children }: { children: React.ReactNode }) => {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [target, setTarget] = useState<string | null>(null);
+  const [target, setTarget] = useState<PendingTarget | null>(null);
 
-  const navigate = (href: string) => {
-    setTarget(href);
+  const navigate = (href: string, group: string) => {
+    setTarget({ href, group });
     startTransition(() => {
       // The switch sits at the top of the page; keep the scroll position instead of jumping.
       router.push(href, { scroll: false });
@@ -72,11 +80,10 @@ export const PendingRegion = ({
   );
 };
 
-const isPlainLeftClick = (event: React.MouseEvent<HTMLAnchorElement>) =>
-  event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey;
-
 type SegmentedLinkProps = {
   href: string;
+  /** Names the switch, so a click in one (a filter) leaves another (the tabs) as it is. */
+  group: string;
   active: boolean;
   children: React.ReactNode;
   className?: string;
@@ -90,6 +97,7 @@ type SegmentedLinkProps = {
  */
 export const SegmentedLink = ({
   href,
+  group,
   active,
   children,
   className,
@@ -97,7 +105,7 @@ export const SegmentedLink = ({
   inactiveClassName,
 }: SegmentedLinkProps) => {
   const { pending, target, navigate } = usePendingNav();
-  const current = pending && target ? target === href : active;
+  const current = pending && target?.group === group ? target.href === href : active;
 
   return (
     <Link
@@ -109,7 +117,7 @@ export const SegmentedLink = ({
         }
 
         event.preventDefault();
-        navigate(href);
+        navigate(href, group);
       }}
       className={cn(className, current ? activeClassName : inactiveClassName)}
     >

@@ -4,7 +4,7 @@ import type { WidgetMode } from '@parbot/shared';
 import { cn } from 'cn';
 import { ExternalLink } from 'lucide-react';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useState, useSyncExternalStore } from 'react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -30,18 +30,34 @@ type WidgetPreviewProps = {
   knowledgeHref: string;
 };
 
+const noSubscription = () => () => {};
+
+/** False on the server and while the page hydrates, true from the first client render on. */
+const useHydrated = () =>
+  useSyncExternalStore(
+    noSubscription,
+    () => true,
+    () => false,
+  );
+
 const PreviewFrame = ({ src }: { src: string }) => {
+  // The frame is created in the browser only. In the server HTML it starts loading before React
+  // hydrates, and a load that finishes first never reaches onLoad, so the skeleton stayed up for
+  // good after a full page load.
+  const hydrated = useHydrated();
   const [loaded, setLoaded] = useState(false);
 
   return (
-    <div className="relative">
+    <div className="relative h-[620px]">
       {loaded ? null : <Skeleton className="absolute inset-0 rounded-lg" />}
-      <iframe
-        src={src}
-        title="Widget preview"
-        onLoad={() => setLoaded(true)}
-        className={cn('bg-background h-[620px] w-full rounded-lg border', !loaded && 'opacity-0')}
-      />
+      {hydrated ? (
+        <iframe
+          src={src}
+          title="Widget preview"
+          onLoad={() => setLoaded(true)}
+          className={cn('bg-background size-full rounded-lg border', !loaded && 'opacity-0')}
+        />
+      ) : null}
     </div>
   );
 };

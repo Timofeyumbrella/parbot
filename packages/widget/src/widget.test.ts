@@ -669,6 +669,96 @@ describe('widget', () => {
     expect(document.getElementById('parbot-widget')).toBeNull();
   });
 
+  describe('⌘K pressed while the config loads', () => {
+    /** A config request that answers only when the test says so. */
+    const holdConfig = (overrides: Partial<WidgetConfig>) => {
+      let answer: () => void = () => {};
+
+      vi.stubGlobal(
+        'fetch',
+        vi.fn<typeof fetch>(
+          () =>
+            new Promise<Response>((resolve) => {
+              answer = () => resolve(Response.json({ ...config, ...overrides }));
+            }),
+        ),
+      );
+
+      return () => answer();
+    };
+
+    const shortcut = () => {
+      const event = new KeyboardEvent('keydown', {
+        key: 'k',
+        metaKey: true,
+        bubbles: true,
+        cancelable: true,
+      });
+
+      document.dispatchEvent(event);
+
+      return event;
+    };
+
+    it('opens the palette once it mounts, and keeps the browser from taking the keys', async () => {
+      const answer = holdConfig({ mode: 'palette' });
+      const starting = boot(mountScript());
+
+      expect(shortcut().defaultPrevented).toBe(true);
+      answer();
+
+      const widget = await starting;
+
+      expect(widget!.opened).toBe(true);
+      expect(shadowOf(widget!).activeElement).toBe(shadowOf(widget!).querySelector('textarea'));
+
+      // From here the widget's own listener handles the shortcut, once per press.
+      shortcut();
+      expect(widget!.opened).toBe(false);
+    });
+
+    it('toggles like the shortcut does: two presses leave the palette closed', async () => {
+      const answer = holdConfig({ mode: 'palette' });
+      const starting = boot(mountScript());
+
+      shortcut();
+      shortcut();
+      answer();
+
+      expect((await starting)!.opened).toBe(false);
+    });
+
+    it('drops the press when the widget turns out to be a bubble', async () => {
+      const answer = holdConfig({ mode: 'bubble' });
+      const starting = boot(mountScript());
+
+      shortcut();
+      answer();
+
+      expect((await starting)!.opened).toBe(false);
+    });
+
+    it('leaves the keys to the page when the script pins the bubble, or the widget is gone', async () => {
+      const answer = holdConfig({ mode: 'palette' });
+      const starting = boot(mountScript({ 'data-mode': 'bubble' }));
+
+      expect(shortcut().defaultPrevented).toBe(false);
+      answer();
+      expect((await starting)!.opened).toBe(false);
+
+      resetForTests();
+      document.head.innerHTML = '';
+
+      const again = holdConfig({ mode: 'palette' });
+      const destroyedWhileStarting = boot(mountScript());
+
+      destroy();
+      expect(shortcut().defaultPrevented).toBe(false);
+      again();
+      expect(await destroyedWhileStarting).toBeNull();
+    });
+  });
+
   it('does nothing without a key and warns when the config cannot load', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.stubGlobal(

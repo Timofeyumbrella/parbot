@@ -16,6 +16,7 @@ export const PeriodSwitch = ({ assistantId, days }: { assistantId: string; days:
       <SegmentedLink
         key={period}
         href={`/a/${assistantId}?days=${period}`}
+        group="period"
         active={period === days}
         className={pillLinkClass}
         activeClassName={pillActiveClass}

@@ -25,6 +25,34 @@ export const useThread = (conversationId: string, enabled = true) => {
   });
 };
 
+/**
+ * Starts reading a conversation the reader is about to open (a hovered or focused row), so its
+ * messages are often in the cache by the time the click lands. A thread already cached is left
+ * alone: it may be streaming, and the pane refreshes it itself when it goes stale.
+ */
+export const usePrefetchThread = () => {
+  const queryClient = useQueryClient();
+
+  return useCallback(
+    (conversationId: string) => {
+      const key = threadKey(conversationId);
+
+      if (queryClient.getQueryData(key) !== undefined) {
+        return;
+      }
+
+      void queryClient.prefetchQuery({
+        queryKey: key,
+        queryFn: () =>
+          fetchThread(getSupabaseBrowserClient(), conversationId, () =>
+            queryClient.getQueryData<Thread>(key),
+          ),
+      });
+    },
+    [queryClient],
+  );
+};
+
 /** Thumbs up or down on an answer. The thread updates first and rolls back if the server says no. */
 export const useFeedback = (conversationId: string) => {
   const queryClient = useQueryClient();
