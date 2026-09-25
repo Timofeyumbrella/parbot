@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Progress } from '@/components/ui/progress';
 import type { AccountUsage } from '@/lib/account';
 import { USAGE_WARNING_PERCENT, usagePercent } from '@/lib/billing/pricing';
+import { formatCount } from '@/lib/format';
 import type { Plan } from '@/lib/plans';
 
 type MeterProps = {
@@ -11,8 +12,6 @@ type MeterProps = {
   used: number;
   limit: number;
 };
-
-const format = (value: number) => value.toLocaleString('en-US');
 
 export const UsageMeter = ({ label, used, limit }: MeterProps) => {
   const percent = usagePercent(used, limit);
@@ -33,12 +32,12 @@ export const UsageMeter = ({ label, used, limit }: MeterProps) => {
             full && 'text-destructive',
           )}
         >
-          {format(used)} of {format(limit)}
+          {formatCount(used)} of {formatCount(limit)}
         </span>
       </div>
       <Progress
         value={percent}
-        aria-label={`${label}: ${format(used)} of ${format(limit)}`}
+        aria-label={`${label}: ${formatCount(used)} of ${formatCount(limit)}`}
         className={cn(
           'h-1.5',
           warning && '[&_[data-slot=progress-indicator]]:bg-warning',
