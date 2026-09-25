@@ -12,6 +12,7 @@ import {
   MAX_WELCOME_MESSAGE_LENGTH,
   normalizeWidgetTheme,
   PUBLIC_KEY_PATTERN,
+  safeHttpUrl,
   UUID_PATTERN,
   VISITOR_ID_PATTERN,
   WIDGET_MODES,
@@ -25,7 +26,7 @@ import {
 import { z } from 'zod';
 
 import type { Assistant } from '@/lib/db';
-import type { ServiceClient } from '@/lib/engine';
+import type { RateLimitVerdict, ServiceClient } from '@/lib/engine';
 import { publicEnv } from '@/lib/env';
 import { type Plan, type PlanLimits, planFor } from '@/lib/plans';
 
@@ -41,7 +42,19 @@ import { type Plan, type PlanLimits, planFor } from '@/lib/plans';
 const key = z.string().regex(PUBLIC_KEY_PATTERN, 'Malformed public key.');
 const visitorId = z.string().regex(VISITOR_ID_PATTERN, 'Malformed visitor id.');
 const conversationId = z.string().regex(UUID_PATTERN, 'Malformed conversation id.');
-const pageUrl = z.string().max(MAX_PAGE_URL_LENGTH).optional();
+/**
+ * The page the widget sat on, later rendered as a link in the owner's inbox. Anything that is
+ * not an http(s) address of sane length is dropped rather than refused: the question still
+ * deserves an answer, the link just goes unrecorded.
+ */
+const pageUrl = z
+  .string()
+  .optional()
+  .transform((value) =>
+    value !== undefined && value.length <= MAX_PAGE_URL_LENGTH
+      ? (safeHttpUrl(value) ?? undefined)
+      : undefined,
+  );
 
 export const widgetChatSchema = z.object({
   key,
@@ -96,7 +109,8 @@ const parseOrigin = (value: string) => {
   }
 };
 
-const HOSTNAME = /^(?:\*\.)?[a-z0-9]([a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*(?::\d{1,5})?$/i;
+const HOSTNAME =
+  /^(?:\*\.)?[a-z0-9]([a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*(?::\d{1,5})?$/i;
 
 /** True for the forms an owner may list: `https://docs.acme.com`, `docs.acme.com`, `*.acme.com`. */
 export const isValidOriginEntry = (entry: string) => {
@@ -109,7 +123,9 @@ export const isValidOriginEntry = (entry: string) => {
   if (value.includes('://')) {
     const url = parseOrigin(value);
 
-    return Boolean(url && (url.pathname === '/' || url.pathname === '') && !url.search && !url.hash);
+    return Boolean(
+      url && (url.pathname === '/' || url.pathname === '') && !url.search && !url.hash,
+    );
   }
 
   return HOSTNAME.test(value);
@@ -214,16 +230,57 @@ export const jsonError = (
 export const configCacheControl = (request: Request) =>
   new URL(request.url).searchParams.has('v') ? 'no-store' : 'public, max-age=60';
 
-/** The first address in x-forwarded-for is the client; the rest are proxies. */
+/**
+ * The address a request came from, as the platform saw it. A client writes whatever it likes at
+ * the front of x-forwarded-for, so the platform's own header wins and, failing that, the last
+ * entry: the one the proxy in front of the app appended itself.
+ */
 export const clientIp = (request: Request) => {
-  const forwarded = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
+  const platform =
+    request.headers.get('x-vercel-forwarded-for')?.trim() ||
+    request.headers.get('x-real-ip')?.trim();
 
-  return forwarded || request.headers.get('x-real-ip')?.trim() || 'unknown';
+  if (platform) {
+    return platform;
+  }
+
+  const hops = (request.headers.get('x-forwarded-for') ?? '')
+    .split(',')
+    .map((hop) => hop.trim())
+    .filter(Boolean);
+
+  return hops[hops.length - 1] ?? 'unknown';
 };
 
+/**
+ * The widget's rate limits, each a sliding minute. The visitor limit is a courtesy that keeps one
+ * tab from flooding the assistant; the visitor id is the client's to invent, so it protects
+ * nobody. The address, assistant and owner limits are the ones that hold when a stranger picks a
+ * public key off a customer's site and rotates everything they can.
+ */
 export const WIDGET_VISITOR_LIMIT = { limit: 12, windowMs: 60_000 };
 export const WIDGET_IP_LIMIT = { limit: 60, windowMs: 60_000 };
+export const WIDGET_ASSISTANT_LIMIT = { limit: 60, windowMs: 60_000 };
+export const WIDGET_OWNER_LIMIT = { limit: 120, windowMs: 60_000 };
 export const WIDGET_LEAD_LIMIT = { limit: 5, windowMs: 60_000 };
+export const WIDGET_LEAD_IP_LIMIT = { limit: 20, windowMs: 60_000 };
+export const WIDGET_LEAD_ASSISTANT_LIMIT = { limit: 30, windowMs: 60_000 };
+
+/**
+ * The Retry-After value for a request that any of its buckets refused, or null when all of them
+ * let it through. The wait is the longest one, in whole seconds, and never zero.
+ */
+export const retryAfter = (verdicts: RateLimitVerdict[]): string | null => {
+  const full = verdicts.filter((verdict) => !verdict.allowed);
+
+  if (full.length === 0) {
+    return null;
+  }
+
+  const waitMs = Math.max(...full.map((verdict) => verdict.retryAfterMs));
+
+  return String(Math.max(1, Math.ceil(waitMs / 1000)));
+};
 
 // ---------------------------------------------------------------------------
 // Assistants
@@ -310,7 +367,10 @@ const lines = (value: unknown) =>
         .filter(Boolean)
     : [];
 
-const checkbox = z.preprocess((value) => value === 'on' || value === 'true' || value === true, z.boolean());
+const checkbox = z.preprocess(
+  (value) => value === 'on' || value === 'true' || value === true,
+  z.boolean(),
+);
 
 export const widgetSettingsSchema = z.object({
   mode: z.enum(WIDGET_MODES),
@@ -325,11 +385,21 @@ export const widgetSettingsSchema = z.object({
     .string()
     .trim()
     .min(1, 'Write a welcome message.')
-    .max(MAX_WELCOME_MESSAGE_LENGTH, `Keep the welcome message under ${MAX_WELCOME_MESSAGE_LENGTH} characters.`),
+    .max(
+      MAX_WELCOME_MESSAGE_LENGTH,
+      `Keep the welcome message under ${MAX_WELCOME_MESSAGE_LENGTH} characters.`,
+    ),
   suggestedQuestions: z.preprocess(
     lines,
     z
-      .array(z.string().max(MAX_SUGGESTED_QUESTION_LENGTH, `Keep each question under ${MAX_SUGGESTED_QUESTION_LENGTH} characters.`))
+      .array(
+        z
+          .string()
+          .max(
+            MAX_SUGGESTED_QUESTION_LENGTH,
+            `Keep each question under ${MAX_SUGGESTED_QUESTION_LENGTH} characters.`,
+          ),
+      )
       .max(MAX_SUGGESTED_QUESTIONS, `List at most ${MAX_SUGGESTED_QUESTIONS} suggested questions.`),
   ),
   allowedOrigins: z.preprocess(
@@ -383,8 +453,7 @@ export const widgetFormValues = (formData: FormData): WidgetFormValues => {
 };
 
 export type ParsedWidgetSettings =
-  | { success: true; data: WidgetSettings }
-  | { success: false; error: string };
+  { success: true; data: WidgetSettings } | { success: false; error: string };
 
 export const parseWidgetSettings = (formData: FormData): ParsedWidgetSettings => {
   const result = widgetSettingsSchema.safeParse(widgetFormValues(formData));
@@ -404,7 +473,10 @@ export const parseWidgetSettings = (formData: FormData): ParsedWidgetSettings =>
 };
 
 const sameTheme = (a: WidgetTheme, b: WidgetTheme) =>
-  a.scheme === b.scheme && a.accent.toLowerCase() === b.accent.toLowerCase() && a.position === b.position && a.radius === b.radius;
+  a.scheme === b.scheme &&
+  a.accent.toLowerCase() === b.accent.toLowerCase() &&
+  a.position === b.position &&
+  a.radius === b.radius;
 
 /** The first plan rule the settings break, or null when the plan allows all of them. */
 export const gateWidgetSettings = (settings: WidgetSettings, plan: PlanLimits): string | null => {
