@@ -6,7 +6,7 @@ import { ArrowUp, Square } from 'lucide-react';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
-import { clearDraft, readDraft, writeDraft } from '@/lib/chat/drafts';
+import { clearDraft, handOffFocus, readDraft, takeFocus, writeDraft } from '@/lib/chat/drafts';
 
 export type ComposerProps = {
   /** Where the unsent text is kept between mounts; one per conversation. */
@@ -39,6 +39,7 @@ export const Composer = ({
 }: ComposerProps) => {
   const [value, setValue] = useState(() => readDraft(draftKey));
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const handedFocus = useRef(false);
   const canSend = value.trim().length > 0 && !streaming;
 
   const resize = useCallback(() => {
@@ -57,8 +58,29 @@ export const Composer = ({
     resize();
   }, [resize, value]);
 
+  // A remount for the same conversation (the route taking over from the pane a click rendered,
+  // or the loading screen handing over to the page) keeps the reader's focus and caret. It moves
+  // in the commit that swaps the boxes: left to the effect below, a key pressed in between went
+  // to the page, and an Enter there sent nothing.
+  useLayoutEffect(() => {
+    const textarea = textareaRef.current;
+    const handed = takeFocus(draftKey);
+
+    if (textarea && handed) {
+      textarea.focus();
+      textarea.setSelectionRange(handed.start, handed.end);
+      handedFocus.current = true;
+    }
+
+    return () => {
+      if (textarea && textarea.ownerDocument.activeElement === textarea) {
+        handOffFocus(draftKey, textarea.selectionStart, textarea.selectionEnd);
+      }
+    };
+  }, [draftKey]);
+
   useEffect(() => {
-    if (!autoFocus) {
+    if (!autoFocus || handedFocus.current) {
       return;
     }
 
