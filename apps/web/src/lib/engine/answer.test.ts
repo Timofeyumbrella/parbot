@@ -735,6 +735,7 @@ describe('streamAnswer stop', () => {
         citations: [{ index: 1, documentId: 'd1', title: 'Setup', url: null, snippet: 's' }],
         answered: true,
         owner_id: 'o1',
+        created_at: new Date().toISOString(),
       },
     });
     const { provider } = fakeProvider({ answer });

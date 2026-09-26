@@ -91,11 +91,19 @@ export const citationsWithin = (content: string, citations: Json): Json[] => {
 };
 
 /**
+ * How long after an answer is saved a stop can still change it. A stop that lands after the save
+ * is a race lost by a moment: the reader pressed Stop before `done` reached their screen. Much
+ * later it can only be a replay, or a client asking to have an answer it read in full not count.
+ */
+export const LATE_STOP_WINDOW_MS = 30_000;
+
+/**
  * What happened to a saved answer when a stop arrived late: `stopped` when a finished answer
  * became a stopped one and its slot was given back, `trimmed` when a stopped answer was cut back
- * to what the reader saw, `unchanged` when there was nothing to do, `none` when no answer is saved.
+ * to what the reader saw, `unchanged` when there was nothing to do, `late` when the answer was
+ * saved too long ago to change, `none` when no answer is saved.
  */
-export type SavedStopOutcome = 'stopped' | 'trimmed' | 'unchanged' | 'none';
+export type SavedStopOutcome = 'stopped' | 'trimmed' | 'unchanged' | 'late' | 'none';
 
 /**
  * Makes a saved answer match a stop that arrived after it was written: the text the reader saw,
@@ -113,7 +121,7 @@ export const settleSavedStop = async (
 ): Promise<SavedStopOutcome> => {
   const { data: row, error } = await service
     .from('messages')
-    .select('content, citations, answered, owner_id')
+    .select('content, citations, answered, owner_id, created_at')
     .eq('id', target.messageId)
     .eq('conversation_id', target.conversationId)
     .eq('assistant_id', target.assistantId)
@@ -128,6 +136,10 @@ export const settleSavedStop = async (
 
   if (!row) {
     return 'none';
+  }
+
+  if (Date.now() - Date.parse(row.created_at) > LATE_STOP_WINDOW_MS) {
+    return 'late';
   }
 
   const content = shownPart(row.content, shown);

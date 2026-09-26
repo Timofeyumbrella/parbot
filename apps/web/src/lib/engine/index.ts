@@ -28,6 +28,7 @@ export {
 export { errorStream, SSE_HEADERS, streamResponse } from './sse';
 export {
   findStop,
+  LATE_STOP_WINDOW_MS,
   type SavedStopOutcome,
   settleSavedStop,
   shownPart,

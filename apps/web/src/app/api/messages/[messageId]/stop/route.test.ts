@@ -109,7 +109,7 @@ describe.skipIf(!hasLocalDb)(
     };
 
     /** A finished exchange as the engine saves it, counted against the month. */
-    const savedExchange = async (account: TestAccount) => {
+    const savedExchange = async (account: TestAccount, savedAt = new Date()) => {
       const conversationId = crypto.randomUUID();
       const messageId = crypto.randomUUID();
       const row = { assistant_id: account.assistantId, owner_id: account.userId };
@@ -133,6 +133,7 @@ describe.skipIf(!hasLocalDb)(
           { index: 2, documentId: 'd2', title: 'Rotation', url: null, snippet: 'b' },
         ],
         answered: true,
+        created_at: savedAt.toISOString(),
       });
       await service.rpc('reserve_message', { owner: account.userId, max_allowed: 1000 });
 
@@ -191,6 +192,32 @@ describe.skipIf(!hasLocalDb)(
       // Pressing Stop twice (or a retried request) gives nothing back twice.
       await post(messageId, { assistantId: owner!.assistantId, conversationId, text: 'Create' });
       expect(await usage(owner!)).toBe(before - 1);
+    });
+
+    it('leaves an answer saved long before the stop as it is, and counted', async () => {
+      const { conversationId, messageId } = await savedExchange(
+        owner!,
+        new Date(Date.now() - 2 * 60_000),
+      );
+      const before = await usage(owner!);
+
+      signInAs(owner!);
+
+      const response = await post(messageId, {
+        assistantId: owner!.assistantId,
+        conversationId,
+        text: 'Create',
+      });
+
+      expect(await response.json()).toEqual({ stopped: true, answer: 'late' });
+      expect(
+        (await service.from('messages').select('content, answered').eq('id', messageId).single())
+          .data,
+      ).toEqual({
+        content: 'Create keys in Settings [1]. Rotate them monthly [2].',
+        answered: true,
+      });
+      expect(await usage(owner!)).toBe(before);
     });
 
     it('records a stop that overtakes its question, for the engine to find', async () => {
