@@ -9,12 +9,14 @@ import { deleteSource, reindexSource } from '@/actions/sources';
 import type { Source } from '@/lib/db';
 import { getSupabaseBrowserClient, realtimeReadyClient } from '@/lib/supabase/client';
 
-import { isActiveStatus } from './format';
-
-export type SourcesSnapshot = { sources: Source[]; pagesUsed: number };
+import { isActiveStatus, type SourceStatus } from './format';
 
 export const sourcesQueryKey = (assistantId: string) =>
   ['knowledge', assistantId, 'sources'] as const;
+
+/** The account's pages across every assistant, as the meter on this assistant's screen shows it. */
+export const pagesUsedQueryKey = (assistantId: string) =>
+  ['knowledge', assistantId, 'pages-used'] as const;
 
 /** How often the list is refreshed while a source is being indexed, on top of realtime updates. */
 export const ACTIVE_POLL_MS = 4000;
@@ -29,22 +31,31 @@ const upsert = (sources: Source[], source: Source) =>
 
 const without = (sources: Source[], id: string) => sources.filter((source) => source.id !== id);
 
-const loadSnapshot = async (assistantId: string): Promise<SourcesSnapshot> => {
-  const supabase = getSupabaseBrowserClient();
-  const [sources, pages] = await Promise.all([
-    supabase
-      .from('sources')
-      .select('*')
-      .eq('assistant_id', assistantId)
-      .order('created_at', { ascending: false }),
-    supabase.from('documents').select('id', { count: 'exact', head: true }),
-  ]);
+const loadSources = async (assistantId: string) => {
+  const { data, error } = await getSupabaseBrowserClient()
+    .from('sources')
+    .select('*')
+    .eq('assistant_id', assistantId)
+    .order('created_at', { ascending: false });
 
-  if (sources.error) {
-    throw new Error(`The sources could not be loaded (${sources.error.message}).`);
+  if (error) {
+    throw new Error(`The sources could not be loaded (${error.message}).`);
   }
 
-  return { sources: sources.data, pagesUsed: pages.count ?? 0 };
+  return data;
+};
+
+/** Row level security limits the count to the visitor's own documents, in every assistant. */
+const loadPagesUsed = async () => {
+  const { count, error } = await getSupabaseBrowserClient()
+    .from('documents')
+    .select('id', { count: 'exact', head: true });
+
+  if (error) {
+    throw new Error(`The page count could not be loaded (${error.message}).`);
+  }
+
+  return count ?? 0;
 };
 
 type UseSourcesOptions = {
@@ -58,7 +69,7 @@ type UseSourcesOptions = {
  * realtime pushes row changes as ingestion writes them, and a slow poll covers a dropped socket
  * while anything is still indexing. Rows the screen draws ahead of the server (an added source, a
  * queued re-index, a removed row) survive a poll until the server has answered or realtime has
- * delivered the real row.
+ * delivered the real row. The pages meter is read again whenever a row settles or goes away.
  */
 export const useSources = ({
   assistantId,
@@ -67,6 +78,7 @@ export const useSources = ({
 }: UseSourcesOptions) => {
   const queryClient = useQueryClient();
   const queryKey = useMemo(() => sourcesQueryKey(assistantId), [assistantId]);
+  const pagesKey = useMemo(() => pagesUsedQueryKey(assistantId), [assistantId]);
   // id -> the row to show in place of the server's, or null while a delete is in flight.
   const overrides = useRef(new Map<string, Source | null>());
 
@@ -88,37 +100,67 @@ export const useSources = ({
 
   const query = useQuery({
     queryKey,
-    queryFn: async () => {
-      const snapshot = await loadSnapshot(assistantId);
-
-      return { ...snapshot, sources: applyOverrides(snapshot.sources) };
-    },
-    initialData: { sources: initialSources, pagesUsed: initialPagesUsed },
+    queryFn: async () => applyOverrides(await loadSources(assistantId)),
+    initialData: initialSources,
     refetchInterval: (current) =>
-      current.state.data?.sources.some((source) => isActiveStatus(source.status))
-        ? ACTIVE_POLL_MS
-        : false,
+      current.state.data?.some((source) => isActiveStatus(source.status)) ? ACTIVE_POLL_MS : false,
   });
 
-  const patch = useCallback(
-    (updater: (snapshot: SourcesSnapshot) => SourcesSnapshot) =>
-      queryClient.setQueryData<SourcesSnapshot>(queryKey, (current) =>
+  const pages = useQuery({
+    queryKey: pagesKey,
+    queryFn: loadPagesUsed,
+    initialData: initialPagesUsed,
+  });
+
+  const sources = query.data;
+  // Each row's status as last drawn; null until the first draw, which the server already counted.
+  const drawn = useRef<Map<string, SourceStatus> | null>(null);
+
+  // A run that finishes or a source that goes changes the account's page count. The news can come
+  // from realtime, the poll or the screen's own request, and the poll reads the rows and the count
+  // side by side, so the count can predate the row it came with. Reading the count once the rows
+  // show the change covers every path. Mid-run progress is left out: a large crawl would read it
+  // once per page.
+  useEffect(() => {
+    const previous = drawn.current;
+    const current = new Map(sources.map((source) => [source.id, source.status]));
+
+    drawn.current = current;
+
+    if (!previous) {
+      return;
+    }
+
+    const settled = sources.some(
+      (source) => !isActiveStatus(source.status) && previous.get(source.id) !== source.status,
+    );
+    // A row hidden by an unfinished delete is the mutation's to account for, once it succeeds.
+    const gone = [...previous.keys()].some((id) => !current.has(id) && !overrides.current.has(id));
+
+    if (settled || gone) {
+      void queryClient.invalidateQueries({ queryKey: pagesKey });
+    }
+  }, [sources, queryClient, pagesKey]);
+
+  const setSources = useCallback(
+    (updater: (sources: Source[]) => Source[]) =>
+      queryClient.setQueryData<Source[]>(queryKey, (current) =>
         current ? updater(current) : current,
       ),
     [queryClient, queryKey],
   );
 
-  const setSources = useCallback(
-    (updater: (sources: Source[]) => Source[]) =>
-      patch((snapshot) => ({ ...snapshot, sources: updater(snapshot.sources) })),
-    [patch],
+  const shiftPagesUsed = useCallback(
+    (delta: number) =>
+      queryClient.setQueryData<number>(pagesKey, (used) => Math.max((used ?? 0) + delta, 0)),
+    [queryClient, pagesKey],
   );
 
   /** Shows `row` for `id` (or hides the id) until the server has spoken. */
   const override = useCallback(
     (id: string, row: Source | null) => {
       overrides.current.set(id, row);
-      setSources((sources) => (row ? upsert(sources, row) : without(sources, id)));
+      setSources((current) => (row ? upsert(current, row) : without(current, id)));
     },
     [setSources],
   );
@@ -127,7 +169,7 @@ export const useSources = ({
   const settle = useCallback(
     (id: string, row: Source | null) => {
       overrides.current.delete(id);
-      setSources((sources) => (row ? upsert(sources, row) : without(sources, id)));
+      setSources((current) => (row ? upsert(current, row) : without(current, id)));
     },
     [setSources],
   );
@@ -161,7 +203,7 @@ export const useSources = ({
 
               if (id) {
                 overrides.current.delete(id);
-                setSources((sources) => without(sources, id));
+                setSources((current) => without(current, id));
               }
 
               return;
@@ -171,12 +213,7 @@ export const useSources = ({
 
             // The database is the truth; anything the screen assumed about this row is done with.
             overrides.current.delete(next.id);
-            setSources((sources) => upsert(sources, next));
-
-            // A finished run changed the document count; the poll would catch it, but not this soon.
-            if (!isActiveStatus(next.status)) {
-              void queryClient.invalidateQueries({ queryKey });
-            }
+            setSources((current) => upsert(current, next));
           },
         )
         .subscribe((status, error) => {
@@ -193,7 +230,7 @@ export const useSources = ({
         void client.removeChannel(channel);
       }
     };
-  }, [assistantId, queryClient, queryKey, setSources]);
+  }, [assistantId, setSources]);
 
   const reindex = useMutation({
     mutationFn: async (source: Source) => {
@@ -233,30 +270,29 @@ export const useSources = ({
         throw new Error(result.error);
       }
     },
-    onMutate: (source) => {
+    onMutate: async (source) => {
       override(source.id, null);
-      patch((snapshot) => ({
-        ...snapshot,
-        pagesUsed: Math.max(snapshot.pagesUsed - source.document_count, 0),
-      }));
+      // A count already on its way predates the delete and would put the pages back.
+      await queryClient.cancelQueries({ queryKey: pagesKey });
+      shiftPagesUsed(-source.document_count);
 
       return { previous: source };
     },
     onError: (error, source, context) => {
       settle(source.id, context?.previous ?? source);
-      patch((snapshot) => ({ ...snapshot, pagesUsed: snapshot.pagesUsed + source.document_count }));
+      shiftPagesUsed(source.document_count);
       toast.error(error.message);
     },
     onSuccess: (_result, source) => {
       settle(source.id, null);
       toast.success(`Removed ${source.title}.`);
-      void queryClient.invalidateQueries({ queryKey });
+      void queryClient.invalidateQueries({ queryKey: pagesKey });
     },
   });
 
   return {
-    sources: query.data.sources,
-    pagesUsed: query.data.pagesUsed,
+    sources,
+    pagesUsed: pages.data,
     error: query.error,
     isRefreshing: query.isFetching,
     refetch: query.refetch,
