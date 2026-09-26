@@ -51,6 +51,59 @@ test.describe('landing page', () => {
   });
 });
 
+test.describe('the live demo in the hero', () => {
+  test.skip(!process.env.NEXT_PUBLIC_DEMO_ASSISTANT_KEY, 'Needs NEXT_PUBLIC_DEMO_ASSISTANT_KEY.');
+
+  test('lists each cited page once, markers ascending', async ({ page }) => {
+    const citation = (index: number, slug: string, title: string) => ({
+      index,
+      documentId: slug,
+      title,
+      url: `https://docs.acme.test/${slug}`,
+      snippet: '',
+    });
+    const events = [
+      {
+        type: 'token',
+        text: 'Paste the script tag [2] with your public key [3], then reload [1].',
+      },
+      {
+        type: 'citations',
+        citations: [
+          citation(2, 'install', 'Installing the widget'),
+          citation(3, 'keys', 'Public keys'),
+          citation(1, 'install', 'Installing the widget'),
+        ],
+      },
+      { type: 'done', answered: true, latencyMs: 5 },
+    ];
+
+    // The answer's citation order is the model's; a fixed stream pins the case that duplicated.
+    await page.route('**/api/widget/chat', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'text/event-stream',
+        body: events.map((event) => `data: ${JSON.stringify(event)}\n\n`).join(''),
+      }),
+    );
+    await page.goto('/');
+
+    const input = page.getByRole('textbox', { name: 'Ask a question' });
+
+    // A production build hydrates quickly, but a submit that lands before React is lost.
+    await expect(async () => {
+      await input.fill('How do I install the widget?');
+      await input.press('Enter');
+      await expect(page.getByRole('list', { name: 'Sources' })).toBeVisible({ timeout: 1_000 });
+    }).toPass({ timeout: 30_000 });
+
+    await expect(page.getByRole('list', { name: 'Sources' }).getByRole('listitem')).toHaveText([
+      '12Installing the widget',
+      '3Public keys',
+    ]);
+  });
+});
+
 test.describe('the demo palette on the landing page', () => {
   // A light OS is the case where the widget's own "auto" opened a white palette over the dark page.
   test.use({ colorScheme: 'light' });
