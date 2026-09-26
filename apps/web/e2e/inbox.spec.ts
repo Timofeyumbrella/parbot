@@ -292,9 +292,30 @@ test.describe('the inbox and the overview', () => {
     await expect(rows).toHaveCount(30);
     expect(await shown()).toEqual(expected.slice(0, 30));
 
+    // Live changes keep that order. One to a row on this page shows in place; one to a row on the
+    // next page leaves it there for "Load more". Realtime delivers a channel's changes in order,
+    // so once the last rename shows, the one before it has been handled too.
+    const rename = async (id: string, title: string) =>
+      must(await service.from('conversations').update({ title }).eq('id', id).select('id'));
+    const row = (id: string) => rows.and(page.locator(`[data-conversation-id="${id}"]`));
+
+    // The first rename also waits for the list's channel to join: one made before that is lost.
+    await expect(async () => {
+      await rename(expected[0]!, 'Renamed on the first page');
+      await expect(row(expected[0]!)).toContainText('Renamed on the first page', {
+        timeout: 1000,
+      });
+    }).toPass({ timeout: 15_000 });
+    await rename(expected[30]!, 'Renamed on the next page');
+    await rename(expected[1]!, 'Renamed after it');
+    await expect(row(expected[1]!)).toContainText('Renamed after it', { timeout: 10_000 });
+    await expect(rows).toHaveCount(30);
+    expect(await shown()).toEqual(expected.slice(0, 30));
+
     await page.getByRole('button', { name: 'Load more' }).click();
     await expect(rows).toHaveCount(expected.length);
     expect(await shown()).toEqual(expected);
+    await expect(row(expected[30]!)).toContainText('Renamed on the next page');
     await expect(page.getByRole('button', { name: 'Load more' })).toHaveCount(0);
   });
 
