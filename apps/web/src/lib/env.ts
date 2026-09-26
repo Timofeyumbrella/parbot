@@ -14,6 +14,12 @@ const read = (name: string, fallback?: string) => {
   );
 };
 
+/**
+ * Where Parbot is deployed. Text that leaves this app and names a host a reader will open, such
+ * as the crawler's user agent and the seeded demo answers, uses it: no parbot.dev host resolves.
+ */
+export const DEPLOYED_APP_URL = 'https://parbot-web.vercel.app';
+
 /** Values that are safe in the browser. Next.js inlines them, so they must be read literally. */
 export const publicEnv = {
   appUrl: process.env.NEXT_PUBLIC_APP_URL?.trim() || 'http://localhost:3000',

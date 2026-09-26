@@ -5,5 +5,11 @@
   "trailingComma": "all",
   "plugins": ["prettier-plugin-tailwindcss"],
   "tailwindStylesheet": "./apps/web/src/app/globals.css",
-  "tailwindFunctions": ["cn", "cva"]
+  "tailwindFunctions": ["cn", "cva"],
+  "overrides": [
+    {
+      "files": "apps/web/content/**/*.md",
+      "options": { "embeddedLanguageFormatting": "off" }
+    }
+  ]
 }
