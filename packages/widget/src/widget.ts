@@ -130,8 +130,11 @@ const toStored = (message: Message): StoredMessage => ({
 /** An answer being streamed: the id the server saves it under and where it goes. */
 type InFlight = { messageId: string; conversationId: string; answer: Message };
 
-/** keepalive caps a body at 64 KiB; a stop that large is sent without it. */
-const KEEPALIVE_CHARS = 20_000;
+/**
+ * keepalive caps a body at 64 KiB, and a UTF-16 unit takes up to three bytes on the wire, so a
+ * longer stop is sent without it rather than refused.
+ */
+const KEEPALIVE_CHARS = 16_000;
 
 const prefersDark = () =>
   typeof window.matchMedia === 'function' &&
