@@ -2,6 +2,7 @@ import { expect, type Page, test } from '@playwright/test';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { adminClient, trackAccounts } from './support/accounts';
+import { visit } from './support/navigation';
 
 const accounts = trackAccounts();
 
@@ -44,7 +45,7 @@ const storedPlan = async (service: SupabaseClient, email: string) => {
 };
 
 const signUp = async (page: Page, email: string) => {
-  await page.goto('/signup');
+  await visit(page, '/signup');
   await page.getByLabel(/full name/i).fill('Billing Tester');
   await page.getByLabel(/email/i).fill(email);
   await page.getByLabel(/^password/i).fill('correct-horse-battery');
@@ -61,7 +62,7 @@ test.describe('billing in test mode', () => {
 
     await signUp(page, email);
 
-    await page.goto('/billing');
+    await visit(page, '/billing');
     await expect(page.getByText(/test mode/i).first()).toBeVisible();
     await expect(currentPlan).toContainText('Hobby');
     await expect(currentPlan).toContainText('Free');
@@ -81,10 +82,10 @@ test.describe('billing in test mode', () => {
 
     // The Account page describes the same subscription, with the date in the same shape.
     const renewal = (await currentPlan.getByText(/Renews on/).textContent())?.trim();
-    await page.goto('/account');
+    await visit(page, '/account');
     await expect(page.getByText(`Starter, $29 a month. ${renewal}`)).toBeVisible();
 
-    await page.goto('/billing');
+    await visit(page, '/billing');
     await page.getByRole('button', { name: /manage subscription/i }).click();
     await expect(page).toHaveURL(/mock_portal=1/);
     await page
@@ -125,7 +126,7 @@ test.describe('billing in test mode', () => {
       .eq('account_id', id);
     expect(error).toBeNull();
 
-    await page.goto('/billing');
+    await visit(page, '/billing');
     await expect(currentPlan).toContainText('Hobby');
     await expect(currentPlan).toContainText('Payment pending');
     await expect(currentPlan).toContainText('so you are on Hobby');
@@ -133,7 +134,7 @@ test.describe('billing in test mode', () => {
     await expect(page.getByTestId('plan-hobby')).toHaveAttribute('data-current', 'true');
     await expect(page.getByRole('link', { name: /^Billing/ })).toContainText('Hobby');
 
-    await page.goto('/account');
+    await visit(page, '/account');
     await expect(
       page.getByText('Hobby, Free. Upgrade for more assistants, pages and answers.'),
     ).toBeVisible();

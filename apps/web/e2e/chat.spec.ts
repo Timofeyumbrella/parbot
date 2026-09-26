@@ -3,6 +3,8 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 import { stubEmbedding } from '../src/lib/ai/stub';
 
+import { visit } from './support/navigation';
+
 /**
  * The in-app chat, end to end against the stub provider: the reader's bubble and the streaming
  * placeholder land before the server answers, switching reads from the cache, Stop and Retry
@@ -132,7 +134,7 @@ const seedAssistant = async (service: SupabaseClient) => {
 };
 
 const signIn = async (page: Page, next: string) => {
-  await page.goto(`/login?next=${encodeURIComponent(next)}`);
+  await visit(page, `/login?next=${encodeURIComponent(next)}`);
   await page.getByLabel('Email').fill(DEMO_EMAIL);
   await page.getByLabel('Password').fill(DEMO_PASSWORD);
   await page.getByRole('button', { name: 'Sign in' }).click();
@@ -197,7 +199,7 @@ test.describe('the in-app chat', () => {
     page.on('pageerror', (error) => consoleProblems.push(`[pageerror] ${error.message}`));
     // Visit both chat routes once so a dev server's first compile does not count against the timings below.
     await signIn(page, `/a/${assistantId}/chat/${crypto.randomUUID()}`);
-    await page.goto(`/a/${assistantId}/chat`);
+    await visit(page, `/a/${assistantId}/chat`);
     await expect(page.getByTestId('welcome')).toBeVisible();
   });
 
@@ -504,7 +506,7 @@ test.describe('the in-app chat', () => {
   });
 
   test('an unknown conversation id opens an empty thread with the composer, not a 404', async () => {
-    await page.goto(`/a/${assistantId}/chat/${crypto.randomUUID()}`);
+    await visit(page, `/a/${assistantId}/chat/${crypto.randomUUID()}`);
 
     await expect(page.getByTestId('welcome')).toBeVisible();
     await expect(composer(page)).toBeVisible();
@@ -543,7 +545,7 @@ test.describe('the in-app chat', () => {
     ).toBeVisible();
 
     // A new chat on a phone: the longest suggested question wraps inside the pane and nothing scrolls sideways.
-    await mobile.goto(`/a/${assistantId}/chat`);
+    await visit(mobile, `/a/${assistantId}/chat`);
     await expect(mobile.getByTestId('welcome')).toBeVisible();
 
     const chip = mobile.getByRole('button', { name: LONG_QUESTION });
@@ -627,7 +629,7 @@ test.describe('the in-app chat', () => {
       expect(messageError).toBeNull();
     }
 
-    await page.goto(`/a/${assistantId}/chat/${conversationId}`);
+    await visit(page, `/a/${assistantId}/chat/${conversationId}`);
 
     const last = assistantBubble(page, 'complete').last();
 

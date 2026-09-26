@@ -3,6 +3,8 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 import { stubEmbedding } from '../src/lib/ai/stub';
 
+import { reload, visit } from './support/navigation';
+
 /**
  * The public demo page with the real widget on it, against the stub provider. The spec seeds
  * its own Starter account with an assistant and two indexed chunks, and deletes the account
@@ -135,7 +137,7 @@ test.describe('widget on the demo page', () => {
   test('the bubble answers a question with sources', async ({ page }) => {
     test.skip(!seeded, 'Needs the Supabase service role key from apps/web/.env');
 
-    await page.goto(`/demo/${seeded!.publicKey}`);
+    await visit(page, `/demo/${seeded!.publicKey}`);
     // The assistant is already named after its docs, so the stand-in site says "docs" once.
     await expect(page.getByRole('heading', { level: 1 })).toHaveText('Example docs for Northwind');
     await expect(page.getByRole('banner')).toContainText('Northwind docs');
@@ -169,7 +171,7 @@ test.describe('widget on the demo page', () => {
   }) => {
     test.skip(!seeded, 'Needs the Supabase service role key from apps/web/.env');
 
-    await page.goto(`/demo/${seeded!.publicKey}?mode=palette`);
+    await visit(page, `/demo/${seeded!.publicKey}?mode=palette`);
     await expect(widget(page, '.pb-launcher')).toContainText('Ask AI');
 
     await page.keyboard.press('Meta+K');
@@ -207,7 +209,7 @@ test.describe('widget on the demo page', () => {
   });
 
   test('an unknown key is a real 404 with a way out', async ({ page }) => {
-    const response = await page.goto('/demo/pb_ffffffffffffffffffffffffffffffff');
+    const response = await visit(page, '/demo/pb_ffffffffffffffffffffffffffffffff');
 
     expect(response?.status()).toBe(404);
     await expect(page.getByRole('heading', { level: 1 })).toHaveText('No assistant has this key');
@@ -217,7 +219,7 @@ test.describe('widget on the demo page', () => {
   test('the live preview shows after a full page load and a reload', async ({ page }) => {
     test.skip(!seeded, 'Needs the Supabase service role key from apps/web/.env');
 
-    await page.goto('/login');
+    await visit(page, '/login');
     await page.getByLabel(/email/i).fill(seeded!.email);
     await page.getByLabel(/^password/i).fill(PASSWORD);
     await page.getByRole('button', { name: 'Sign in' }).click();
@@ -237,10 +239,10 @@ test.describe('widget on the demo page', () => {
 
     const frame = page.locator('iframe[title="Widget preview"]');
 
-    await page.goto(`/a/${seeded!.assistantId}/widget`);
+    await visit(page, `/a/${seeded!.assistantId}/widget`);
     await expect(frame).toHaveCSS('opacity', '1', { timeout: 10_000 });
 
-    await page.reload();
+    await reload(page);
     await expect(frame).toHaveCSS('opacity', '1', { timeout: 10_000 });
     await expect(
       page.frameLocator('iframe[title="Widget preview"]').locator('#parbot-widget'),
@@ -252,13 +254,13 @@ test.describe('widget on the demo page', () => {
   test('a saved theme shows in the settings preview at once', async ({ page }) => {
     test.skip(!seeded, 'Needs the Supabase service role key from apps/web/.env');
 
-    await page.goto('/login');
+    await visit(page, '/login');
     await page.getByLabel(/email/i).fill(seeded!.email);
     await page.getByLabel(/^password/i).fill(PASSWORD);
     await page.getByRole('button', { name: 'Sign in' }).click();
     await page.waitForURL(/\/(dashboard|a\/)/);
 
-    await page.goto(`/a/${seeded!.assistantId}/widget`);
+    await visit(page, `/a/${seeded!.assistantId}/widget`);
     await expect(page.getByRole('heading', { name: 'Widget' })).toBeVisible();
     // A production server can stream the snippet in before React swaps it into place, so two
     // copies exist for a moment; either one carries the key.

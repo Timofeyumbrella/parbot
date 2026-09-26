@@ -1,6 +1,8 @@
 import { type Browser, expect, type Page, test } from '@playwright/test';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
+import { visit } from './support/navigation';
+
 /**
  * The Inbox and the Overview against real rows: the list pages in the server's order and keeps it
  * after "Load more", a transcript shows its sources exactly as the chat shows them, and the
@@ -239,7 +241,7 @@ const seed = async (service: SupabaseClient): Promise<Seed> => {
 };
 
 const signIn = async (page: Page, email: string, next: string) => {
-  await page.goto(`/login?next=${encodeURIComponent(next)}`);
+  await visit(page, `/login?next=${encodeURIComponent(next)}`);
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Password').fill(PASSWORD);
   await page.getByRole('button', { name: 'Sign in' }).click();
@@ -281,7 +283,7 @@ test.describe('the inbox and the overview', () => {
         .order('id', { ascending: false }),
     ).map((row) => row.id as string);
 
-    await page.goto(`/a/${seeded.assistantId}/inbox`);
+    await visit(page, `/a/${seeded.assistantId}/inbox`);
 
     const rows = page.getByTestId('conversation-list').locator('li[data-conversation-id]');
     const shown = () =>
@@ -297,7 +299,7 @@ test.describe('the inbox and the overview', () => {
   });
 
   test('a transcript shows its sources with the chat components, one chip per page', async () => {
-    await page.goto(`/a/${seeded.assistantId}/inbox/${seeded.citedConversationId}`);
+    await visit(page, `/a/${seeded.assistantId}/inbox/${seeded.citedConversationId}`);
 
     const answer = page.locator('[data-testid="transcript-message"][data-role="assistant"]');
 
@@ -323,7 +325,7 @@ test.describe('the inbox and the overview', () => {
     const transcriptHtml = await sources.evaluate((node) => node.outerHTML);
 
     // The same answer in the chat renders the very same markup.
-    await page.goto(`/a/${seeded.assistantId}/chat/${seeded.citedConversationId}`);
+    await visit(page, `/a/${seeded.assistantId}/chat/${seeded.citedConversationId}`);
 
     const chatAnswer = page.locator('[data-role="assistant"]');
     const chatSources = chatAnswer.getByTestId('sources');
@@ -364,7 +366,7 @@ test.describe('the inbox and the overview', () => {
           }),
         );
 
-    await page.goto(`/a/${seeded.assistantId}`);
+    await visit(page, `/a/${seeded.assistantId}`);
     await expect(page.getByTestId('top-questions').getByText(OLD_QUESTION)).toBeVisible();
 
     const top = await measure('top-questions');
