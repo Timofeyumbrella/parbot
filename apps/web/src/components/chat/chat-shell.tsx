@@ -53,7 +53,8 @@ export type ChatShellProps = {
 export const ChatShell = ({ assistantId, list, children }: ChatShellProps) => {
   const params = useParams<{ conversationId?: string }>();
   const routed = params.conversationId ?? null;
-  const [picked, setPicked] = useState<{ id: string | null } | null>(null);
+  // `fresh` tells one New chat from the next, so each click starts a blank screen.
+  const [picked, setPicked] = useState<{ id: string | null; fresh: number } | null>(null);
   const [route, setRoute] = useState(routed);
 
   // The route moved (the pick landed, or the reader went elsewhere): the route is the truth again.
@@ -63,8 +64,13 @@ export const ChatShell = ({ assistantId, list, children }: ChatShellProps) => {
   }
 
   const conversationId = picked ? picked.id : routed;
+  // New chat never defers to the route, even on the new chat URL: a chat just started there shows
+  // its thread until the router has moved to the chat's own URL, a round trip after a page load.
   const select = useCallback(
-    (id: string | null) => setPicked(id === routed ? null : { id }),
+    (id: string | null) =>
+      setPicked((current) =>
+        id !== null && id === routed ? null : { id, fresh: (current?.fresh ?? 0) + 1 },
+      ),
     [routed],
   );
   const selection = useMemo(
@@ -125,7 +131,7 @@ export const ChatShell = ({ assistantId, list, children }: ChatShellProps) => {
               picked.id ? (
                 <Thread key={picked.id} conversationId={picked.id} />
               ) : (
-                <NewChat />
+                <NewChat key={picked.fresh} />
               )
             ) : (
               children
