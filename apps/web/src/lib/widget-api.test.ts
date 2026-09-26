@@ -188,13 +188,14 @@ describe('corsHeaders and clientIp', () => {
     expect(clientIp(new Request('http://x'))).toBe('unknown');
   });
 
-  it('charges the buckets narrowest first and stops at the first that is full', () => {
+  it('charges the buckets narrowest first and stops at the first that is full', async () => {
     resetRateLimits();
+    const service = createFakeService().client;
     const tight = { limit: 1, windowMs: 60_000 };
     const wide = { limit: 5, windowMs: 60_000 };
 
     expect(
-      takeRateLimits([
+      await takeRateLimits(service, [
         ['test:narrow', tight],
         ['test:wide', wide],
       ]),
@@ -202,17 +203,45 @@ describe('corsHeaders and clientIp', () => {
 
     // Refused by the narrow bucket, with the wait in whole seconds, and not charged to the wide one.
     expect(
-      takeRateLimits([
+      await takeRateLimits(service, [
         ['test:narrow', tight],
         ['test:wide', wide],
       ]),
     ).toBe('60');
 
     for (let index = 0; index < 4; index += 1) {
-      expect(takeRateLimits([['test:wide', wide]])).toBeNull();
+      expect(await takeRateLimits(service, [['test:wide', wide]])).toBeNull();
     }
 
-    expect(takeRateLimits([['test:wide', wide]])).toBe('60');
+    expect(await takeRateLimits(service, [['test:wide', wide]])).toBe('60');
+  });
+
+  it('asks the shared limiter once per request with every bucket in order', async () => {
+    const fake = createFakeService();
+
+    await takeRateLimits(fake.client, [
+      ['test:visitor', { limit: 12, windowMs: 60_000 }],
+      ['test:ip', { limit: 30, windowMs: 60_000 }],
+    ]);
+
+    expect(fake.calls).toEqual([
+      {
+        fn: 'take_rate_limits',
+        args: {
+          buckets: ['test:visitor', 'test:ip'],
+          max_hits: [12, 30],
+          window_ms: [60_000, 60_000],
+        },
+      },
+    ]);
+  });
+
+  it('never answers a zero wait, even when the database says less than a second', async () => {
+    const service = createFakeService().client;
+    const blip = { limit: 1, windowMs: 200 };
+
+    expect(await takeRateLimits(service, [['test:blip', blip]])).toBeNull();
+    expect(await takeRateLimits(service, [['test:blip', blip]])).toBe('1');
   });
 });
 

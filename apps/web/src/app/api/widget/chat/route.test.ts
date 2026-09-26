@@ -218,6 +218,49 @@ describe('POST /api/widget/chat', () => {
     expect(other.status).toBe(200);
   });
 
+  it('charges the shared limiter once per message: visitor, address, assistant, then owner', async () => {
+    const fake = holder.service as FakeService;
+
+    await (await post(body(), { 'x-forwarded-for': '203.0.113.5' })).text();
+
+    expect(fake.calls).toEqual([
+      {
+        fn: 'take_rate_limits',
+        args: {
+          buckets: [
+            `widget:visitor:11111111-1111-4111-8111-111111111111:${VISITOR}`,
+            'widget:ip:203.0.113.5',
+            'widget:assistant:11111111-1111-4111-8111-111111111111',
+            'widget:owner:00000000-0000-4000-8000-000000000001',
+          ],
+          max_hits: [12, 30, 60, 120],
+          window_ms: [60_000, 60_000, 60_000, 60_000],
+        },
+      },
+    ]);
+  });
+
+  it('keeps limiting on this instance when the shared limiter fails, and logs why', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const fake = holder.service as FakeService;
+    fake.failRpc('take_rate_limits', 'connection refused');
+
+    for (let index = 0; index < 12; index += 1) {
+      const response = await post(body());
+      expect(response.status).toBe(200);
+      await response.text();
+    }
+
+    const limited = await post(body());
+    expect(limited.status).toBe(429);
+    expect(Number(limited.headers.get('retry-after'))).toBeGreaterThan(0);
+    expect(logged).toHaveBeenCalledWith(
+      expect.stringContaining('[rate-limit]'),
+      'connection refused',
+    );
+    logged.mockRestore();
+  });
+
   it('limits one address to 30 messages a minute across visitors and assistants', async () => {
     holder.service = manyAssistants();
 

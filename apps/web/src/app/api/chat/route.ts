@@ -3,13 +3,14 @@ import type { NextRequest } from 'next/server';
 import { z } from 'zod';
 
 import { getAiProvider } from '@/lib/ai';
-import { errorStream, rateLimit, streamAnswer, streamResponse } from '@/lib/engine';
+import { chargeRateLimits, errorStream, streamAnswer, streamResponse } from '@/lib/engine';
 import { getSession } from '@/lib/session';
 import { createSupabaseServiceClient } from '@/lib/supabase/service';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
+/** A sliding minute per account, counted in the database so every server instance shares it. */
 const CHAT_LIMIT = { limit: 30, windowMs: 60_000 };
 
 const requestSchema = z.object({
@@ -70,11 +71,18 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  const { data: assistant } = await supabase
-    .from('assistants')
-    .select('id, owner_id, name, instructions')
-    .eq('id', parsed.data.assistantId)
-    .maybeSingle();
+  // The limit is the account's own, so it is charged alongside the lookup rather than after it:
+  // one round trip less before the answer starts, at the cost of counting a request for a missing
+  // assistant against the account that sent it.
+  const service = createSupabaseServiceClient();
+  const [{ data: assistant }, verdict] = await Promise.all([
+    supabase
+      .from('assistants')
+      .select('id, owner_id, name, instructions')
+      .eq('id', parsed.data.assistantId)
+      .maybeSingle(),
+    chargeRateLimits(service, [[`chat:${user.id}`, CHAT_LIMIT]]),
+  ]);
 
   if (!assistant) {
     return fail(404, {
@@ -83,8 +91,6 @@ export async function POST(request: NextRequest) {
       message: 'That assistant does not exist.',
     });
   }
-
-  const verdict = rateLimit(`chat:${user.id}`, CHAT_LIMIT);
 
   if (!verdict.allowed) {
     const seconds = Math.max(Math.ceil(verdict.retryAfterMs / 1000), 1);
@@ -98,7 +104,7 @@ export async function POST(request: NextRequest) {
 
   return streamResponse(
     streamAnswer({
-      service: createSupabaseServiceClient(),
+      service,
       provider: getAiProvider(),
       assistant,
       conversation: { id: parsed.data.conversationId, channel: 'app' },

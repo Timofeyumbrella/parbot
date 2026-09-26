@@ -168,6 +168,25 @@ describe('POST /api/widget/lead', () => {
     expect((await post(body({ conversationId: undefined }))).status).toBe(429);
   });
 
+  it('charges the shared limiter once per lead: visitor, address, then assistant', async () => {
+    await post(body({ conversationId: undefined }), { 'x-forwarded-for': '203.0.113.5' });
+
+    expect((holder.service as FakeService).calls).toEqual([
+      {
+        fn: 'take_rate_limits',
+        args: {
+          buckets: [
+            `widget:lead:${ASSISTANT}:${VISITOR}`,
+            'widget:lead:ip:203.0.113.5',
+            `widget:lead:assistant:${ASSISTANT}`,
+          ],
+          max_hits: [5, 20, 30],
+          window_ms: [60_000, 60_000, 60_000],
+        },
+      },
+    ]);
+  });
+
   it('caps one address however the visitor id changes', async () => {
     for (let index = 0; index < 20; index += 1) {
       const response = await post(body({ conversationId: undefined, visitorId: visitor(index) }), {

@@ -420,6 +420,24 @@ export type Database = {
         }
         Relationships: []
       }
+      rate_limits: {
+        Row: {
+          bucket: string
+          expires_at: string
+          hits: string[]
+        }
+        Insert: {
+          bucket: string
+          expires_at: string
+          hits?: string[]
+        }
+        Update: {
+          bucket?: string
+          expires_at?: string
+          hits?: string[]
+        }
+        Relationships: []
+      }
       sources: {
         Row: {
           assistant_id: string
@@ -655,6 +673,20 @@ export type Database = {
       reserve_message: {
         Args: { max_allowed: number; owner: string }
         Returns: boolean
+      }
+      take_rate_limit: {
+        Args: { bucket: string; max_hits: number; window_ms: number }
+        Returns: {
+          allowed: boolean
+          retry_after_ms: number
+        }[]
+      }
+      take_rate_limits: {
+        Args: { buckets: string[]; max_hits: number[]; window_ms: number[] }
+        Returns: {
+          allowed: boolean
+          retry_after_ms: number
+        }[]
       }
       top_questions: {
         Args: { assistant: string; max_rows?: number; since: string }

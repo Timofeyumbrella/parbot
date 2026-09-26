@@ -14,7 +14,7 @@ const session = vi.hoisted(() => ({
 
 const engine = vi.hoisted(() => ({
   streamAnswer: vi.fn(),
-  rateLimit: vi.fn(() => ({ allowed: true, remaining: 29, retryAfterMs: 0 })),
+  chargeRateLimits: vi.fn(async () => ({ allowed: true, retryAfterMs: 0 })),
 }));
 
 vi.mock('@/lib/session', () => ({
@@ -38,7 +38,11 @@ vi.mock('@/lib/ai', () => ({ getAiProvider: () => ({ name: 'stub' }) }));
 vi.mock('@/lib/engine', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/engine')>();
 
-  return { ...actual, streamAnswer: engine.streamAnswer, rateLimit: engine.rateLimit };
+  return {
+    ...actual,
+    streamAnswer: engine.streamAnswer,
+    chargeRateLimits: engine.chargeRateLimits,
+  };
 });
 
 import { POST } from './route';
@@ -79,7 +83,7 @@ describe('POST /api/chat', () => {
       yield { type: 'token', text: 'Hello' };
       yield { type: 'done', answered: true, latencyMs: 5 };
     });
-    engine.rateLimit.mockReturnValue({ allowed: true, remaining: 29, retryAfterMs: 0 });
+    engine.chargeRateLimits.mockResolvedValue({ allowed: true, retryAfterMs: 0 });
   });
 
   it('rejects a body that is not JSON with an error event', async () => {
@@ -165,7 +169,7 @@ describe('POST /api/chat', () => {
   });
 
   it('rate limits per user', async () => {
-    engine.rateLimit.mockReturnValue({ allowed: false, remaining: 0, retryAfterMs: 4200 });
+    engine.chargeRateLimits.mockResolvedValue({ allowed: false, retryAfterMs: 4200 });
 
     const response = await post({
       assistantId: ASSISTANT,
@@ -174,7 +178,11 @@ describe('POST /api/chat', () => {
     });
 
     expect(response.status).toBe(429);
-    expect(engine.rateLimit).toHaveBeenCalledWith('chat:user-1', { limit: 30, windowMs: 60_000 });
+    // Charged once, to the account's own bucket, in the limiter every instance shares.
+    expect(engine.chargeRateLimits).toHaveBeenCalledTimes(1);
+    expect(engine.chargeRateLimits).toHaveBeenCalledWith({ service: true }, [
+      ['chat:user-1', { limit: 30, windowMs: 60_000 }],
+    ]);
     expect(await events(response)).toEqual([
       {
         type: 'error',
@@ -182,6 +190,7 @@ describe('POST /api/chat', () => {
         message: 'You are sending messages quickly. Try again in 5 seconds.',
       },
     ]);
+    expect(engine.streamAnswer).not.toHaveBeenCalled();
   });
 
   it("streams the engine's events for a valid request", async () => {

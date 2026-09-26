@@ -28,7 +28,7 @@ import { z } from 'zod';
 import { entitledPlanId } from '@/lib/billing/entitlement';
 import type { Assistant } from '@/lib/db';
 import type { ServiceClient } from '@/lib/engine';
-import { rateLimit } from '@/lib/engine/rate-limit';
+import { chargeRateLimits, type RateLimitBucket } from '@/lib/engine/rate-limit';
 import { publicEnv } from '@/lib/env';
 import { type Plan, type PlanLimits, planFor } from '@/lib/plans';
 
@@ -268,11 +268,12 @@ export const clientIp = (request: Request) => {
 };
 
 /**
- * The widget's rate limits, each a sliding minute. The visitor limit is a courtesy that keeps one
- * tab from flooding the assistant; the visitor id is the client's to invent, so it protects
- * nobody. The address, assistant and owner limits are the ones that hold when a stranger picks a
- * public key off a customer's site and rotates everything they can. An address gets less than an
- * assistant, so no single address can take a whole assistant's minute.
+ * The widget's rate limits, each a sliding minute shared by every server instance. The visitor
+ * limit is a courtesy that keeps one tab from flooding the assistant; the visitor id is the
+ * client's to invent, so it protects nobody. The address, assistant and owner limits are the ones
+ * that hold when a stranger picks a public key off a customer's site and rotates everything they
+ * can. An address gets less than an assistant, so no single address can take a whole assistant's
+ * minute.
  */
 export const WIDGET_VISITOR_LIMIT = { limit: 12, windowMs: 60_000 };
 export const WIDGET_IP_LIMIT = { limit: 30, windowMs: 60_000 };
@@ -282,25 +283,21 @@ export const WIDGET_LEAD_LIMIT = { limit: 5, windowMs: 60_000 };
 export const WIDGET_LEAD_IP_LIMIT = { limit: 20, windowMs: 60_000 };
 export const WIDGET_LEAD_ASSISTANT_LIMIT = { limit: 30, windowMs: 60_000 };
 
-type RateLimitBucket = readonly [key: string, limit: { limit: number; windowMs: number }];
-
 /**
  * Charges one request to each bucket in turn, narrowest first, and stops at the first that is
  * full. A request one bucket refuses is not charged to the wider ones behind it, so a runaway tab
  * or a busy address uses up only its own allowance, not the whole assistant's minute for every
- * other visitor. Returns the Retry-After value in whole seconds (never zero) when a bucket
- * refused, or null when every bucket let the request through.
+ * other visitor. The buckets live in the database, so every instance counts against the same
+ * ones. Returns the Retry-After value in whole seconds (never zero) when a bucket refused, or
+ * null when every bucket let the request through.
  */
-export const takeRateLimits = (buckets: RateLimitBucket[]): string | null => {
-  for (const [key, limit] of buckets) {
-    const verdict = rateLimit(key, limit);
+export const takeRateLimits = async (
+  service: ServiceClient,
+  buckets: readonly RateLimitBucket[],
+): Promise<string | null> => {
+  const outcome = await chargeRateLimits(service, buckets);
 
-    if (!verdict.allowed) {
-      return String(Math.max(1, Math.ceil(verdict.retryAfterMs / 1000)));
-    }
-  }
-
-  return null;
+  return outcome.allowed ? null : String(Math.max(1, Math.ceil(outcome.retryAfterMs / 1000)));
 };
 
 // ---------------------------------------------------------------------------
