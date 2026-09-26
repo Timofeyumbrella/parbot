@@ -14,6 +14,7 @@ import {
   hastText,
   rehypeCitations,
   rehypeStreamingCaret,
+  rehypeStripCitations,
 } from '@/lib/chat/markdown';
 
 import './answer.css';
@@ -24,6 +25,8 @@ type AnswerMarkdownProps = {
   /** The id the sources row carries, so a chip without a url can jump to it. */
   sourcesId: string;
   streaming?: boolean;
+  /** Removes `[n]` markers instead of linking them: for a stopped answer that got no citations. */
+  stripCitations?: boolean;
   className?: string;
 };
 
@@ -125,6 +128,7 @@ export const AnswerMarkdown = memo(function AnswerMarkdown({
   citations,
   sourcesId,
   streaming = false,
+  stripCitations = false,
   className,
 }: AnswerMarkdownProps) {
   // Indexes are the passages' places in the prompt and only cited ones are kept, so an answer
@@ -136,7 +140,9 @@ export const AnswerMarkdown = memo(function AnswerMarkdown({
       [rehypeHighlight, { detect: false }],
     ];
 
-    if (max > 0) {
+    if (stripCitations) {
+      plugins.push(rehypeStripCitations);
+    } else if (max > 0) {
       plugins.push([rehypeCitations, { max }]);
     }
 
@@ -145,7 +151,7 @@ export const AnswerMarkdown = memo(function AnswerMarkdown({
     }
 
     return plugins;
-  }, [max, streaming]);
+  }, [max, streaming, stripCitations]);
 
   const components = useMemo(() => buildComponents(citations, sourcesId), [citations, sourcesId]);
 

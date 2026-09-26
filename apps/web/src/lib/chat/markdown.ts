@@ -90,6 +90,61 @@ export const rehypeCitations = (options: { max: number }) => (tree: HastRoot) =>
   }
 };
 
+/** A marker with the space before it, and a marker cut off at the end of the text by a stop. */
+const MARKER_WITH_SPACE = /[ \t]?\[\d{1,2}(?:\s*,\s*\d{1,2})*\]/g;
+const CUT_MARKER = /[ \t]?\[[\d,\s]*$/;
+
+/** Removes `[n]` markers from text, and a half-written one at its end. */
+export const stripCitationMarkers = (value: string, atEnd: boolean) => {
+  const stripped = value.replace(MARKER_WITH_SPACE, '');
+
+  return atEnd ? stripped.replace(CUT_MARKER, '') : stripped;
+};
+
+/** The last text with something in it; line breaks between blocks do not count. */
+const lastTextNode = (node: HastNode): HastText | null => {
+  if (isText(node)) {
+    return node.value.trim() ? node : null;
+  }
+
+  if (!isParent(node)) {
+    return null;
+  }
+
+  for (let index = node.children.length - 1; index >= 0; index -= 1) {
+    const found = lastTextNode(node.children[index]!);
+
+    if (found) {
+      return found;
+    }
+  }
+
+  return null;
+};
+
+const walkStrip = (node: HastNode, last: HastText | null) => {
+  if (!isParent(node) || (isElement(node) && NO_CITATIONS_INSIDE.has(node.tagName))) {
+    return;
+  }
+
+  for (const child of node.children) {
+    if (isText(child)) {
+      child.value = stripCitationMarkers(child.value, child === last);
+    } else {
+      walkStrip(child, last);
+    }
+  }
+};
+
+/**
+ * Takes `[n]` markers out of an answer that has no citations for them to point at. A stopped
+ * answer never received its citations (they come with the end of the stream), and bare markers
+ * read as noise; the saved answer carries them, so a reload shows the chips and the sources.
+ */
+export const rehypeStripCitations = () => (tree: HastRoot) => {
+  walkStrip(tree, lastTextNode(tree));
+};
+
 const lastElement = (node: HastNode): HastElement | null => {
   if (!isParent(node)) {
     return null;

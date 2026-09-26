@@ -6,7 +6,9 @@ import {
   hastText,
   rehypeCitations,
   rehypeStreamingCaret,
+  rehypeStripCitations,
   splitCitations,
+  stripCitationMarkers,
 } from './markdown';
 
 const paragraph = (text: string) => ({
@@ -64,6 +66,54 @@ describe('rehypeCitations', () => {
     const first = tree.children[0] as { children: { type: string; value?: string }[] };
     expect(first.children.map((node) => node.type)).toEqual(['text', 'element']);
     expect(hastText(tree.children[1])).toBe('x[1]');
+  });
+});
+
+describe('stripCitationMarkers', () => {
+  it('takes markers out with the space before them', () => {
+    expect(stripCitationMarkers('Rotate it in Settings [1]. Verify it [2, 3].', false)).toBe(
+      'Rotate it in Settings. Verify it.',
+    );
+  });
+
+  it('also drops a marker a stop cut in half, but only at the very end', () => {
+    expect(stripCitationMarkers('Rotate it in Settings [1', true)).toBe('Rotate it in Settings');
+    expect(stripCitationMarkers('Rotate it in Settings [', true)).toBe('Rotate it in Settings');
+    expect(stripCitationMarkers('An array [1', false)).toBe('An array [1');
+  });
+});
+
+describe('rehypeStripCitations', () => {
+  it('strips markers from prose and leaves code alone', () => {
+    const tree: HastRoot = {
+      type: 'root',
+      children: [
+        paragraph('Keys live in Settings [1]. Rotate them [2].'),
+        { type: 'text', value: '\n' },
+        {
+          type: 'element',
+          tagName: 'pre',
+          properties: {},
+          children: [
+            {
+              type: 'element',
+              tagName: 'code',
+              properties: {},
+              children: [{ type: 'text', value: 'keys[1]' }],
+            },
+          ],
+        },
+        { type: 'text', value: '\n' },
+        paragraph('Webhooks are signed [3'),
+        { type: 'text', value: '\n' },
+      ],
+    };
+
+    rehypeStripCitations()(tree);
+
+    expect(hastText(tree)).toBe(
+      'Keys live in Settings. Rotate them.\nkeys[1]\nWebhooks are signed\n',
+    );
   });
 });
 

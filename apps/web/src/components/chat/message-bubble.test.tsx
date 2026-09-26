@@ -248,6 +248,42 @@ describe('MessageBubble for the assistant', () => {
     ).not.toBeNull();
   });
 
+  it('drops the bare markers of a stopped answer that never got its citations', () => {
+    const { container } = renderBubble({
+      message: message({
+        content: 'Rotate the key in **Settings** [1]. Keep the old one [2',
+        citations: [],
+        status: 'stopped',
+        latency_ms: null,
+      }),
+    });
+
+    const answer = container.querySelector('.answer-prose')!;
+
+    expect(answer.textContent).toBe('Rotate the key in Settings. Keep the old one');
+    expect(answer.querySelector('sup')).toBeNull();
+    expect(screen.queryByTestId('sources')).not.toBeInTheDocument();
+    expect(screen.getByText('Stopped')).toBeInTheDocument();
+  });
+
+  it('shows the chips and sources of a stopped answer read back with its citations', () => {
+    const { container } = renderBubble({
+      message: message({
+        content: 'Rotate the key in **Settings** [1]. Keep',
+        citations: [citations[0]!],
+        status: 'stopped',
+        answered: null,
+      }),
+    });
+
+    expect(container.querySelector('sup[data-citation="1"] a')).toHaveAttribute(
+      'href',
+      'https://docs.acme.test/auth',
+    );
+    expect(screen.getByTestId('sources')).toHaveTextContent('Authentication');
+    expect(screen.getByText('Stopped')).toBeInTheDocument();
+  });
+
   it('labels a stopped answer and keeps its partial text', () => {
     renderBubble({
       message: message({ content: 'Partial', citations: [], status: 'stopped', latency_ms: null }),

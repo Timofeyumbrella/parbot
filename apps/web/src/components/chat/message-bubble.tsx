@@ -119,6 +119,7 @@ const AssistantBubble = ({
             citations={message.citations}
             sourcesId={sourcesId}
             streaming={streaming}
+            stripCitations={message.status === 'stopped' && message.citations.length === 0}
             className={cn(unanswered && 'text-muted-foreground')}
           />
         )}
