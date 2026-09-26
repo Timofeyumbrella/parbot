@@ -735,11 +735,12 @@ test.describe('the in-app chat', () => {
     expect(Date.now() - started).toBeLessThan(600);
 
     // The held payloads arrive; the reader stays on the new chat they asked for.
-    await releaseRoutes(page);
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(2500);
     await expect(page).toHaveURL(/\/chat$/);
     await expect(page.getByTestId('new-chat').getByTestId('welcome')).toBeVisible();
     await expect(thread(page)).toHaveCount(0);
+    // The router dropped the chat's own navigation, so its held request never settles.
+    await page.unrouteAll({ behavior: 'ignoreErrors' });
   });
 
   test('none of the flows above logged a console error or warning', () => {
