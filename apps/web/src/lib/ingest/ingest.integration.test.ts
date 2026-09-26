@@ -89,7 +89,7 @@ const serve =
 
 // Runs against the local Supabase stack; skipped where there is none.
 describe.skipIf(!serviceKey)('ingestSource against the local database', () => {
-  const service = createClient<Database>(url, serviceKey ?? '', {
+  const service = createClient<Database>(url, serviceKey || 'not-configured', {
     auth: { persistSession: false, autoRefreshToken: false },
   });
   const provider = createStubProvider();

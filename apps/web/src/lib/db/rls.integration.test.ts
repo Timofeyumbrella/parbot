@@ -20,7 +20,7 @@ const clientOptions = { auth: { persistSession: false, autoRefreshToken: false }
  * that drops or loosens a policy fails here instead of shipping.
  */
 describe.skipIf(!serviceKey || !anonKey)('row level security against the local database', () => {
-  const service = createClient<Database>(url, serviceKey ?? 'missing', clientOptions);
+  const service = createClient<Database>(url, serviceKey || 'not-configured', clientOptions);
   const stamp = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
   type Account = {
@@ -128,7 +128,7 @@ describe.skipIf(!serviceKey || !anonKey)('row level security against the local d
       .single();
     await service.rpc('increment_usage', { owner: id, usage: 'messages', delta: 3 });
 
-    const client = createClient<Database>(url, anonKey ?? 'missing', clientOptions);
+    const client = createClient<Database>(url, anonKey || 'not-configured', clientOptions);
     clients.push(client);
     const { error: signInError } = await client.auth.signInWithPassword({ email, password });
 
@@ -338,7 +338,7 @@ describe.skipIf(!serviceKey || !anonKey)('row level security against the local d
   });
 
   it('gives the anon key no table access at all', async () => {
-    const anon = createClient<Database>(url, anonKey ?? 'missing', clientOptions);
+    const anon = createClient<Database>(url, anonKey || 'not-configured', clientOptions);
 
     const [assistants, conversations, owns] = await Promise.all([
       anon.from('assistants').select('id, public_key').limit(1),

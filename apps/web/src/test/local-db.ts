@@ -15,7 +15,12 @@ export const hasLocalDb = Boolean(anonKey && serviceKey);
 
 const options = { auth: { persistSession: false, autoRefreshToken: false } };
 
-export const createServiceClient = () => createClient<Database>(url, serviceKey, options);
+// Suites build their client while Vitest collects them, even when they are skipped for want of
+// keys; a placeholder keeps that from throwing. Skipped suites never send a request with it.
+const UNCONFIGURED = 'not-configured';
+
+export const createServiceClient = () =>
+  createClient<Database>(url, serviceKey || UNCONFIGURED, options);
 
 export type TestAccount = {
   userId: string;
@@ -51,7 +56,7 @@ export const createTestAccount = async (
     throw new Error(assistantError?.message ?? 'no assistant');
   }
 
-  const client = createClient<Database>(url, anonKey, options);
+  const client = createClient<Database>(url, anonKey || UNCONFIGURED, options);
   const { error: signInError } = await client.auth.signInWithPassword({ email, password });
 
   if (signInError) {

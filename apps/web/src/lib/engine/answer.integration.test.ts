@@ -15,7 +15,7 @@ const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 // Runs against the local Supabase stack as a throwaway account; skipped where there is none.
 describe.skipIf(!serviceKey)('streamAnswer against the local database', () => {
-  const service = createClient<Database>(url, serviceKey ?? 'missing', {
+  const service = createClient<Database>(url, serviceKey || 'not-configured', {
     auth: { persistSession: false, autoRefreshToken: false },
   });
   const provider = createStubProvider();

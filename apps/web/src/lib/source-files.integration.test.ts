@@ -13,7 +13,7 @@ const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 // The recursion relies on Storage reporting folders with a null id and one level per listing.
 // This checks those assumptions against the local stack; skipped where there is none.
 describe.skipIf(!serviceKey)('removeStoredFiles against local Storage', () => {
-  const service = createClient<Database>(url, serviceKey ?? '', {
+  const service = createClient<Database>(url, serviceKey || 'not-configured', {
     auth: { persistSession: false, autoRefreshToken: false },
   });
   // The service role bypasses the folder policies, so the ids need not belong to anyone.
