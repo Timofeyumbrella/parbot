@@ -323,6 +323,48 @@ export type Database = {
           },
         ]
       }
+      message_stops: {
+        Row: {
+          assistant_id: string
+          content: string
+          conversation_id: string
+          created_at: string
+          message_id: string
+          owner_id: string
+        }
+        Insert: {
+          assistant_id: string
+          content?: string
+          conversation_id: string
+          created_at?: string
+          message_id: string
+          owner_id: string
+        }
+        Update: {
+          assistant_id?: string
+          content?: string
+          conversation_id?: string
+          created_at?: string
+          message_id?: string
+          owner_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "message_stops_assistant_id_fkey"
+            columns: ["assistant_id"]
+            isOneToOne: false
+            referencedRelation: "assistants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_stops_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       messages: {
         Row: {
           answered: boolean | null
@@ -417,6 +459,24 @@ export type Database = {
           full_name?: string | null
           id?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      rate_limits: {
+        Row: {
+          bucket: string
+          expires_at: string
+          hits: string[]
+        }
+        Insert: {
+          bucket: string
+          expires_at: string
+          hits?: string[]
+        }
+        Update: {
+          bucket?: string
+          expires_at?: string
+          hits?: string[]
         }
         Relationships: []
       }
@@ -655,6 +715,20 @@ export type Database = {
       reserve_message: {
         Args: { max_allowed: number; owner: string }
         Returns: boolean
+      }
+      take_rate_limit: {
+        Args: { bucket: string; max_hits: number; window_ms: number }
+        Returns: {
+          allowed: boolean
+          retry_after_ms: number
+        }[]
+      }
+      take_rate_limits: {
+        Args: { buckets: string[]; max_hits: number[]; window_ms: number[] }
+        Returns: {
+          allowed: boolean
+          retry_after_ms: number
+        }[]
       }
       top_questions: {
         Args: { assistant: string; max_rows?: number; since: string }

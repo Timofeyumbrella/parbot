@@ -26,6 +26,10 @@ type FakeOptions = {
   reserved?: boolean;
   conversationInsertError?: { code: string; message: string } | null;
   assistantInsertError?: { code: string; message: string } | null;
+  /** The reader's recorded stop, read afresh on every look. */
+  stop?: () => Row | null;
+  /** The saved answer a late stop reads back. */
+  savedAnswer?: Row | null;
 };
 
 const fakeService = (options: FakeOptions = {}) => {
@@ -46,7 +50,14 @@ const fakeService = (options: FakeOptions = {}) => {
       case 'conversations/insert':
         return { data: null, error: options.conversationInsertError ?? null };
       case 'messages/select':
-        return { data: options.history ?? [], error: null };
+        // A read by id is a late stop looking for the saved answer; anything else is the history.
+        return 'id' in call.filters
+          ? { data: options.savedAnswer ?? null, error: null }
+          : { data: options.history ?? [], error: null };
+      case 'messages/update':
+        return { data: [{ id: call.filters.id }], error: null };
+      case 'message_stops/select':
+        return { data: options.stop?.() ?? null, error: null };
       case 'messages/insert': {
         const payload = call.payload as Row;
 
@@ -73,6 +84,16 @@ const fakeService = (options: FakeOptions = {}) => {
       limit: () => chain,
       eq: (column: string, value: unknown) => {
         call.filters[column] = value;
+
+        return chain;
+      },
+      is: (column: string, value: unknown) => {
+        call.filters[`${column} is`] = value;
+
+        return chain;
+      },
+      not: (column: string, operator: string, value: unknown) => {
+        call.filters[`${column} not ${operator}`] = value;
 
         return chain;
       },
@@ -144,6 +165,8 @@ const chunk = (content: string): Row => ({
 type ProviderOptions = {
   answer?: string;
   failWith?: Error;
+  /** A pause before each word, like a model streaming over the network. */
+  delayMs?: number;
 };
 
 /**
@@ -164,7 +187,9 @@ const fakeProvider = (options: ProviderOptions = {}) => {
     }
 
     for (const word of answer.split(' ')) {
-      await Promise.resolve();
+      await (options.delayMs
+        ? new Promise((resolve) => setTimeout(resolve, options.delayMs))
+        : Promise.resolve());
 
       if (input.signal?.aborted) {
         throw new DOMException('The answer was stopped.', 'AbortError');
@@ -589,6 +614,182 @@ describe('streamAnswer stop', () => {
       content: tokenText(seen).trim(),
       answered: null,
     });
+    expect(fake.find('messages', 'delete')).toHaveLength(0);
+    expect(fake.rpcNames()).toEqual(['release_message']);
+  });
+
+  it('saves the answer under the id the client proposed', async () => {
+    const fake = fakeService({ conversationReads: [null], chunks: [chunk('Relevant.')] });
+    const { provider } = fakeProvider();
+    const events = await collect(
+      streamAnswer({
+        service: fake.service,
+        provider,
+        assistant,
+        conversation: { id: 'c-new', channel: 'app' },
+        message: 'Where is the palette?',
+        assistantMessageId: 'proposed-id',
+      }),
+    );
+
+    expect(events[0]).toMatchObject({ type: 'meta', assistantMessageId: 'proposed-id' });
+    expect(assistantInsert(fake)).toMatchObject({ id: 'proposed-id', answered: true });
+  });
+
+  it('honours a recorded stop mid-answer though the request never aborts', async () => {
+    let stop: Row | null = null;
+    const fake = fakeService({
+      conversationReads: [null],
+      chunks: [chunk('Relevant.')],
+      stop: () => stop,
+    });
+    const { provider } = fakeProvider({
+      answer: Array.from({ length: 60 }, (_, index) => `word${index}`).join(' '),
+      delayMs: 5,
+    });
+    const events: ChatStreamEvent[] = [];
+
+    for await (const event of streamAnswer({
+      service: fake.service,
+      provider,
+      assistant,
+      conversation: { id: 'c-new', channel: 'app' },
+      message: 'Where is the palette?',
+      assistantMessageId: 'answer-1',
+      stopPollMs: 10,
+    })) {
+      events.push(event);
+
+      // The server has sent word3 by now, but the reader's screen only got as far as word2.
+      if (event.type === 'token' && event.text.includes('word3') && !stop) {
+        stop = { content: 'word0 word1 word2 ' };
+      }
+    }
+
+    const reads = fake.find('message_stops', 'select');
+
+    expect(reads[0]!.filters).toEqual({
+      message_id: 'answer-1',
+      conversation_id: 'c-new',
+      assistant_id: 'a1',
+    });
+    // The model was cut off long before its sixtieth word, and nothing went out after the stop.
+    expect(events.map((event) => event.type)).not.toContain('done');
+    expect(tokenText(events)).not.toContain('word59');
+    expect(tokenText(events)).toContain('word3');
+    // What the reader saw, not what the server had sent.
+    expect(assistantInsert(fake)).toMatchObject({
+      id: 'answer-1',
+      content: 'word0 word1 word2',
+      answered: null,
+    });
+    expect(fake.find('messages', 'delete')).toHaveLength(0);
+    expect(fake.rpcNames()).toEqual(['release_message']);
+  });
+
+  it('looks once more before saving, so a stop that just landed is not saved as an answer', async () => {
+    let stop: Row | null = null;
+    const fake = fakeService({
+      conversationReads: [null],
+      chunks: [chunk('Relevant.')],
+      stop: () => stop,
+    });
+    const { provider } = fakeProvider();
+    const events: ChatStreamEvent[] = [];
+
+    for await (const event of streamAnswer({
+      service: fake.service,
+      provider,
+      assistant,
+      conversation: { id: 'c-new', channel: 'app' },
+      message: 'Where is the palette?',
+      // Only the first look and the one before saving happen within this answer.
+      stopPollMs: 60_000,
+    })) {
+      events.push(event);
+
+      if (event.type === 'token') {
+        stop = { content: 'Pick the palette' };
+      }
+    }
+
+    expect(events.map((event) => event.type)).not.toContain('done');
+    expect(assistantInsert(fake)).toMatchObject({
+      content: 'Pick the palette',
+      answered: null,
+      citations: [],
+    });
+    expect(fake.rpcNames()).toEqual(['release_message']);
+  });
+
+  it('applies a stop that lands between the last look and the save, after the reader has done', async () => {
+    const answer =
+      'Pick the palette mode in Settings, then choose a shortcut for opening it from any page. [1]';
+    let saved = false;
+    const fake = fakeService({
+      conversationReads: [null],
+      chunks: [chunk('Relevant.')],
+      stop: () => (saved ? { content: 'Pick the palette mode' } : null),
+      savedAnswer: {
+        content: answer,
+        citations: [{ index: 1, documentId: 'd1', title: 'Setup', url: null, snippet: 's' }],
+        answered: true,
+        owner_id: 'o1',
+      },
+    });
+    const { provider } = fakeProvider({ answer });
+    const events: ChatStreamEvent[] = [];
+
+    for await (const event of streamAnswer({
+      service: fake.service,
+      provider,
+      assistant,
+      conversation: { id: 'c-new', channel: 'app' },
+      message: 'Where is the palette?',
+      assistantMessageId: 'answer-2',
+      stopPollMs: 60_000,
+    })) {
+      events.push(event);
+      saved ||= event.type === 'citations';
+    }
+
+    // The reader got the whole answer; the stop recorded meanwhile still wins in the database.
+    expect(events.at(-1)).toMatchObject({ type: 'done', answered: true });
+    expect(assistantInsert(fake)).toMatchObject({ id: 'answer-2', answered: true });
+
+    const update = fake.find('messages', 'update')[0];
+
+    expect(update?.payload).toEqual({
+      content: 'Pick the palette mode',
+      citations: [],
+      answered: null,
+    });
+    expect(update?.filters).toMatchObject({ id: 'answer-2', 'answered not is': null });
+    expect(fake.rpcNames()).toEqual(['release_message']);
+  });
+
+  it('keeps only the question when a stop was recorded before the answer started', async () => {
+    const fake = fakeService({
+      conversationReads: [null],
+      chunks: [chunk('Relevant.')],
+      stop: () => ({ content: '' }),
+    });
+    const { provider } = fakeProvider();
+
+    const events = await collect(
+      streamAnswer({
+        service: fake.service,
+        provider,
+        assistant,
+        conversation: { id: 'c-new', channel: 'app' },
+        message: 'Where is the palette?',
+      }),
+    );
+
+    expect(events.map((event) => event.type)).not.toContain('done');
+    expect(fake.find('messages', 'insert').map((call) => (call.payload as Row).role)).toEqual([
+      'user',
+    ]);
     expect(fake.find('messages', 'delete')).toHaveLength(0);
     expect(fake.rpcNames()).toEqual(['release_message']);
   });

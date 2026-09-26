@@ -4,7 +4,12 @@
  * controllers therefore live here, keyed by conversation, and components subscribe for changes.
  */
 
-const controllers = new Map<string, AbortController>();
+/** The answer a stream is writing: its assistant and the id it will be saved under. */
+export type StreamTarget = { assistantId: string; messageId: string };
+
+type Entry = { controller: AbortController; target: StreamTarget | null };
+
+const entries = new Map<string, Entry>();
 const listeners = new Set<() => void>();
 
 const notify = () => {
@@ -14,39 +19,44 @@ const notify = () => {
 };
 
 export const streamRegistry = {
-  start(conversationId: string) {
+  start(conversationId: string, target: StreamTarget | null = null) {
     const controller = new AbortController();
 
-    controllers.get(conversationId)?.abort();
-    controllers.set(conversationId, controller);
+    entries.get(conversationId)?.controller.abort();
+    entries.set(conversationId, { controller, target });
     notify();
 
     return controller;
   },
 
   finish(conversationId: string, controller: AbortController) {
-    if (controllers.get(conversationId) === controller) {
-      controllers.delete(conversationId);
+    if (entries.get(conversationId)?.controller === controller) {
+      entries.delete(conversationId);
       notify();
     }
   },
 
   stop(conversationId: string) {
-    const controller = controllers.get(conversationId);
+    const entry = entries.get(conversationId);
 
-    if (!controller) {
+    if (!entry) {
       return false;
     }
 
-    controller.abort();
-    controllers.delete(conversationId);
+    entry.controller.abort();
+    entries.delete(conversationId);
     notify();
 
     return true;
   },
 
+  /** The answer the conversation's stream is writing, so a Stop can name it to the server. */
+  target(conversationId: string) {
+    return entries.get(conversationId)?.target ?? null;
+  },
+
   isStreaming(conversationId: string) {
-    return controllers.has(conversationId);
+    return entries.has(conversationId);
   },
 
   subscribe(listener: () => void) {
@@ -59,11 +69,11 @@ export const streamRegistry = {
 
   /** Test hook. */
   reset() {
-    for (const controller of controllers.values()) {
-      controller.abort();
+    for (const entry of entries.values()) {
+      entry.controller.abort();
     }
 
-    controllers.clear();
+    entries.clear();
     notify();
   },
 };

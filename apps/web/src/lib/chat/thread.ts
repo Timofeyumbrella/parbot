@@ -255,6 +255,17 @@ export const stopExchange = (thread: Thread): Thread => {
   };
 };
 
+/** The text of the answer a stream is writing, exactly as the reader sees it; null when none is. */
+export const activeAnswerText = (thread: Thread | undefined): string | null => {
+  const active = thread?.active;
+
+  if (!active) {
+    return null;
+  }
+
+  return thread.messages.find((message) => message.id === active.assistantId)?.content ?? '';
+};
+
 /** Drops a user message and the assistant message that answers it, for a retry. */
 export const removeExchange = (thread: Thread, userId: string): Thread => {
   const index = thread.messages.findIndex((message) => message.id === userId);

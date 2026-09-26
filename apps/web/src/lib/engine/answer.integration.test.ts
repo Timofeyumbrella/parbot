@@ -9,6 +9,7 @@ import { PLANS, usagePeriodStart } from '@/lib/plans';
 
 import { type AnswerConversation, streamAnswer } from './answer';
 import { UNANSWERED_TEXT } from './prompt';
+import { settleSavedStop } from './stops';
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'http://127.0.0.1:54321';
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -36,7 +37,9 @@ describe.skipIf(!serviceKey)('streamAnswer against the local database', () => {
     options: {
       provider?: AiProvider;
       signal?: AbortSignal;
-      onEvent?: (e: ChatStreamEvent) => void;
+      assistantMessageId?: string;
+      stopPollMs?: number;
+      onEvent?: (e: ChatStreamEvent) => void | Promise<void>;
     } = {},
   ) => {
     const events: ChatStreamEvent[] = [];
@@ -48,12 +51,77 @@ describe.skipIf(!serviceKey)('streamAnswer against the local database', () => {
       conversation,
       message,
       signal: options.signal,
+      assistantMessageId: options.assistantMessageId,
+      stopPollMs: options.stopPollMs,
     })) {
       events.push(event);
-      options.onEvent?.(event);
+      await options.onEvent?.(event);
     }
 
     return events;
+  };
+
+  /** What the stop routes write: the reader's stop, with the text on their screen. */
+  const recordStop = async (messageId: string, conversationId: string, content: string) => {
+    const { error } = await service.from('message_stops').insert({
+      message_id: messageId,
+      conversation_id: conversationId,
+      assistant_id: assistantId,
+      owner_id: ownerId,
+      content,
+    });
+
+    if (error) {
+      throw new Error(error.message);
+    }
+  };
+
+  const assistantRow = async (messageId: string) => {
+    const { data } = await service
+      .from('messages')
+      .select('content, answered, citations')
+      .eq('id', messageId)
+      .maybeSingle();
+
+    return data;
+  };
+
+  /**
+   * Streams a long answer slowly, like a model on the network, and notes whether it was told to
+   * stop. It opens with a cited sentence so a stopped answer has a citation to keep.
+   */
+  const slowProvider = () => {
+    const state = { aborted: false, words: 0 };
+    const words = [
+      'API',
+      'keys',
+      'are',
+      'created',
+      'in',
+      'Settings',
+      '[1].',
+      ...Array.from({ length: 80 }, (_, index) => `more${index}`),
+    ];
+    const slow: AiProvider = {
+      ...provider,
+      stream: async function* (input) {
+        for (const [index, word] of words.entries()) {
+          await new Promise((resolve) => setTimeout(resolve, 25));
+
+          if (input.signal?.aborted) {
+            state.aborted = true;
+            throw new DOMException('The answer was stopped.', 'AbortError');
+          }
+
+          state.words += 1;
+          yield { text: index === 0 ? word : ` ${word}` };
+        }
+
+        return { model: 'slow-stub', promptTokens: 1, completionTokens: words.length };
+      },
+    };
+
+    return { slow, state, total: words.length };
   };
 
   const tokenText = (events: ChatStreamEvent[]) =>
@@ -300,6 +368,198 @@ describe.skipIf(!serviceKey)('streamAnswer against the local database', () => {
       rows: 2,
     });
     expect(await usage()).toBe(before);
+  });
+
+  describe('Stop recorded by the reader while the request itself never aborts', () => {
+    // A serverless host never passes the reader's disconnect on: the signal stays live throughout.
+    const live = () => new AbortController().signal;
+
+    it('before any text: keeps the question, saves no answer and meters nothing', async () => {
+      const conversationId = crypto.randomUUID();
+      const messageId = crypto.randomUUID();
+      const before = await usage();
+      const { slow, state } = slowProvider();
+
+      // The stop overtook the question: it is recorded before the engine has even started.
+      await recordStop(messageId, conversationId, '');
+
+      const events = await run(
+        { id: conversationId, channel: 'app' },
+        'Where do I create an API key?',
+        {
+          provider: slow,
+          signal: live(),
+          assistantMessageId: messageId,
+        },
+      );
+
+      expect(events.map((event) => event.type)).toEqual(['meta']);
+      expect(state.words).toBeLessThan(3);
+
+      const { data: messages } = await service
+        .from('messages')
+        .select('role, content')
+        .eq('conversation_id', conversationId);
+
+      expect(messages).toEqual([{ role: 'user', content: 'Where do I create an API key?' }]);
+      expect(await usage()).toBe(before);
+    });
+
+    it('mid-answer: stops the model and saves exactly what the reader saw, with its citation', async () => {
+      const conversationId = crypto.randomUUID();
+      const messageId = crypto.randomUUID();
+      const before = await usage();
+      const { slow, state, total } = slowProvider();
+      let recorded = false;
+
+      const events = await run(
+        { id: conversationId, channel: 'app' },
+        'Where do I create an API key?',
+        {
+          provider: slow,
+          signal: live(),
+          assistantMessageId: messageId,
+          stopPollMs: 50,
+          onEvent: async (event) => {
+            // The server has sent more2 by now; the reader's screen only got as far as more1.
+            if (event.type === 'token' && event.text.includes('more2') && !recorded) {
+              recorded = true;
+              await recordStop(
+                messageId,
+                conversationId,
+                'API keys are created in Settings [1]. more0 more1',
+              );
+            }
+          },
+        },
+      );
+
+      expect(events.map((event) => event.type)).not.toContain('done');
+      expect(state.aborted).toBe(true);
+      expect(state.words).toBeLessThan(total);
+      expect(await assistantRow(messageId)).toEqual({
+        content: 'API keys are created in Settings [1]. more0 more1',
+        answered: null,
+        citations: [expect.objectContaining({ index: 1, title: 'Authentication' })],
+      });
+      expect(await counts(conversationId)).toEqual({
+        conversation: { message_count: 2, unanswered_count: 0 },
+        rows: 2,
+      });
+      expect(await usage()).toBe(before);
+    });
+
+    it('between the last look and the save: the engine applies it once the answer is written', async () => {
+      const conversationId = crypto.randomUUID();
+      const messageId = crypto.randomUUID();
+      const before = await usage();
+
+      const events = await run(
+        { id: conversationId, channel: 'app' },
+        'Where do I create an API key?',
+        {
+          signal: live(),
+          assistantMessageId: messageId,
+          stopPollMs: 60_000,
+          onEvent: async (event) => {
+            // The citations event goes out after the insert and before the engine's last look.
+            if (event.type === 'citations') {
+              await recordStop(messageId, conversationId, 'API keys');
+            }
+          },
+        },
+      );
+
+      expect(events.at(-1)).toMatchObject({ type: 'done', answered: true });
+      expect(await assistantRow(messageId)).toEqual({
+        content: 'API keys',
+        answered: null,
+        citations: [],
+      });
+      expect(await usage()).toBe(before);
+    });
+
+    it('after the save: the stop route turns the saved answer into the stopped one, once', async () => {
+      const conversationId = crypto.randomUUID();
+      const messageId = crypto.randomUUID();
+      const before = await usage();
+
+      const events = await run(
+        { id: conversationId, channel: 'app' },
+        'Where do I create an API key?',
+        {
+          signal: live(),
+          assistantMessageId: messageId,
+        },
+      );
+      const full = tokenText(events).trim();
+
+      expect(full).toContain('[1]');
+      expect(await usage()).toBe(before + 1);
+
+      // What the stop routes do when the stop arrives after everything else.
+      const shown = full.slice(0, full.indexOf('[1]') + 3);
+
+      await recordStop(messageId, conversationId, shown);
+
+      const target = { messageId, conversationId, assistantId };
+
+      await expect(settleSavedStop(service, target, shown)).resolves.toBe('stopped');
+      expect(await assistantRow(messageId)).toEqual({
+        content: shown,
+        answered: null,
+        citations: [expect.objectContaining({ index: 1 })],
+      });
+      expect(await usage()).toBe(before);
+
+      // A second stop request for the same answer changes nothing and gives nothing back twice.
+      await expect(settleSavedStop(service, target, shown)).resolves.toBe('unchanged');
+      expect(await usage()).toBe(before);
+    });
+
+    it('after the save of an unanswered reply: the unanswered counter moves back', async () => {
+      const conversationId = crypto.randomUUID();
+      const messageId = crypto.randomUUID();
+      const before = await usage();
+
+      await run({ id: conversationId, channel: 'app' }, 'zzz qqq unrelated gibberish', {
+        assistantMessageId: messageId,
+      });
+      expect((await counts(conversationId)).conversation).toEqual({
+        message_count: 2,
+        unanswered_count: 1,
+      });
+
+      await expect(
+        settleSavedStop(service, { messageId, conversationId, assistantId }, UNANSWERED_TEXT),
+      ).resolves.toBe('stopped');
+      expect(await assistantRow(messageId)).toMatchObject({ answered: null });
+      expect((await counts(conversationId)).conversation).toEqual({
+        message_count: 2,
+        unanswered_count: 0,
+      });
+      expect(await usage()).toBe(before);
+    });
+
+    it('after the save, with nothing shown: the answer goes, the question stays', async () => {
+      const conversationId = crypto.randomUUID();
+      const messageId = crypto.randomUUID();
+      const before = await usage();
+
+      await run({ id: conversationId, channel: 'app' }, 'Where do I create an API key?', {
+        assistantMessageId: messageId,
+      });
+
+      await expect(
+        settleSavedStop(service, { messageId, conversationId, assistantId }, ''),
+      ).resolves.toBe('stopped');
+      expect(await assistantRow(messageId)).toBeNull();
+      expect(await counts(conversationId)).toEqual({
+        conversation: { message_count: 1, unanswered_count: 0 },
+        rows: 1,
+      });
+      expect(await usage()).toBe(before);
+    });
   });
 
   it('leaves no conversation behind when the first answer fails before any text', async () => {

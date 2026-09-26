@@ -8,6 +8,7 @@ import {
   MAX_MESSAGE_LENGTH,
   MAX_PAGE_URL_LENGTH,
   MAX_SUGGESTED_QUESTION_LENGTH,
+  MAX_STOP_TEXT_LENGTH,
   MAX_SUGGESTED_QUESTIONS,
   MAX_WELCOME_MESSAGE_LENGTH,
   normalizeWidgetTheme,
@@ -44,6 +45,7 @@ import { type Plan, type PlanLimits, planFor } from '@/lib/plans';
 const key = z.string().regex(PUBLIC_KEY_PATTERN, 'Malformed public key.');
 const visitorId = z.string().regex(VISITOR_ID_PATTERN, 'Malformed visitor id.');
 const conversationId = z.string().regex(UUID_PATTERN, 'Malformed conversation id.');
+const messageId = z.string().regex(UUID_PATTERN, 'Malformed message id.');
 /**
  * The page the widget sat on, later rendered as a link in the owner's inbox. Anything that is
  * not an http(s) address of sane length is dropped rather than refused: the question still
@@ -64,6 +66,16 @@ export const widgetChatSchema = z.object({
   conversationId,
   message: z.string().trim().min(1).max(MAX_MESSAGE_LENGTH),
   pageUrl,
+  assistantMessageId: messageId.optional(),
+});
+
+/** The visitor abandoned an answer mid-stream; `text` is what the widget had shown of it. */
+export const widgetStopSchema = z.object({
+  key,
+  visitorId,
+  conversationId,
+  messageId,
+  text: z.string().max(MAX_STOP_TEXT_LENGTH),
 });
 
 export const widgetLeadSchema = z.object({

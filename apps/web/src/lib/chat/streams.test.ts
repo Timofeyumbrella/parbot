@@ -36,6 +36,21 @@ describe('streamRegistry', () => {
     expect(streamRegistry.isStreaming('c1')).toBe(true);
   });
 
+  it('remembers which answer a stream is writing until it finishes or stops', () => {
+    const target = { assistantId: 'a1', messageId: 'm1' };
+    const controller = streamRegistry.start('c1', target);
+
+    expect(streamRegistry.target('c1')).toEqual(target);
+    expect(streamRegistry.target('c2')).toBeNull();
+
+    streamRegistry.finish('c1', controller);
+    expect(streamRegistry.target('c1')).toBeNull();
+
+    streamRegistry.start('c1', target);
+    streamRegistry.stop('c1');
+    expect(streamRegistry.target('c1')).toBeNull();
+  });
+
   it('stop aborts and reports whether anything was running', () => {
     const controller = streamRegistry.start('c1');
 

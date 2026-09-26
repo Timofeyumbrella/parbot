@@ -1,12 +1,15 @@
 import {
   type ChatErrorCode,
   MAX_MESSAGE_LENGTH,
+  MAX_STOP_TEXT_LENGTH,
+  randomUuid,
   readChatStream,
   type WidgetChatRequest,
   type WidgetConfig,
   type WidgetLeadRequest,
   type WidgetMode,
   type WidgetScheme,
+  type WidgetStopRequest,
 } from '@parbot/shared';
 
 import { accentText, isWidgetScheme, onAccent } from './config';
@@ -124,6 +127,12 @@ const toStored = (message: Message): StoredMessage => ({
   answered: message.answered,
 });
 
+/** An answer being streamed: the id the server saves it under and where it goes. */
+type InFlight = { messageId: string; conversationId: string; answer: Message };
+
+/** keepalive caps a body at 64 KiB; a stop that large is sent without it. */
+const KEEPALIVE_CHARS = 20_000;
+
 const prefersDark = () =>
   typeof window.matchMedia === 'function' &&
   window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -148,6 +157,7 @@ export class ParbotWidget {
   private visitorId: string;
   private conversationId: string;
   private controller: AbortController | null = null;
+  private inFlight: InFlight | null = null;
   private lastFocus: Element | null = null;
 
   private readonly root: HTMLElement;
@@ -210,7 +220,7 @@ export class ParbotWidget {
   }
 
   destroy() {
-    this.controller?.abort();
+    this.abandonAnswer();
     document.removeEventListener('keydown', this.onDocumentKeydown);
     this.media?.removeEventListener('change', this.onSystemSchemeChange);
     this.host.remove();
@@ -542,12 +552,54 @@ export class ParbotWidget {
   }
 
   private newConversation() {
-    this.controller?.abort();
-    this.controller = null;
+    this.abandonAnswer();
     this.conversationId = resetConversation(this.key);
     this.messages = [];
     this.renderAll();
     this.input.focus();
+  }
+
+  /**
+   * Drops the answer being streamed, if any, and tells the server. Aborting the request is not
+   * enough on a serverless host, where the dropped connection never reaches the function writing
+   * the answer; without the stop the owner's inbox would show, and the plan would count, an answer
+   * the visitor walked away from.
+   */
+  private abandonAnswer() {
+    const inFlight = this.inFlight;
+
+    if (this.controller) {
+      this.controller.abort();
+      this.controller = null;
+      // The aborted send no longer owns the composer, so it will not hand the button back itself.
+      this.setBusy(false);
+    }
+
+    this.inFlight = null;
+
+    // An answer that already finished or failed has nothing left to stop.
+    if (!inFlight || inFlight.answer.answered !== undefined || inFlight.answer.error) {
+      return;
+    }
+
+    const body: WidgetStopRequest = {
+      key: this.key,
+      visitorId: this.visitorId,
+      conversationId: inFlight.conversationId,
+      messageId: inFlight.messageId,
+      text: inFlight.answer.text.slice(0, MAX_STOP_TEXT_LENGTH),
+    };
+
+    // text/plain keeps this a simple request: no preflight, so it can go out as the page leaves.
+    void fetch(`${this.api}/api/widget/stop`, {
+      method: 'POST',
+      headers: { 'content-type': 'text/plain;charset=UTF-8' },
+      body: JSON.stringify(body),
+      credentials: 'omit',
+      keepalive: body.text.length < KEEPALIVE_CHARS,
+    }).catch(() => {
+      // The visitor has moved on; there is nobody to tell.
+    });
   }
 
   private autosize() {
@@ -591,7 +643,9 @@ export class ParbotWidget {
     this.setBusy(true);
 
     const controller = new AbortController();
+    const messageId = randomUuid();
     this.controller = controller;
+    this.inFlight = { messageId, conversationId: this.conversationId, answer };
 
     const body: WidgetChatRequest = {
       key: this.key,
@@ -599,6 +653,7 @@ export class ParbotWidget {
       conversationId: this.conversationId,
       message: text,
       pageUrl: window.location.href,
+      assistantMessageId: messageId,
     };
 
     try {
@@ -648,6 +703,7 @@ export class ParbotWidget {
     } finally {
       if (this.controller === controller) {
         this.controller = null;
+        this.inFlight = null;
         this.setBusy(false);
       }
     }
