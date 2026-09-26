@@ -1,6 +1,8 @@
 import { expect, test } from '@playwright/test';
 import { createClient } from '@supabase/supabase-js';
 
+import { visit } from './support/navigation';
+
 const unique = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 
 const BUCKET = 'sources';
@@ -62,7 +64,7 @@ test.describe('deleting an assistant and the account', () => {
     const paths: string[] = [];
 
     try {
-      await page.goto('/signup');
+      await visit(page, '/signup');
       await page.getByLabel(/full name/i).fill('Delete Tester');
       await page.getByLabel(/email/i).fill(email);
       await page.getByLabel(/^password/i).fill('correct-horse-battery');
@@ -90,7 +92,7 @@ test.describe('deleting an assistant and the account', () => {
       expect(await storedNames(admin!, `${ownerId}/${assistantId}`)).toHaveLength(2);
 
       // The assistant: Settings, Danger zone, type the name.
-      await page.goto(`/a/${assistantId}/settings`);
+      await visit(page, `/a/${assistantId}/settings`);
       await page.getByRole('button', { name: 'Delete assistant' }).click();
       await page.getByLabel('Type Acme Docs to confirm').fill('Acme Docs');
       await page.getByRole('button', { name: 'Delete for good' }).click();
@@ -114,7 +116,7 @@ test.describe('deleting an assistant and the account', () => {
 
       paths.push(await seedStoredSource(admin!, ownerId, second!.id));
 
-      await page.goto('/account');
+      await visit(page, '/account');
       await page.getByRole('button', { name: 'Delete account' }).click();
       await page.getByLabel(`Type ${email} to confirm`).fill(email);
       await page.getByRole('button', { name: 'Delete for good' }).click();

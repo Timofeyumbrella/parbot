@@ -3,6 +3,8 @@ import path from 'node:path';
 import { expect, type Page, test } from '@playwright/test';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
+import { visit } from './support/navigation';
+
 /**
  * The Knowledge screen against the stub provider: the Add source dialog says what is wrong inline,
  * and pasted text and an uploaded Word file are stored, indexed after the response and shown as
@@ -53,7 +55,7 @@ const seed = async (): Promise<Seeded | null> => {
 };
 
 const signIn = async (page: Page, seeded: Seeded, next: string) => {
-  await page.goto(`/login?next=${encodeURIComponent(next)}`);
+  await visit(page, `/login?next=${encodeURIComponent(next)}`);
   await page.getByLabel('Email').fill(seeded.email);
   await page.getByLabel('Password').fill(PASSWORD);
   await page.getByRole('button', { name: 'Sign in' }).click();

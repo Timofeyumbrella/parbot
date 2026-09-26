@@ -2,9 +2,11 @@ import { expect, test } from '@playwright/test';
 
 import { formatPrice, PLANS } from '../src/lib/plans';
 
+import { visit } from './support/navigation';
+
 test.describe('landing page', () => {
   test('presents the product and the three plans with their prices', async ({ page }) => {
-    await page.goto('/');
+    await visit(page, '/');
 
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
 
@@ -17,7 +19,7 @@ test.describe('landing page', () => {
   });
 
   test('the yearly toggle changes the amounts', async ({ page }) => {
-    await page.goto('/');
+    await visit(page, '/');
 
     const yearly = page
       .getByRole('group', { name: 'Billing interval' })
@@ -40,7 +42,7 @@ test.describe('landing page', () => {
   });
 
   test('the primary call to action leads to sign up', async ({ page }) => {
-    await page.goto('/');
+    await visit(page, '/');
 
     await page
       .getByRole('link', { name: /start free/i })
@@ -64,7 +66,7 @@ test.describe('the demo palette on the landing page', () => {
       await expect(palette).toHaveClass(/pb-open/);
     };
 
-    await page.goto('/');
+    await visit(page, '/');
     await expect(page.locator('html')).toHaveClass(/\bdark\b/);
     await expect(widget.locator('.pb-root')).toHaveAttribute('data-scheme', 'dark');
 

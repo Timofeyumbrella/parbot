@@ -98,6 +98,16 @@ export const applyChange = (
     return { data, added: null };
   }
 
+  // A row that sorts past the last loaded one belongs to a page "Load more" has not fetched yet,
+  // and that page brings it in its place. Shown now, it would sit below the loaded rows until
+  // the page arrived and slotted its own rows in above it. This also covers an event that
+  // Realtime delivers late, for a change made before the list subscribed.
+  const cursor = data.pages[data.pages.length - 1]?.cursor;
+
+  if (cursor && compareActivity(row, { last_message_at: cursor.at, id: cursor.id }) > 0) {
+    return { data, added: null };
+  }
+
   const [first, ...rest] = data.pages;
 
   return {

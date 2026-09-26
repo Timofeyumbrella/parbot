@@ -223,6 +223,66 @@ describe('applyChange', () => {
     expect(result.added).toBe('a');
   });
 
+  describe('while more pages wait behind "Load more"', () => {
+    /** One loaded page ending at `a`, with a cursor saying more rows follow it. */
+    const paged = (): ListData => ({
+      pages: [
+        {
+          rows: [
+            row({ id: 'b', last_message_at: '2026-09-23T11:00:00Z' }),
+            row({ id: 'a', last_message_at: '2026-09-23T10:00:00Z' }),
+          ],
+          cursor: { at: '2026-09-23T10:00:00Z', id: 'a' },
+        },
+      ],
+      pageParams: [null],
+    });
+
+    it('leaves a row that belongs to an unloaded page for that page to bring', () => {
+      const data = paged();
+
+      // An older conversation renamed, or a change Realtime delivers after the list subscribed.
+      const older = applyChange(
+        data,
+        update(row({ id: 'old', last_message_at: '2026-09-23T09:00:00Z' })),
+        'all',
+      );
+      // Started but never asked anything: the server pages it after every row with a message.
+      const started = applyChange(data, insert(row({ id: 'new', last_message_at: null })), 'all');
+      // Same moment as the last loaded row, but after it in the id order the cursor follows.
+      const tie = applyChange(
+        data,
+        update(row({ id: '0', last_message_at: '2026-09-23T10:00:00Z' })),
+        'all',
+      );
+
+      for (const result of [older, started, tie]) {
+        expect(result.data).toBe(data);
+        expect(result.added).toBeNull();
+      }
+    });
+
+    it('still adds a row that lands among the loaded ones', () => {
+      const data = paged();
+
+      const newest = applyChange(
+        data,
+        update(row({ id: 'z', last_message_at: '2026-09-23T12:00:00Z' })),
+        'all',
+      );
+      const between = applyChange(
+        data,
+        update(row({ id: 'm', last_message_at: '2026-09-23T10:30:00Z' })),
+        'all',
+      );
+
+      expect(ids(newest.data)).toEqual(['z', 'b', 'a']);
+      expect(newest.added).toBe('z');
+      expect(ids(between.data)).toEqual(['m', 'b', 'a']);
+      expect(between.added).toBe('m');
+    });
+  });
+
   it('removes a deleted row and leaves the data untouched when the row is unknown', () => {
     const data = list([row({ id: 'a' }), row({ id: 'b' })]);
 

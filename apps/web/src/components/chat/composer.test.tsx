@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { useLayoutEffect } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { resetDrafts } from '@/lib/chat/drafts';
@@ -105,6 +106,81 @@ describe('Composer', () => {
 
     render(<Composer draftKey="c1" onSend={onSend} />);
     expect(box()).toHaveValue('');
+  });
+
+  describe('when the box is replaced by another for the same conversation', () => {
+    // Where focus is as the commit that swaps the boxes ends, before any effect of theirs runs.
+    let focusAtCommit: Element | null = null;
+    const Probe = () => {
+      useLayoutEffect(() => {
+        focusAtCommit = document.activeElement;
+      });
+
+      return null;
+    };
+
+    /** The pane a click rendered, then the route's page taking over: a new element, same key. */
+    const Screen = ({ routed, onSend }: { routed: boolean; onSend: (text: string) => void }) =>
+      routed ? (
+        <section>
+          <Composer draftKey="c1" onSend={onSend} />
+          <Probe />
+        </section>
+      ) : (
+        <div>
+          <Composer draftKey="c1" onSend={onSend} />
+        </div>
+      );
+
+    beforeEach(() => {
+      focusAtCommit = null;
+    });
+
+    it('hands the focus and the caret over in the same commit, so the next key lands', async () => {
+      const user = userEvent.setup();
+      const onSend = vi.fn();
+      const view = render(<Screen routed={false} onSend={onSend} />);
+
+      await user.type(box(), 'Which scopes a key carry?');
+      // The caret sits where the reader put it, not at the end.
+      (box() as HTMLTextAreaElement).setSelectionRange(13, 13);
+
+      const replaced = box();
+
+      view.rerender(<Screen routed onSend={onSend} />);
+
+      expect(box()).not.toBe(replaced);
+      expect(focusAtCommit).toBe(box());
+      expect(box()).toHaveFocus();
+      expect(box()).toHaveValue('Which scopes a key carry?');
+
+      await user.keyboard('does {Enter}');
+
+      expect(onSend).toHaveBeenCalledWith('Which scopes does a key carry?');
+    });
+
+    it('leaves focus alone when the box was not focused, or when it left for good', async () => {
+      const user = userEvent.setup();
+      const first = render(<Screen routed={false} onSend={vi.fn()} />);
+
+      await user.type(box(), 'half a thought');
+      await user.click(document.body);
+      first.rerender(<Screen routed onSend={vi.fn()} />);
+
+      expect(box()).not.toHaveFocus();
+      first.unmount();
+
+      // Focused as it goes, then a later visit to the same conversation.
+      const second = render(<Screen routed={false} onSend={vi.fn()} />);
+
+      await user.click(box());
+      second.unmount();
+      await Promise.resolve();
+      render(<Screen routed onSend={vi.fn()} />);
+
+      expect(box()).not.toHaveFocus();
+      expect(box()).toHaveValue('half a thought');
+    });
   });
 
   it('shows the remaining characters as the limit approaches', () => {

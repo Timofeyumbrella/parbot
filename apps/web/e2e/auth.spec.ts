@@ -3,6 +3,7 @@ import { expect, test } from '@playwright/test';
 import { authErrorMessage } from '../src/components/auth/auth-errors';
 
 import { trackAccounts } from './support/accounts';
+import { visit } from './support/navigation';
 
 const accounts = trackAccounts();
 
@@ -16,7 +17,7 @@ test.describe('signing up and creating the first assistant', () => {
     const email = accounts.email('e2e');
     test.info().annotations.push({ type: 'account', description: email });
 
-    await page.goto('/signup');
+    await visit(page, '/signup');
     await expect(page.getByText('Create your account')).toBeVisible();
 
     await page.getByLabel(/full name/i).fill('E2E Tester');
@@ -36,7 +37,7 @@ test.describe('signing up and creating the first assistant', () => {
 
     await expect(page).toHaveURL(/\/a\/[0-9a-f-]{36}\/knowledge/);
 
-    await page.goto('/dashboard');
+    await visit(page, '/dashboard');
     await expect(page.getByText('Acme Docs').first()).toBeVisible();
 
     // At three cards a row "conversations in 30 days" wraps; both numbers still share one line.
@@ -51,7 +52,7 @@ test.describe('signing up and creating the first assistant', () => {
     titles.push(await titleX());
 
     for (const path of ['/account', '/billing']) {
-      await page.goto(path);
+      await visit(page, path);
       titles.push(await titleX());
     }
 
@@ -59,14 +60,14 @@ test.describe('signing up and creating the first assistant', () => {
   });
 
   test('guarded routes bounce to login and keep the destination', async ({ page }) => {
-    await page.goto('/billing');
+    await visit(page, '/billing');
     await expect(page).toHaveURL(/\/login\?next=%2Fbilling/);
   });
 
   test('a wrong password is explained inline', async ({ page }) => {
     const message = authErrorMessage({ code: 'invalid_credentials' });
 
-    await page.goto('/login');
+    await visit(page, '/login');
     await expect(page.getByText(message)).toHaveCount(0);
 
     await page.getByLabel(/email/i).fill('demo@parbot.dev');
