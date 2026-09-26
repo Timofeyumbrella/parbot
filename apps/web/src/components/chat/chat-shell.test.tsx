@@ -45,9 +45,20 @@ vi.mock('@/components/chat/thread', () => ({
     <div data-testid="thread" data-conversation={conversationId} />
   ),
 }));
-vi.mock('@/components/chat/new-chat', () => ({
-  NewChat: () => <div data-testid="new-chat" />,
-}));
+const newChatMounts = vi.hoisted(() => ({ count: 0 }));
+
+vi.mock('@/components/chat/new-chat', async () => {
+  const { useState } = await import('react');
+
+  return {
+    // Numbers each mount, so a test can tell a blank screen from the one it replaced.
+    NewChat: () => {
+      const [mount] = useState(() => ++newChatMounts.count);
+
+      return <div data-testid="new-chat" data-mount={mount} />;
+    },
+  };
+});
 vi.mock('@/actions/conversations', () => ({
   renameConversation: vi.fn(),
   deleteConversation: vi.fn(),
@@ -139,6 +150,29 @@ describe('ChatShell', () => {
     await user.click(screen.getAllByRole('link', { name: 'New chat' })[0]!);
     expect(screen.getByTestId('new-chat')).toBeInTheDocument();
     expect(list().getByRole('link', { name: /Chat c1/ })).not.toHaveAttribute('aria-current');
+  });
+
+  it('starts a blank chat on the new chat route while a chat just started there waits for its URL', async () => {
+    const user = userEvent.setup();
+
+    // The new chat page has sent its first message and shows that thread; the router is still
+    // fetching the chat's own URL, so the route says "new chat".
+    navigation.params.conversationId = undefined;
+    render(<Shell page={<p>thread of the chat just started</p>} />);
+
+    await user.click(screen.getAllByRole('link', { name: 'New chat' })[0]!);
+
+    expect(screen.queryByText('thread of the chat just started')).not.toBeInTheDocument();
+
+    const first = screen.getByTestId('new-chat');
+
+    // Another click starts over again rather than keeping what the last one showed.
+    await user.click(screen.getAllByRole('link', { name: 'New chat' })[0]!);
+
+    expect(screen.getByTestId('new-chat')).not.toHaveAttribute(
+      'data-mount',
+      first.getAttribute('data-mount'),
+    );
   });
 
   it('leaves a modified click to the browser', async () => {

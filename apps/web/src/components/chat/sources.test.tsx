@@ -51,6 +51,15 @@ describe('Sources', () => {
     expect(row.textContent).toMatch(/Authentication.*Pasted notes/);
   });
 
+  it('numbers the markers of a page in ascending order whatever order the answer cites them', () => {
+    render(<Sources citations={[auth(5, 'Scopes.'), auth(2, 'Settings.')]} id="s" />);
+
+    const link = within(screen.getByTestId('sources')).getByRole('link');
+
+    expect(link).toHaveTextContent(/^25Authentication/);
+    expect(link).toHaveAttribute('title', 'Settings.\n\nScopes.');
+  });
+
   it('reads the markers of one page in ascending order, whatever order the answer cited them', () => {
     const cli = (index: number): Citation => ({
       index,

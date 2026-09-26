@@ -9,6 +9,8 @@
  *
  * Runs outside Next, so it builds its own service client and never imports server-only modules.
  * With GEMINI_API_KEY unset it indexes on the stub provider, which is fine for local demos.
+ * The seeded install answer quotes widget.js on NEXT_PUBLIC_APP_URL, so set it to the deployment
+ * when seeding the hosted demo.
  */
 import { readdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -19,6 +21,7 @@ import { createClient } from '@supabase/supabase-js';
 import { getAiProvider, hasLiveAiProvider } from '../src/lib/ai';
 import type { Database } from '../src/lib/db';
 import { ingestSource } from '../src/lib/ingest';
+import { demoAppUrl, demoExchanges } from './demo-history';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const DOCS_DIR = path.resolve(here, '../content/docs');
@@ -51,6 +54,8 @@ const service = createClient<Database>(
 );
 
 const log = (message: string) => console.info(`  ${message}`);
+
+const EXCHANGES = demoExchanges(demoAppUrl());
 
 const ensureDemoUser = async () => {
   const { data: profile } = await service
@@ -223,102 +228,6 @@ const indexDocs = async (ownerId: string, assistantId: string) => {
     );
   }
 };
-
-type Exchange = {
-  question: string;
-  answer: string | null;
-  doc?: string;
-  feedback?: 1 | -1;
-  channel?: 'app' | 'widget';
-  page?: string;
-};
-
-/** Questions a reader of Parbot's docs would ask, answered or not, for the inbox and overview. */
-const EXCHANGES: Exchange[] = [
-  {
-    question: 'How do I install the widget on my docs site?',
-    answer:
-      'Add one script tag to any page:\n\n```html\n<script src="https://app.parbot.dev/widget.js" data-parbot="pb_your_public_key" async></script>\n```\n\nThe exact snippet with your key is on the Widget page of your assistant [1].',
-    doc: 'Installing the widget',
-    feedback: 1,
-    page: 'https://docs.example.com/getting-started',
-  },
-  {
-    question: 'What is palette mode?',
-    answer:
-      'Palette mode has no launcher in the way. Readers press ⌘K, or Ctrl+K on Windows and Linux, and a command-palette style dialog opens with the question box on top. It is available on Starter and Growth [1].',
-    doc: 'Installing the widget',
-    page: 'https://docs.example.com/widget',
-  },
-  {
-    question: 'Does it work with Docusaurus?',
-    answer:
-      'Yes. For Docusaurus, Mintlify, Astro, Hugo and plain HTML, paste the script tag into the site head or footer template [1].',
-    doc: 'Installing the widget',
-    feedback: 1,
-    page: 'https://docs.example.com/widget',
-  },
-  {
-    question: 'How many pages can I index on the Starter plan?',
-    answer:
-      'Starter includes 2,000 indexed pages across all of your assistants, with 3,000 answers a month [1].',
-    doc: 'Plans and billing',
-    page: 'https://docs.example.com/pricing',
-  },
-  {
-    question: 'What happens when the docs do not cover a question?',
-    answer:
-      'The assistant says so instead of guessing. With lead capture on, the widget then offers a small form for an email and a note, and the lead appears in your Inbox. The question is also recorded as unanswered [1].',
-    doc: 'Theming and behaviour',
-    feedback: 1,
-    channel: 'app',
-  },
-  {
-    question: 'Can I restrict which sites can load my widget?',
-    answer:
-      'Yes. Add the origins on the Widget page, one per line. Bare hostnames and wildcards like *.example.com are accepted, and requests from anywhere else are refused [1].',
-    doc: 'Installing the widget',
-    page: 'https://docs.example.com/widget',
-  },
-  {
-    question: 'Do you support JavaScript-rendered docs sites?',
-    answer:
-      'Not for crawling: pages that render everything with JavaScript after load are not rendered. Give Parbot a sitemap or export the pages instead [1].',
-    doc: 'Frequently asked questions',
-    feedback: -1,
-    page: 'https://docs.example.com/sources',
-  },
-  {
-    question: 'Is there a Slack integration?',
-    answer: null,
-    page: 'https://docs.example.com/integrations',
-  },
-  {
-    question: 'Can I export conversations to CSV automatically every week?',
-    answer: null,
-    page: 'https://docs.example.com/inbox',
-  },
-  {
-    question: 'How do I delete my account?',
-    answer:
-      'Write to privacy@parbot.dev and the account is deleted along with everything it owns [1].',
-    doc: 'Privacy and security',
-    channel: 'app',
-  },
-  {
-    question: 'Does Parbot train models on my documentation?',
-    answer:
-      'No. Only the handful of passages closest to a question are sent to the model, together with the question and the recent turns of that conversation. Parbot does not train models on your content [1].',
-    doc: 'Privacy and security',
-    feedback: 1,
-    page: 'https://docs.example.com/privacy',
-  },
-  {
-    question: 'Is there an API?',
-    answer: null,
-    page: 'https://docs.example.com/api',
-  },
-];
 
 const UNANSWERED_TEXT =
   "I couldn't find that in the documentation, so I'd rather not guess. Try rephrasing, or ask about something the docs cover.";

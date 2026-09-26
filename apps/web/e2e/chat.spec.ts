@@ -703,6 +703,48 @@ test.describe('the in-app chat', () => {
     expect(html).toMatch(/<template id="B:\d+">/);
   });
 
+  test('New chat right after the first send of a page load shows the welcome at once', async () => {
+    await page.goto(`/a/${assistantId}/chat`);
+    await expect(page.getByTestId('welcome')).toBeVisible();
+
+    // After a page load the router has no payload for the new chat's own URL yet. Holding every
+    // route payload keeps the address bar on the new chat route while the thread shows.
+    await page.route('**/*', async (route) => {
+      if (route.request().headers()['rsc'] === '1') {
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+      }
+
+      try {
+        await route.continue();
+      } catch {
+        // A later navigation cancelled the held one.
+      }
+    });
+
+    await page
+      .getByTestId('welcome')
+      .getByRole('button', { name: 'How are webhooks signed?' })
+      .click();
+    await expect(thread(page)).toBeVisible();
+    await expect(page).toHaveURL(/\/chat$/);
+
+    const started = Date.now();
+
+    await page.getByRole('link', { name: 'New chat' }).first().click();
+    await expect(page.getByTestId('new-chat').getByTestId('welcome')).toBeVisible({
+      timeout: 400,
+    });
+    expect(Date.now() - started).toBeLessThan(600);
+
+    // The held payloads arrive; the reader stays on the new chat they asked for.
+    await page.waitForTimeout(2500);
+    await expect(page).toHaveURL(/\/chat$/);
+    await expect(page.getByTestId('new-chat').getByTestId('welcome')).toBeVisible();
+    await expect(thread(page)).toHaveCount(0);
+    // The router dropped the chat's own navigation, so its held request never settles.
+    await page.unrouteAll({ behavior: 'ignoreErrors' });
+  });
+
   test('none of the flows above logged a console error or warning', () => {
     expect(consoleProblems).toEqual([]);
   });

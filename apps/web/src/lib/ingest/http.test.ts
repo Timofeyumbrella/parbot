@@ -122,7 +122,7 @@ describe('fetchResource', () => {
   it('sends the crawler identity and a timeout on every request', async () => {
     const fetchImpl: FetchImpl = async (_input, init) => {
       expect(new Headers(init?.headers).get('user-agent')).toBe(
-        'ParbotBot/0.1 (+https://parbot.dev)',
+        'ParbotBot/0.1 (+https://parbot-web.vercel.app)',
       );
       expect(new Headers(init?.headers).get('accept')).toContain('text/html');
       expect(init?.signal).toBeInstanceOf(AbortSignal);

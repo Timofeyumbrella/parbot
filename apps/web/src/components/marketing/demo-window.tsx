@@ -1,10 +1,14 @@
 import { cn } from 'cn';
 import { Bot, ExternalLink } from 'lucide-react';
 
+import { groupCitationsByPageAscending } from '@/lib/citations';
+
 export type DemoCitation = {
   index: number;
   title: string;
   url: string | null;
+  /** Set on live answers; passages of one document share a chip. */
+  documentId?: string;
 };
 
 type DemoWindowProps = {
@@ -100,13 +104,24 @@ export const AssistantTurn = ({
   </div>
 );
 
+/**
+ * One chip per cited page with every marker that points at it, like the chat's sources row. The
+ * hero reads as a short numbered list, so pages go in ascending marker order.
+ */
 export const CitationList = ({ citations }: { citations: DemoCitation[] }) => (
   <ul className="flex flex-wrap gap-1.5" aria-label="Sources">
-    {citations.map((citation) => {
+    {groupCitationsByPageAscending(citations).map(({ citation, indexes }) => {
       const body = (
         <>
-          <span className="bg-primary/15 text-primary flex size-4 items-center justify-center rounded-sm font-mono text-[10px] font-semibold">
-            {citation.index}
+          <span className="inline-flex gap-0.5">
+            {indexes.map((index) => (
+              <span
+                key={index}
+                className="bg-primary/15 text-primary flex h-4 min-w-4 items-center justify-center rounded-sm px-1 font-mono text-[10px] font-semibold"
+              >
+                {index}
+              </span>
+            ))}
           </span>
           <span className="truncate">{citation.title}</span>
           {citation.url ? (
@@ -118,13 +133,21 @@ export const CitationList = ({ citations }: { citations: DemoCitation[] }) => (
         'bg-background hover:bg-muted inline-flex max-w-full items-center gap-1.5 rounded-md border px-2 py-1 text-xs transition-colors';
 
       return (
-        <li key={citation.index} className="max-w-full">
+        <li key={indexes[0]} className="max-w-full">
           {citation.url ? (
-            <a href={citation.url} target="_blank" rel="noreferrer" className={className}>
+            <a
+              href={citation.url}
+              target="_blank"
+              rel="noreferrer"
+              title={citation.title}
+              className={className}
+            >
               {body}
             </a>
           ) : (
-            <span className={className}>{body}</span>
+            <span title={citation.title} className={className}>
+              {body}
+            </span>
           )}
         </li>
       );

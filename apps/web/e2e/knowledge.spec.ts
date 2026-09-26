@@ -66,6 +66,9 @@ const signIn = async (page: Page, seeded: Seeded, next: string) => {
 const sourceRow = (page: Page, title: string) =>
   page.getByTestId('source-row').filter({ hasText: title });
 
+/** The header copy of the meter; a second one takes its place on phones. */
+const pagesMeter = (page: Page) => page.getByTestId('pages-meter').first();
+
 test.describe('knowledge screen', () => {
   let seeded: Seeded | null = null;
 
@@ -127,6 +130,7 @@ test.describe('knowledge screen', () => {
       timeout: 30_000,
     });
     await expect(sourceRow(page, 'Refund policy')).toContainText('1 page');
+    await expect(pagesMeter(page)).toContainText(/^1 of [\d,]+ pages/);
 
     await page.getByRole('button', { name: 'Add source' }).click();
     await dialog.getByRole('tab', { name: /Upload/ }).click();
@@ -138,6 +142,8 @@ test.describe('knowledge screen', () => {
       timeout: 30_000,
     });
     await expect(sourceRow(page, 'handbook.docx')).toContainText('1 page');
+    // The meter follows the rows without a reload: it once stayed at 1 until the next visit.
+    await expect(pagesMeter(page)).toContainText(/^2 of [\d,]+ pages/, { timeout: 2_000 });
 
     const { data: documents } = await seeded!.admin
       .from('documents')
@@ -146,5 +152,14 @@ test.describe('knowledge screen', () => {
       .order('title');
 
     expect(documents).toEqual([{ title: 'Handbook' }, { title: 'Refund policy' }]);
+
+    await page.getByRole('button', { name: 'Actions for Refund policy' }).click();
+    await page.getByRole('menuitem', { name: 'Delete' }).click();
+    await page
+      .getByRole('dialog', { name: 'Delete Refund policy?' })
+      .getByRole('button', { name: 'Delete' })
+      .click();
+    await expect(sourceRow(page, 'Refund policy')).toHaveCount(0);
+    await expect(pagesMeter(page)).toContainText(/^1 of [\d,]+ pages/, { timeout: 2_000 });
   });
 });

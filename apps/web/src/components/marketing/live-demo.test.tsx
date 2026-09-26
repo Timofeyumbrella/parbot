@@ -1,5 +1,5 @@
 import { type ChatStreamEvent, encodeSseEvent, type WidgetChatRequest } from '@parbot/shared';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -97,6 +97,54 @@ describe('LiveDemo', () => {
 
     await waitFor(() =>
       expect(screen.getByRole('textbox', { name: 'Ask a question' })).toBeEnabled(),
+    );
+  });
+
+  it('lists each cited page once with its markers, in ascending order', async () => {
+    const citation = (index: number, documentId: string, title: string) => ({
+      index,
+      documentId,
+      title,
+      url: `https://docs.acme.dev/${documentId}`,
+      snippet: '',
+    });
+
+    fetchMock.mockImplementation(async (input: RequestInfo | URL) =>
+      String(input).startsWith('/api/widget/config')
+        ? json(CONFIG)
+        : sse([
+            { type: 'token', text: 'Paste the tag [2]. Set the key [3]. Reload [1].' },
+            {
+              type: 'citations',
+              citations: [
+                citation(2, 'install', 'Installing the widget'),
+                citation(3, 'keys', 'Public keys'),
+                citation(1, 'install', 'Installing the widget'),
+              ],
+            },
+            { type: 'done', answered: true, latencyMs: 5 },
+          ]),
+    );
+
+    const user = userEvent.setup();
+
+    render(<LiveDemo demoKey="pb_demo" />);
+
+    await user.type(
+      await screen.findByRole('textbox', { name: 'Ask a question' }),
+      'How do I install it?{Enter}',
+    );
+
+    const sources = await screen.findByRole('list', { name: 'Sources' });
+    const chips = within(sources).getAllByRole('listitem');
+
+    expect(chips.map((chip) => chip.textContent)).toEqual([
+      '12Installing the widget',
+      '3Public keys',
+    ]);
+    expect(within(chips[0]!).getByRole('link')).toHaveAttribute(
+      'href',
+      'https://docs.acme.dev/install',
     );
   });
 

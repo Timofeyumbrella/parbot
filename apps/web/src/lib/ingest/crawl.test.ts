@@ -126,7 +126,7 @@ const makeFetch =
 
     log.push(url);
     expect(new Headers(init?.headers).get('user-agent')).toBe(
-      'ParbotBot/0.1 (+https://parbot.dev)',
+      'ParbotBot/0.1 (+https://parbot-web.vercel.app)',
     );
     expect(init?.signal).toBeInstanceOf(AbortSignal);
 

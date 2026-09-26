@@ -1,6 +1,9 @@
+import { DEPLOYED_APP_URL } from '@/lib/env';
+
 import { assertPublicUrl, BlockedHostError, defaultLookup, type HostLookup } from './guard';
 
-export const USER_AGENT = 'ParbotBot/0.1 (+https://parbot.dev)';
+/** The link is where a site owner reading their logs goes to learn what crawled them. */
+export const USER_AGENT = `ParbotBot/0.1 (+${DEPLOYED_APP_URL})`;
 export const FETCH_TIMEOUT_MS = 10_000;
 /** Larger responses are almost never documentation pages; reading them would only cost memory. */
 export const MAX_RESPONSE_BYTES = 5 * 1024 * 1024;

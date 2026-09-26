@@ -3,7 +3,7 @@
 The widget is one script tag. Add it to any page and the assistant is there.
 
 ```html
-<script src="https://app.parbot.dev/widget.js" data-parbot="pb_your_public_key" async></script>
+<script src="https://parbot-web.vercel.app/widget.js" data-parbot="pb_your_public_key" async></script>
 ```
 
 Find your public key and the exact snippet on the Widget page of your assistant. The key is public on purpose: it only identifies the assistant, and the origins allowed to use it are controlled on the same page.
