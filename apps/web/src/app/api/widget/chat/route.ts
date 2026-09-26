@@ -38,7 +38,7 @@ export async function POST(request: Request) {
     return jsonError(400, 'bad_request', firstIssue(parsed.error), cors);
   }
 
-  const { key, visitorId, conversationId, message, pageUrl } = parsed.data;
+  const { key, visitorId, conversationId, message, pageUrl, assistantMessageId } = parsed.data;
   const service = createSupabaseServiceClient();
   const assistant = await findAssistantByKey(service, key);
 
@@ -81,6 +81,7 @@ export async function POST(request: Request) {
       assistant,
       conversation: { id: conversationId, channel: 'widget', visitorId, pageUrl },
       message,
+      assistantMessageId,
       signal: request.signal,
     }),
     { headers: cors },

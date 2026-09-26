@@ -69,6 +69,17 @@ export type WidgetChatRequest = {
   conversationId: string;
   message: string;
   pageUrl?: string;
+  /** The id the answer will be saved under, chosen by the client so it can stop the answer at any moment. */
+  assistantMessageId?: string;
+};
+
+/** POST /api/widget/stop: the visitor abandoned an answer; `text` is what they had been shown. */
+export type WidgetStopRequest = {
+  key: string;
+  visitorId: string;
+  conversationId: string;
+  messageId: string;
+  text: string;
 };
 
 export type WidgetLeadRequest = {
@@ -84,7 +95,22 @@ export type AppChatRequest = {
   assistantId: string;
   conversationId: string;
   message: string;
+  /** The id the answer will be saved under, chosen by the client so it can stop the answer at any moment. */
+  assistantMessageId?: string;
 };
+
+/** POST /api/messages/[messageId]/stop: the reader pressed Stop; `text` is what they had been shown. */
+export type AppStopRequest = {
+  assistantId: string;
+  conversationId: string;
+  text: string;
+};
+
+/**
+ * The longest shown text a stop request carries. Answers are capped far below this; a longer
+ * text is cut by the client, and a cut text is still a prefix of the answer.
+ */
+export const MAX_STOP_TEXT_LENGTH = 20_000;
 
 export const MAX_MESSAGE_LENGTH = 2000;
 export const VISITOR_ID_PATTERN = /^[A-Za-z0-9_-]{8,64}$/;
@@ -92,6 +118,25 @@ export const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export const HEX_COLOR_PATTERN = /^#[0-9a-f]{6}$/i;
+
+/**
+ * A random version 4 UUID. `crypto.randomUUID` exists only in secure contexts, and the widget also
+ * runs on plain http pages, so this falls back to `getRandomValues`, which works everywhere.
+ */
+export const randomUuid = (): string => {
+  if (typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+
+  bytes[6] = (bytes[6]! & 0x0f) | 0x40;
+  bytes[8] = (bytes[8]! & 0x3f) | 0x80;
+
+  const hex = [...bytes].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+};
 
 export const isWidgetTheme = (value: unknown): value is WidgetTheme => {
   if (!value || typeof value !== 'object') {

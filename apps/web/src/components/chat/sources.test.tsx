@@ -51,6 +51,24 @@ describe('Sources', () => {
     expect(row.textContent).toMatch(/Authentication.*Pasted notes/);
   });
 
+  it('reads the markers of one page in ascending order, whatever order the answer cited them', () => {
+    const cli = (index: number): Citation => ({
+      index,
+      documentId: 'd-cli',
+      title: 'Zephyr CLI guide',
+      url: 'https://docs.acme.test/cli',
+      snippet: `Passage ${index}`,
+    });
+
+    render(<Sources citations={[cli(2), cli(1), cli(4), notes, cli(6)]} id="sources-m2" />);
+
+    const link = within(screen.getByTestId('sources')).getByRole('link');
+
+    expect(link).toHaveTextContent(/^1246Zephyr CLI guidedocs\.acme\.test$/);
+    // Each snippet stays with its own marker.
+    expect(link).toHaveAttribute('title', 'Passage 1\n\nPassage 2\n\nPassage 4\n\nPassage 6');
+  });
+
   it('keeps citations without a document apart instead of merging them', () => {
     const loose = { index: 1, title: 'Loose', url: null, snippet: '' } as unknown as Citation;
 

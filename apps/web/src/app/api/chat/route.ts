@@ -17,6 +17,7 @@ const requestSchema = z.object({
   assistantId: z.uuid(),
   conversationId: z.uuid(),
   message: z.string().trim().min(1).max(MAX_MESSAGE_LENGTH),
+  assistantMessageId: z.uuid().optional(),
 });
 
 /** Says which part of the request was wrong, so a broken link reads differently from a long message. */
@@ -27,7 +28,7 @@ const validationMessage = (error: z.ZodError) => {
     return 'That assistant link is not valid. Open the assistant from the dashboard and try again.';
   }
 
-  if (fields.has('conversationId')) {
+  if (fields.has('conversationId') || fields.has('assistantMessageId')) {
     return 'That conversation link is not valid. Start a new chat.';
   }
 
@@ -109,6 +110,7 @@ export async function POST(request: NextRequest) {
       assistant,
       conversation: { id: parsed.data.conversationId, channel: 'app' },
       message: parsed.data.message,
+      assistantMessageId: parsed.data.assistantMessageId,
       signal: request.signal,
     }),
   );

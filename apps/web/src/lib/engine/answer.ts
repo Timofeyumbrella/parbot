@@ -23,6 +23,15 @@ import {
   type RetrievedChunk,
   type ServiceClient,
 } from './retrieval';
+import {
+  findStop,
+  settleSavedStop,
+  shownPart,
+  STOP_POLL_MS,
+  type StopTarget,
+  type StopWatch,
+  watchForStop,
+} from './stops';
 
 export type AnswerAssistant = {
   id: string;
@@ -44,7 +53,15 @@ export type AnswerParams = {
   assistant: AnswerAssistant;
   conversation: AnswerConversation;
   message: string;
+  /** Aborted when the reader goes away, on hosts that pass a disconnect on to the route. */
   signal?: AbortSignal;
+  /**
+   * The id to save the answer under. The client picks it, so it can record a stop for the answer
+   * before the stream has told it anything; one is made up when the client sent none.
+   */
+  assistantMessageId?: string;
+  /** How often to look for a recorded stop while answering. */
+  stopPollMs?: number;
 };
 
 const HISTORY_TURNS = 6;
@@ -156,8 +173,13 @@ export const historyTurns = (newestFirst: { role: string; content: string }[]): 
  * - a failure before any text removes the reader's message (the delete trigger moves the
  *   conversation's counters back) and, when this request created the conversation, the
  *   conversation too, so nothing is left that the reader never saw answered;
- * - a stop (the reader pressed Stop or went away) keeps the reader's message and the text that had
- *   arrived, as an assistant message with `answered` null, and is not metered.
+ * - a stop keeps the reader's message and the text they had been shown, as an assistant message
+ *   with `answered` null and the citations that text carries, and is not metered.
+ *
+ * A stop reaches the engine two ways. Where the host passes the reader's disconnect on, `signal`
+ * aborts or the transport stops pulling events. Everywhere, and always on a serverless host where
+ * neither happens, the client records the stop in `message_stops` with the text on its screen;
+ * the engine looks for that row while it answers, before it saves and after (see `./stops`).
  */
 export async function* streamAnswer(params: AnswerParams): AsyncGenerator<ChatStreamEvent> {
   const { service, provider, assistant, conversation, signal } = params;
@@ -206,7 +228,15 @@ export async function* streamAnswer(params: AnswerParams): AsyncGenerator<ChatSt
     return;
   }
 
-  const assistantMessageId = crypto.randomUUID();
+  const assistantMessageId = params.assistantMessageId ?? crypto.randomUUID();
+  const stopTarget: StopTarget = {
+    messageId: assistantMessageId,
+    conversationId: conversation.id,
+    assistantId: assistant.id,
+  };
+  /** Starts once the reader's message is saved; from then on a stop keeps that message. */
+  let watch: StopWatch | null = null;
+  const stopped = () => Boolean(signal?.aborted || watch?.signal.aborted);
   let created = false;
   let userMessageId: string | null = null;
   let chunks: RetrievedChunk[] = [];
@@ -217,6 +247,7 @@ export async function* streamAnswer(params: AnswerParams): AsyncGenerator<ChatSt
   let shown = '';
   /** Saved or rolled back. Leaving the generator any other way means the reader stopped. */
   let settled = false;
+  let saved = false;
   let metered = false;
 
   const rollback = async () => {
@@ -234,9 +265,17 @@ export async function* streamAnswer(params: AnswerParams): AsyncGenerator<ChatSt
 
   const keepPartial = async () => {
     settled = true;
-    const content = shown.trim();
 
-    if (!userMessageId || !content) {
+    if (!userMessageId) {
+      return;
+    }
+
+    // The reader's own record of what they saw wins over what this function sent: the stream
+    // may have run on after they left, and a token in flight never reached their screen.
+    const stop = await (watch?.check() ?? findStop(service, stopTarget));
+    const content = stop ? shownPart(shown, stop.content) : shown.trim();
+
+    if (!content) {
       return;
     }
 
@@ -335,6 +374,9 @@ export async function* streamAnswer(params: AnswerParams): AsyncGenerator<ChatSt
     }
 
     userMessageId = userMessage.id;
+    // The first look runs beside retrieval, so a stop recorded before the question even arrived
+    // is known before the model is asked.
+    watch = watchForStop(() => findStop(service, stopTarget), params.stopPollMs ?? STOP_POLL_MS);
 
     yield {
       type: 'meta',
@@ -357,6 +399,10 @@ export async function* streamAnswer(params: AnswerParams): AsyncGenerator<ChatSt
       return;
     }
 
+    if (stopped()) {
+      return;
+    }
+
     let text = '';
     let refused = chunks.length === 0;
 
@@ -368,7 +414,7 @@ export async function* streamAnswer(params: AnswerParams): AsyncGenerator<ChatSt
       const generator = provider.stream({
         system: buildSystemPrompt(assistant),
         turns,
-        signal,
+        signal: signal ? AbortSignal.any([signal, watch.signal]) : watch.signal,
       });
 
       let held = '';
@@ -377,6 +423,11 @@ export async function* streamAnswer(params: AnswerParams): AsyncGenerator<ChatSt
       try {
         while (true) {
           const next = await generator.next();
+
+          if (stopped()) {
+            // A provider that finishes a step after the abort; nothing more goes to the reader.
+            return;
+          }
 
           if (next.done) {
             model = next.value.model;
@@ -417,8 +468,8 @@ export async function* streamAnswer(params: AnswerParams): AsyncGenerator<ChatSt
           }
         }
       } catch (cause) {
-        if (signal?.aborted) {
-          // A stop: the finally below keeps the question and what arrived.
+        if (stopped()) {
+          // A stop: the finally below keeps the question and what the reader saw.
           return;
         }
 
@@ -432,6 +483,12 @@ export async function* streamAnswer(params: AnswerParams): AsyncGenerator<ChatSt
         // The model stopped after part of an answer. Keep what arrived rather than lose it.
         console.error('[engine] an answer was cut short', cause);
       }
+    }
+
+    // The last look before saving: a stop recorded since the previous one makes this a stopped
+    // answer, saved as the reader saw it by the finally below.
+    if (stopped() || (await watch.check())) {
+      return;
     }
 
     const answered = !refused;
@@ -469,14 +526,26 @@ export async function* streamAnswer(params: AnswerParams): AsyncGenerator<ChatSt
     }
 
     settled = true;
+    saved = true;
     metered = true;
 
     yield { type: 'citations', citations };
     yield { type: 'done', answered, latencyMs };
   } finally {
+    watch?.dispose();
+
     // Also runs when the transport stops pulling events because the reader went away.
     if (!settled) {
       await keepPartial();
+    } else if (saved) {
+      // A stop recorded between the last look and the insert: the stop route may have looked for
+      // this answer before it existed, so one of the two has to apply it. This runs after `done`
+      // went out, so the reader never waits on it.
+      const late = await findStop(service, stopTarget);
+
+      if (late) {
+        await settleSavedStop(service, stopTarget, late.content);
+      }
     }
 
     if (!metered) {

@@ -337,17 +337,60 @@ describe.skipIf(!serviceKey || !anonKey)('row level security against the local d
     expect(data).toEqual({ value: 3 });
   });
 
+  it('lets an account record and read stops for its own answers only', async () => {
+    const stop = (account: Account, assistantId: string) => ({
+      message_id: crypto.randomUUID(),
+      conversation_id: account.conversationId,
+      assistant_id: assistantId,
+      owner_id: account.id,
+      content: 'API keys are',
+    });
+    const own = stop(owner, owner.assistantId);
+
+    expect((await owner.client.from('message_stops').insert(own)).error).toBeNull();
+    expect(
+      (await owner.client.from('message_stops').select('content').eq('message_id', own.message_id))
+        .data,
+    ).toEqual([{ content: 'API keys are' }]);
+
+    // Neither pointing a stop at someone else's assistant nor reading theirs works.
+    const foreign = await intruder.client
+      .from('message_stops')
+      .insert(stop(intruder, owner.assistantId));
+
+    expect(foreign.error?.code).toBe(PERMISSION_DENIED);
+    expect(
+      (
+        await intruder.client
+          .from('message_stops')
+          .select('message_id')
+          .eq('message_id', own.message_id)
+      ).data,
+    ).toEqual([]);
+
+    // Stops are written once; nobody but the service role changes or removes them.
+    const changed = await owner.client
+      .from('message_stops')
+      .update({ content: 'Something else' })
+      .eq('message_id', own.message_id)
+      .select('message_id');
+
+    expect(changed.error?.code).toBe(PERMISSION_DENIED);
+  });
+
   it('gives the anon key no table access at all', async () => {
     const anon = createClient<Database>(url, anonKey || 'not-configured', clientOptions);
 
-    const [assistants, conversations, owns] = await Promise.all([
+    const [assistants, conversations, stops, owns] = await Promise.all([
       anon.from('assistants').select('id, public_key').limit(1),
       anon.from('conversations').select('id').limit(1),
+      anon.from('message_stops').select('message_id').limit(1),
       anon.rpc('owns_assistant', { assistant: owner.assistantId }),
     ]);
 
     expect(assistants.error?.code).toBe(PERMISSION_DENIED);
     expect(conversations.error?.code).toBe(PERMISSION_DENIED);
+    expect(stops.error?.code).toBe(PERMISSION_DENIED);
     expect(owns.error?.code).toBe(PERMISSION_DENIED);
   });
 });

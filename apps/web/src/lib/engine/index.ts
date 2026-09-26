@@ -37,3 +37,13 @@ export {
   trimToBudget,
 } from './retrieval';
 export { errorStream, SSE_HEADERS, streamResponse } from './sse';
+export {
+  findStop,
+  LATE_STOP_WINDOW_MS,
+  type SavedStopOutcome,
+  settleSavedStop,
+  shownPart,
+  STOP_POLL_MS,
+  type StopRecord,
+  type StopTarget,
+} from './stops';

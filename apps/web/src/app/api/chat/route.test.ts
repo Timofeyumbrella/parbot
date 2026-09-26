@@ -217,4 +217,31 @@ describe('POST /api/chat', () => {
       }),
     );
   });
+
+  it('saves the answer under the id the client proposed, so Stop can name it early', async () => {
+    const proposed = '44444444-4444-4444-8444-444444444444';
+
+    await events(
+      await post({
+        assistantId: ASSISTANT,
+        conversationId: CONVERSATION,
+        message: 'hi',
+        assistantMessageId: proposed,
+      }),
+    );
+
+    expect(engine.streamAnswer).toHaveBeenCalledWith(
+      expect.objectContaining({ assistantMessageId: proposed }),
+    );
+
+    const malformed = await post({
+      assistantId: ASSISTANT,
+      conversationId: CONVERSATION,
+      message: 'hi',
+      assistantMessageId: 'nope',
+    });
+
+    expect(malformed.status).toBe(400);
+    expect(engine.streamAnswer).toHaveBeenCalledTimes(1);
+  });
 });

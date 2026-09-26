@@ -1,6 +1,11 @@
 'use client';
 
-import { type AppChatRequest, type ChatStreamEvent, readChatStream } from '@parbot/shared';
+import {
+  type AppChatRequest,
+  type ChatStreamEvent,
+  randomUuid,
+  readChatStream,
+} from '@parbot/shared';
 import { type QueryClient, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useMemo } from 'react';
 
@@ -18,8 +23,10 @@ import {
   STREAM_CUT_SHORT,
 } from '@/lib/chat/errors';
 import { conversationsKey, INBOX_NAMESPACE, threadKey } from '@/lib/chat/queries';
+import { recordStop } from '@/lib/chat/stop';
 import { streamRegistry } from '@/lib/chat/streams';
 import {
+  activeAnswerText,
   applyStreamEvent,
   beginExchange,
   emptyThread,
@@ -66,6 +73,9 @@ export const sendMessage = async (
   const listKey = conversationsKey(assistantId);
   const userId = tempId();
   const assistantMessageId = tempId();
+  // The id the server saves the answer under, proposed here so Stop can name the answer at any
+  // moment, even before the stream has said anything.
+  const answerId = randomUuid();
   const now = new Date().toISOString();
 
   queryClient.setQueryData<Thread>(key, (thread) =>
@@ -90,7 +100,7 @@ export const sendMessage = async (
     });
   });
 
-  const controller = streamRegistry.start(conversationId);
+  const controller = streamRegistry.start(conversationId, { assistantId, messageId: answerId });
   const apply = (event: ChatStreamEvent) =>
     queryClient.setQueryData<Thread>(key, (thread) =>
       applyStreamEvent(thread ?? emptyThread(), event),
@@ -103,6 +113,13 @@ export const sendMessage = async (
     if (frame !== null) {
       cancelFrame(frame);
       frame = null;
+    }
+
+    if (controller.signal.aborted) {
+      // After Stop the reader keeps exactly what was on screen; that is the text the stop records.
+      buffer = '';
+
+      return;
     }
 
     if (buffer) {
@@ -122,7 +139,12 @@ export const sendMessage = async (
   };
 
   try {
-    const body: AppChatRequest = { assistantId, conversationId, message: content };
+    const body: AppChatRequest = {
+      assistantId,
+      conversationId,
+      message: content,
+      assistantMessageId: answerId,
+    };
     const response = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -195,13 +217,28 @@ export const sendMessage = async (
   }
 };
 
-/** Aborts the stream; the partial answer stays in the thread. */
+/**
+ * Stops the answer at once: the stream is aborted and the partial answer stays in the thread as
+ * the reader sees it. The server is told separately, without the UI waiting on it: an aborted
+ * request does not reach the function on every host, and the stop request carries the text on
+ * screen so the saved answer matches it, unmetered.
+ */
 export const stopMessage = (queryClient: QueryClient, conversationId: string) => {
+  const key = threadKey(conversationId);
+  // Read before the abort: once it lands, tokens still in the frame buffer are dropped, not shown.
+  const shown = activeAnswerText(queryClient.getQueryData<Thread>(key));
+  const target = streamRegistry.target(conversationId);
+
   if (!streamRegistry.stop(conversationId)) {
     // Nothing is in flight (for instance after a hot reload) but the cache still says so.
-    queryClient.setQueryData<Thread>(threadKey(conversationId), (thread) =>
-      thread ? stopExchange(thread) : thread,
-    );
+    queryClient.setQueryData<Thread>(key, (thread) => (thread ? stopExchange(thread) : thread));
+
+    return;
+  }
+
+  // No active exchange means `done` already arrived: the answer is complete, there is nothing to stop.
+  if (target && shown !== null) {
+    void recordStop({ ...target, conversationId, text: shown });
   }
 };
 

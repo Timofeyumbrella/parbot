@@ -21,7 +21,14 @@ const fakeChat = () => {
       controller = ctrl;
     },
   });
-  const fetch = vi.fn((_: string, init?: RequestInit) => {
+  const stops: { url: string; body: unknown; keepalive?: boolean }[] = [];
+  const fetch = vi.fn((url: string, init?: RequestInit) => {
+    if (url.startsWith('/api/messages/')) {
+      stops.push({ url, body: JSON.parse(String(init?.body)), keepalive: init?.keepalive });
+
+      return Promise.resolve(Response.json({ stopped: true, answer: 'none' }));
+    }
+
     init?.signal?.addEventListener('abort', () => {
       try {
         controller?.error(new DOMException('The operation was aborted.', 'AbortError'));
@@ -37,10 +44,18 @@ const fakeChat = () => {
 
   return {
     fetch,
+    stops,
     push: (event: ChatStreamEvent) => controller?.enqueue(encoder.encode(encodeSseEvent(event))),
     close: () => controller?.close(),
   };
 };
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+
+/** The answer id the client proposed with the question. */
+const proposedId = (chat: ReturnType<typeof fakeChat>) =>
+  (JSON.parse(chat.fetch.mock.calls[0]![1]!.body as string) as { assistantMessageId: string })
+    .assistantMessageId;
 
 const meta: ChatStreamEvent = {
   type: 'meta',
@@ -93,16 +108,19 @@ describe('sendMessage', () => {
 
     expect(chat.fetch).toHaveBeenCalledWith(
       '/api/chat',
-      expect.objectContaining({
-        method: 'POST',
-        body: JSON.stringify({
-          assistantId: ASSISTANT,
-          conversationId: CONVERSATION,
-          message: 'Where are API keys?',
-        }),
-        signal: expect.any(AbortSignal),
-      }),
+      expect.objectContaining({ method: 'POST', signal: expect.any(AbortSignal) }),
     );
+    // The client proposes the answer's id, so Stop can name it before the stream says anything.
+    expect(JSON.parse(chat.fetch.mock.calls[0]![1]!.body as string)).toEqual({
+      assistantId: ASSISTANT,
+      conversationId: CONVERSATION,
+      message: 'Where are API keys?',
+      assistantMessageId: expect.stringMatching(UUID),
+    });
+    expect(streamRegistry.target(CONVERSATION)).toEqual({
+      assistantId: ASSISTANT,
+      messageId: proposedId(chat),
+    });
 
     chat.push(meta);
     chat.push({ type: 'done', answered: true, latencyMs: 12 });
@@ -312,6 +330,88 @@ describe('sendMessage', () => {
     });
     expect(thread()?.messages[0]).toMatchObject({ id: 'u1', status: 'stopped' });
     expect(streamRegistry.isStreaming(CONVERSATION)).toBe(false);
+  });
+
+  it('stop tells the server which answer stopped and exactly what the reader saw', async () => {
+    const chat = fakeChat();
+
+    vi.stubGlobal('fetch', chat.fetch);
+
+    const pending = sendMessage(queryClient, ASSISTANT, {
+      conversationId: CONVERSATION,
+      content: 'Long one?',
+    });
+
+    chat.push(meta);
+    chat.push({ type: 'token', text: 'Shown ' });
+
+    await vi.waitFor(() => {
+      expect(thread()?.messages[1]!.content).toBe('Shown ');
+    });
+
+    // A token read into the frame buffer but not yet painted when Stop lands is dropped, not
+    // shown after it: the stop records what was on screen.
+    chat.push({ type: 'token', text: 'unseen' });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    stopMessage(queryClient, CONVERSATION);
+    await pending;
+
+    expect(thread()?.messages[1]).toMatchObject({ status: 'stopped', content: 'Shown ' });
+    await vi.waitFor(() => {
+      expect(chat.stops).toHaveLength(1);
+    });
+    expect(chat.stops[0]).toEqual({
+      url: `/api/messages/${proposedId(chat)}/stop`,
+      body: { assistantId: ASSISTANT, conversationId: CONVERSATION, text: 'Shown ' },
+      keepalive: true,
+    });
+  });
+
+  it('stop before the stream says anything still names the answer, with nothing shown', async () => {
+    const chat = fakeChat();
+
+    vi.stubGlobal('fetch', chat.fetch);
+
+    const pending = sendMessage(queryClient, ASSISTANT, {
+      conversationId: CONVERSATION,
+      content: 'Quick one?',
+    });
+
+    stopMessage(queryClient, CONVERSATION);
+    await pending;
+
+    expect(thread()?.messages.map((message) => message.status)).toEqual(['stopped', 'stopped']);
+    await vi.waitFor(() => {
+      expect(chat.stops).toHaveLength(1);
+    });
+    expect(chat.stops[0]!.url).toBe(`/api/messages/${proposedId(chat)}/stop`);
+    expect(chat.stops[0]!.body).toMatchObject({ text: '' });
+  });
+
+  it('stop after done has nothing to stop and tells the server nothing', async () => {
+    const chat = fakeChat();
+
+    vi.stubGlobal('fetch', chat.fetch);
+
+    const pending = sendMessage(queryClient, ASSISTANT, {
+      conversationId: CONVERSATION,
+      content: 'Done already?',
+    });
+
+    chat.push(meta);
+    chat.push({ type: 'token', text: 'All of it.' });
+    chat.push({ type: 'done', answered: true, latencyMs: 5 });
+
+    await vi.waitFor(() => {
+      expect(thread()?.messages[1]!.status).toBe('complete');
+    });
+
+    // The stream is still open, so the registry still holds it; the answer is complete regardless.
+    stopMessage(queryClient, CONVERSATION);
+    await pending;
+
+    expect(thread()?.messages[1]).toMatchObject({ status: 'complete', content: 'All of it.' });
+    expect(chat.stops).toHaveLength(0);
   });
 
   it('stop with nothing in flight still closes a thread the cache believes is streaming', () => {

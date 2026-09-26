@@ -412,6 +412,140 @@ describe('widget', () => {
     expect(shadow.querySelector('.pb-error')).toBeNull();
   });
 
+  describe('an answer abandoned mid-stream', () => {
+    const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+
+    /** A chat that sends meta and one token, then holds the stream open like a slow model. */
+    const installOpenChat = () => {
+      const stops: { body: Record<string, unknown>; init: RequestInit }[] = [];
+      const mock = vi.fn<typeof fetch>(async (input, init) => {
+        const url = String(input);
+
+        if (url.startsWith(`${API}/api/widget/config`)) {
+          return Response.json(config);
+        }
+
+        if (url === `${API}/api/widget/stop`) {
+          stops.push({ body: JSON.parse(String(init?.body)), init: init! });
+
+          return Response.json({ stopped: true });
+        }
+
+        const body = JSON.parse(String(init?.body)) as {
+          conversationId: string;
+          assistantMessageId: string;
+        };
+
+        return new Response(
+          new ReadableStream<Uint8Array>({
+            start(controller) {
+              const encoder = new TextEncoder();
+
+              controller.enqueue(
+                encoder.encode(
+                  encodeSseEvent({
+                    type: 'meta',
+                    conversationId: body.conversationId,
+                    userMessageId: 'u1',
+                    assistantMessageId: body.assistantMessageId,
+                  }),
+                ),
+              );
+              controller.enqueue(
+                encoder.encode(encodeSseEvent({ type: 'token', text: 'API keys are' })),
+              );
+              init?.signal?.addEventListener('abort', () => {
+                controller.error(new DOMException('The operation was aborted.', 'AbortError'));
+              });
+            },
+          }),
+          { status: 200, headers: { 'content-type': 'text/event-stream' } },
+        );
+      });
+
+      vi.stubGlobal('fetch', mock);
+
+      return { mock, stops };
+    };
+
+    const chatBody = (mock: FetchMock) =>
+      JSON.parse(
+        String(mock.mock.calls.find(([url]) => String(url) === `${API}/api/widget/chat`)![1]?.body),
+      ) as Record<string, string>;
+
+    it('New conversation tells the server what the visitor had been shown, and frees the composer', async () => {
+      const { mock, stops } = installOpenChat();
+      const widget = await boot(mountScript());
+      const shadow = shadowOf(widget!);
+
+      widget!.ask('Where do I create an API key?');
+      await vi.waitFor(() => {
+        expect(shadow.querySelector('.pb-item-assistant .pb-body')?.textContent).toBe(
+          'API keys are',
+        );
+      });
+
+      const sent = chatBody(mock);
+
+      expect(sent.assistantMessageId).toMatch(UUID);
+      expect(shadow.querySelector<HTMLButtonElement>('.pb-send')!.disabled).toBe(true);
+
+      shadow.querySelector<HTMLButtonElement>('.pb-menu button')!.click();
+
+      expect(stops).toHaveLength(1);
+      expect(stops[0]!.body).toEqual({
+        key: KEY,
+        visitorId: sent.visitorId,
+        conversationId: sent.conversationId,
+        messageId: sent.assistantMessageId,
+        text: 'API keys are',
+      });
+      // A simple request, so no preflight stands between the stop and a page that is going away.
+      expect(stops[0]!.init).toMatchObject({
+        method: 'POST',
+        headers: { 'content-type': 'text/plain;charset=UTF-8' },
+        credentials: 'omit',
+        keepalive: true,
+      });
+      expect(shadow.querySelectorAll('.pb-user')).toHaveLength(0);
+      expect(shadow.querySelector<HTMLButtonElement>('.pb-send')!.disabled).toBe(false);
+    });
+
+    it('a page that takes the widget down mid-answer stops the answer too', async () => {
+      const { stops } = installOpenChat();
+      const widget = await boot(mountScript());
+      const shadow = shadowOf(widget!);
+
+      widget!.ask('Where do I create an API key?');
+      await vi.waitFor(() => {
+        expect(shadow.querySelector('.pb-item-assistant .pb-body')?.textContent).toBe(
+          'API keys are',
+        );
+      });
+
+      destroy();
+
+      expect(stops).toHaveLength(1);
+      expect(stops[0]!.body).toMatchObject({ text: 'API keys are' });
+    });
+
+    it('a finished answer has nothing to stop', async () => {
+      const mock = installFetch();
+      const widget = await boot(mountScript());
+      const shadow = shadowOf(widget!);
+
+      widget!.ask('Where do I create an API key?');
+      await vi.waitFor(() => {
+        expect(shadow.querySelector('.pb-sources')).not.toBeNull();
+      });
+
+      shadow.querySelector<HTMLButtonElement>('.pb-menu button')!.click();
+      destroy();
+
+      expect(mock.mock.calls.map(([url]) => String(url))).not.toContain(`${API}/api/widget/stop`);
+    });
+  });
+
   it('replays api calls made before the widget is ready and starts fresh threads', async () => {
     installFetch();
     ask('Early question');

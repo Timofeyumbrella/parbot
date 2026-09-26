@@ -26,7 +26,18 @@ const byDocument = (citations: Citation[]) => {
     }
   }
 
-  return [...groups.values()];
+  // Markers are grouped in the order the answer cites them; within a page they read in order.
+  return [...groups.values()].map((group) => {
+    const order = group.indexes.map((index, position) => ({ index, position }));
+
+    order.sort((a, b) => a.index - b.index);
+
+    return {
+      ...group,
+      indexes: order.map(({ index }) => index),
+      snippets: order.map(({ position }) => group.snippets[position]!),
+    };
+  });
 };
 
 const CHIP =

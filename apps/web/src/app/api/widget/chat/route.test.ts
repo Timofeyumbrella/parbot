@@ -201,6 +201,18 @@ describe('POST /api/widget/chat', () => {
     });
   });
 
+  it('saves the answer under the id the widget proposed, and refuses a malformed one', async () => {
+    const proposed = '44444444-4444-4444-8444-444444444444';
+
+    await (await post(body({ assistantMessageId: proposed }))).text();
+    expect(holder.answers.at(-1)).toMatchObject({ assistantMessageId: proposed });
+
+    const malformed = await post(body({ assistantMessageId: 'nope' }));
+
+    expect(malformed.status).toBe(400);
+    expect(holder.answers).toHaveLength(1);
+  });
+
   it('limits one visitor to 12 messages a minute', async () => {
     for (let index = 0; index < 12; index += 1) {
       expect((await post(body())).status).toBe(200);
