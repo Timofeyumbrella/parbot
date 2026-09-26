@@ -749,5 +749,16 @@ test.describe('the in-app chat', () => {
     });
 
     expect(missing.status()).toBe(404);
+
+    const stop = (messageId: string, body: Record<string, unknown>, client = page.request) =>
+      client.post(`/api/messages/${messageId}/stop`, { data: body });
+    const stopBody = { assistantId, conversationId: crypto.randomUUID(), text: '' };
+
+    expect((await stop(crypto.randomUUID(), stopBody, request)).status()).toBe(401);
+    expect((await stop('nope', stopBody)).status()).toBe(400);
+    // A stop cannot be filed under an assistant the reader does not own.
+    expect(
+      (await stop(crypto.randomUUID(), { ...stopBody, assistantId: crypto.randomUUID() })).status(),
+    ).toBe(404);
   });
 });
