@@ -2,7 +2,7 @@ import { MAX_STOP_TEXT_LENGTH } from '@parbot/shared';
 import type { NextRequest } from 'next/server';
 import { z } from 'zod';
 
-import { rateLimit, settleSavedStop } from '@/lib/engine';
+import { chargeRateLimits, settleSavedStop } from '@/lib/engine';
 import { getSession } from '@/lib/session';
 import { createSupabaseServiceClient } from '@/lib/supabase/service';
 
@@ -58,7 +58,9 @@ export async function POST(
     return Response.json({ error: 'Sign in to stop an answer.' }, { status: 401 });
   }
 
-  const verdict = rateLimit(`stop:${user.id}`, STOP_LIMIT);
+  const service = createSupabaseServiceClient();
+  // Shared by every function instance, like the chat's own limit.
+  const verdict = await chargeRateLimits(service, [[`stop:${user.id}`, STOP_LIMIT]]);
 
   if (!verdict.allowed) {
     return Response.json(
@@ -68,7 +70,6 @@ export async function POST(
   }
 
   const { assistantId, conversationId, text } = parsed.data;
-  const service = createSupabaseServiceClient();
   // The conversation may not exist yet: the stop can overtake the question it stops. When it
   // does exist it has to be the caller's, in this assistant's in-app chat.
   const { data: conversation } = await service

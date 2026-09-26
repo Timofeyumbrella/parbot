@@ -56,7 +56,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const wait = takeRateLimits([
+  const wait = await takeRateLimits(service, [
     [`widget:stop:${assistant.id}:${visitorId}`, WIDGET_VISITOR_LIMIT],
     [`widget:stop:ip:${clientIp(request)}`, WIDGET_IP_LIMIT],
   ]);
