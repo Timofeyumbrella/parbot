@@ -88,25 +88,58 @@ describe('POST /api/stripe/webhook', () => {
     });
 
     expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ error: 'Missing Stripe signature.' });
     expect(memory.saves).toHaveLength(0);
   });
 
-  it('rejects every event while no webhook secret is configured', async () => {
+  it('rejects every event while no webhook secret is configured, without saying so', async () => {
     vi.stubEnv('STRIPE_WEBHOOK_SECRET', '');
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const response = await post(eventFixture('checkout.session.completed', checkoutSession()));
+    const unsigned = await post(eventFixture('checkout.session.completed', checkoutSession()), {
+      header: null,
+    });
+
+    // The caller learns only that the signature did not verify; the reason is in the server log.
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ error: 'Invalid Stripe signature.' });
+    expect(unsigned.status).toBe(400);
+    await expect(unsigned.json()).resolves.toEqual({ error: 'Missing Stripe signature.' });
+    expect(logged).toHaveBeenCalledWith(expect.stringContaining('STRIPE_WEBHOOK_SECRET'));
+    expect(memory.saves).toHaveLength(0);
+    vi.stubEnv('STRIPE_WEBHOOK_SECRET', SECRET);
+    logged.mockRestore();
+  });
+
+  it('does not tell the caller when the Stripe key is missing either', async () => {
+    vi.stubEnv('STRIPE_SECRET_KEY', '');
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     const response = await post(eventFixture('checkout.session.completed', checkoutSession()));
 
     expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ error: 'Invalid Stripe signature.' });
+    expect(logged).toHaveBeenCalledWith(
+      expect.stringContaining('Stripe is not configured'),
+      expect.stringContaining('STRIPE_SECRET_KEY'),
+    );
     expect(memory.saves).toHaveLength(0);
-    vi.stubEnv('STRIPE_WEBHOOK_SECRET', SECRET);
+    vi.stubEnv('STRIPE_SECRET_KEY', 'sk_test_123');
+    logged.mockRestore();
   });
 
-  it('rejects a signature made with another secret', async () => {
+  it('rejects a signature made with another secret and logs why', async () => {
     const response = await post(eventFixture('checkout.session.completed', checkoutSession()), {
       secret: 'whsec_wrong',
     });
 
     expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ error: 'Invalid Stripe signature.' });
+    expect(console.warn).toHaveBeenCalledWith(
+      '[stripe webhook] signature check failed',
+      expect.any(String),
+    );
     expect(memory.saves).toHaveLength(0);
   });
 

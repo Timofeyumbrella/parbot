@@ -138,4 +138,22 @@ test.describe('billing in test mode', () => {
       page.getByText('Hobby, Free. Upgrade for more assistants, pages and answers.'),
     ).toBeVisible();
   });
+
+  test('the Stripe webhook refuses a forged event without saying how billing is set up', async ({
+    request,
+  }) => {
+    const forged = await request.post('/api/stripe/webhook', {
+      headers: { 'stripe-signature': 't=1700000000,v1=forged' },
+      data: { id: 'evt_forged', type: 'checkout.session.completed', data: { object: {} } },
+    });
+
+    // The same answer whether or not a webhook secret is configured on this server.
+    expect(forged.status()).toBe(400);
+    expect(await forged.json()).toEqual({ error: 'Invalid Stripe signature.' });
+
+    const unsigned = await request.post('/api/stripe/webhook', { data: {} });
+
+    expect(unsigned.status()).toBe(400);
+    expect(await unsigned.json()).toEqual({ error: 'Missing Stripe signature.' });
+  });
 });
