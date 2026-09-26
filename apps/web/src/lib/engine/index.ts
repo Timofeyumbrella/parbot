@@ -14,7 +14,18 @@ export {
   renderSources,
   UNANSWERED_TEXT,
 } from './prompt';
-export { rateLimit, type RateLimitVerdict, resetRateLimits } from './rate-limit';
+export {
+  chargeRateLimits,
+  createLocalRateLimiter,
+  rateLimit,
+  type RateLimit,
+  type RateLimitBucket,
+  type RateLimitOutcome,
+  type RateLimitVerdict,
+  resetRateLimits,
+  SHARED_RATE_LIMIT_TIMEOUT_MS,
+  takeInOrder,
+} from './rate-limit';
 export {
   MAX_CONTEXT_CHARS,
   RETRIEVAL_MATCH_COUNT,

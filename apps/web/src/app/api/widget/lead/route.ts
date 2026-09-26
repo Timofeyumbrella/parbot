@@ -57,7 +57,7 @@ export async function POST(request: Request) {
 
   // The visitor id is the client's to invent, so the address and the assistant are capped too;
   // otherwise anyone with the public key could fill the owner's inbox with leads.
-  const wait = takeRateLimits([
+  const wait = await takeRateLimits(service, [
     [`widget:lead:${assistant.id}:${visitorId}`, WIDGET_LEAD_LIMIT],
     [`widget:lead:ip:${clientIp(request)}`, WIDGET_LEAD_IP_LIMIT],
     [`widget:lead:assistant:${assistant.id}`, WIDGET_LEAD_ASSISTANT_LIMIT],

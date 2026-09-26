@@ -13,24 +13,39 @@ import { serverEnv } from '@/lib/env';
  * Stripe posts subscription lifecycle events here. The body is read raw because the signature
  * covers the exact bytes. Anything that fails verification is a 400; an event we cannot apply
  * because of our own failure is a 500 so Stripe retries it.
+ *
+ * Every refusal after the signature header reads the same to the caller, whatever the reason: a
+ * missing secret or key would otherwise tell anyone who posts here that billing is not set up.
+ * The reason goes to the server log instead.
  */
+const invalidSignature = () =>
+  NextResponse.json({ error: 'Invalid Stripe signature.' }, { status: 400 });
+
 export async function POST(request: Request) {
   const secret = serverEnv().stripeWebhookSecret;
   const signature = request.headers.get('stripe-signature');
 
-  if (!secret || !signature) {
-    return NextResponse.json(
-      { error: secret ? 'Missing Stripe signature.' : 'STRIPE_WEBHOOK_SECRET is not configured.' },
-      { status: 400 },
-    );
+  if (!signature) {
+    return NextResponse.json({ error: 'Missing Stripe signature.' }, { status: 400 });
+  }
+
+  if (!secret) {
+    console.error('[stripe webhook] STRIPE_WEBHOOK_SECRET is not configured; event refused');
+
+    return invalidSignature();
   }
 
   let stripe: Stripe;
 
   try {
     stripe = getStripe();
-  } catch {
-    return NextResponse.json({ error: 'Stripe is not configured.' }, { status: 400 });
+  } catch (error) {
+    console.error(
+      '[stripe webhook] Stripe is not configured; event refused',
+      error instanceof Error ? error.message : error,
+    );
+
+    return invalidSignature();
   }
 
   const body = await request.text();
@@ -38,8 +53,13 @@ export async function POST(request: Request) {
 
   try {
     event = await stripe.webhooks.constructEventAsync(body, signature, secret);
-  } catch {
-    return NextResponse.json({ error: 'Invalid Stripe signature.' }, { status: 400 });
+  } catch (error) {
+    console.warn(
+      '[stripe webhook] signature check failed',
+      error instanceof Error ? error.message : error,
+    );
+
+    return invalidSignature();
   }
 
   try {

@@ -33,7 +33,9 @@ and see your bubble in the same frame with the answer streaming into a placehold
   fallback chain, deterministic stub. `getAiProvider()` picks one from env.
 - `apps/web/src/lib/engine`: `streamAnswer()` retrieves, prompts, streams, persists and meters one
   exchange and yields protocol events; `streamResponse()` turns that into an SSE `Response`;
-  `rateLimit()` is an in-memory sliding window. Route handlers wrap these; do not reimplement them.
+  `chargeRateLimits()` charges sliding-window buckets in the database (`take_rate_limits`, shared
+  by every function instance) and falls back to the in-memory `rateLimit()` only when that call
+  fails. Route handlers wrap these; do not reimplement them.
 - `apps/web/src/lib/plans.ts`: plan limits and gated features. Enforce limits server-side.
 - `apps/web/src/lib/supabase`: `server.ts` (visitor's session, RLS applies), `client.ts` (browser,
   RLS applies), `service.ts` (service role, bypasses RLS: verify ownership first).

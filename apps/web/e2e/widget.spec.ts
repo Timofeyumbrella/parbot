@@ -208,6 +208,60 @@ test.describe('widget on the demo page', () => {
     await expect(widget(page, '.pb-launcher')).toBeVisible();
   });
 
+  test('the widget limits live in the database every server instance shares', async ({
+    request,
+  }) => {
+    test.skip(!seeded, 'Needs the Supabase service role key from apps/web/.env');
+
+    const visitorId = `v_e2e_${unique()}`;
+    const bucket = `widget:visitor:${seeded!.assistantId}:${visitorId}`;
+    const ask = () =>
+      request.post('/api/widget/chat', {
+        data: {
+          key: seeded!.publicKey,
+          visitorId,
+          conversationId: crypto.randomUUID(),
+          message: 'What is the rate limit?',
+        },
+      });
+    const hits = async () => {
+      const { data } = await seeded!.admin
+        .from('rate_limits')
+        .select('hits')
+        .eq('bucket', bucket)
+        .maybeSingle();
+
+      return (data?.hits as string[] | undefined)?.length ?? 0;
+    };
+
+    try {
+      // A message this server answered is counted in the shared table, not in its own memory.
+      const answered = await ask();
+      expect(answered.status()).toBe(200);
+      await answered.text();
+      expect(await hits()).toBe(1);
+
+      // Another instance takes the rest of the visitor's minute; this server sees it at once.
+      for (let index = 0; index < 11; index += 1) {
+        const { data, error } = await seeded!.admin.rpc('take_rate_limit', {
+          bucket,
+          max_hits: 12,
+          window_ms: 60_000,
+        });
+        expect(error).toBeNull();
+        expect(data).toEqual([{ allowed: true, retry_after_ms: 0 }]);
+      }
+
+      const limited = await ask();
+      expect(limited.status()).toBe(429);
+      expect(Number(limited.headers()['retry-after'])).toBeGreaterThan(0);
+      expect(await limited.json()).toMatchObject({ error: { code: 'rate_limited' } });
+      expect(await hits()).toBe(12);
+    } finally {
+      await seeded!.admin.from('rate_limits').delete().eq('bucket', bucket);
+    }
+  });
+
   test('an unknown key is a real 404 with a way out', async ({ page }) => {
     const response = await visit(page, '/demo/pb_ffffffffffffffffffffffffffffffff');
 
