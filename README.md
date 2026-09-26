@@ -15,7 +15,7 @@ readers leave when they could not.
 | `packages/shared` | The chat protocol and widget types shared by app and widget         |
 | `supabase/`       | Schema, row level security, pgvector retrieval, analytics functions |
 
-Answers come from the Gemini API free tier (`gemini-3.8-flash` with fallbacks, `gemini-embedding-2`
+Answers come from the Gemini API free tier (`gemini-3.5-flash-lite` with fallbacks, `gemini-embedding-2`
 for retrieval). Without a key the app runs on a deterministic stub, so every screen and test works
 offline. Billing is Stripe in test mode, with a mock provider when no key is set.
 

@@ -396,7 +396,7 @@ const seedHistory = async (ownerId: string, assistantId: string) => {
             ]
           : [],
       feedback: exchange.feedback ?? null,
-      model: hasLiveAiProvider() ? 'gemini-3.8-flash' : 'stub-1',
+      model: hasLiveAiProvider() ? 'gemini-3.5-flash-lite' : 'stub-1',
       latency_ms: 900 + ((index * 131) % 1400),
       prompt_tokens: 600 + ((index * 53) % 400),
       completion_tokens: answered ? 80 + ((index * 17) % 90) : 30,

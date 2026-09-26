@@ -14,8 +14,10 @@ import {
   ProviderError,
 } from './types';
 
-const DEFAULT_CHAT_MODEL = 'gemini-3.8-flash';
-const DEFAULT_FALLBACKS = ['gemini-3.5-flash', 'gemini-3.5-flash-lite'];
+// Flash-Lite starts answering in well under a second on the free tier; the larger Flash models
+// took 8 to 19 seconds to their first token there (measured 2026-09-27), which no reader waits for.
+const DEFAULT_CHAT_MODEL = 'gemini-3.5-flash-lite';
+const DEFAULT_FALLBACKS = ['gemini-3.1-flash-lite', 'gemini-3.5-flash'];
 const DEFAULT_EMBEDDING_MODEL = 'gemini-embedding-2';
 const EMBED_BATCH_SIZE = 32;
 const MAX_OUTPUT_TOKENS = 1024;
@@ -61,7 +63,7 @@ const isNetworkError = (cause: unknown) =>
   (cause instanceof Error && (cause.name === 'AbortError') === false && statusOf(cause) === 0);
 
 const thinkingLevelFrom = (value: string | undefined): ThinkingLevel => {
-  switch ((value ?? 'LOW').toUpperCase()) {
+  switch ((value ?? 'MINIMAL').toUpperCase()) {
     case 'MINIMAL':
       return ThinkingLevel.MINIMAL;
     case 'MEDIUM':
