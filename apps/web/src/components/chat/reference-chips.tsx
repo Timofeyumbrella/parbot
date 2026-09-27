@@ -5,7 +5,12 @@ import { Check, LoaderCircle, TriangleAlert, X } from 'lucide-react';
 import Link from 'next/link';
 
 import { SOURCE_KINDS } from '@/components/knowledge/format';
-import { type ChipStatus, chipLabel, type MessageReference } from '@/lib/chat/references';
+import {
+  type ChipStatus,
+  chipLabel,
+  type DraftReference,
+  type MessageReference,
+} from '@/lib/chat/references';
 import { sourceHref } from '@/lib/knowledge/links';
 
 const StatusMark = ({ status, known = false }: { status: ChipStatus; known?: boolean }) => {
@@ -38,11 +43,10 @@ const StatusMark = ({ status, known = false }: { status: ChipStatus; known?: boo
   );
 };
 
-export type ComposerChip = MessageReference & {
+/** A reference in the composer (`known` included) and where its file is. */
+export type ComposerChip = DraftReference & {
   status: ChipStatus;
   error?: string;
-  /** A file the reader attached that Knowledge already had, referenced instead of uploaded again. */
-  known?: boolean;
 };
 
 /** What hovering a chip explains: why it failed, or that it is the copy already in Knowledge. */

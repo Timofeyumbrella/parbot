@@ -14,6 +14,14 @@ export type SourceStatus = Enums<'source_status'>;
 /** A source a question points at, as its chip and the stored message show it. */
 export type MessageReference = { id: string; title: string; kind: SourceKind };
 
+/**
+ * A reference while a composer or a project's file list holds it, before it is sent or saved.
+ * `known` marks the one a file attached with the paperclip became because Knowledge already had
+ * that file (see `findKnownUpload`), so its chip can say so; `toReference` leaves it behind, and
+ * the same source picked with @ is an ordinary reference.
+ */
+export type DraftReference = MessageReference & { known?: true };
+
 /** A source the picker offers. */
 export type ReferenceOption = MessageReference & {
   status: SourceStatus;
@@ -80,17 +88,21 @@ export const toReference = ({ id, title, kind }: MessageReference): MessageRefer
   kind,
 });
 
+/** A reference as a draft keeps it: `toReference`, and whether it is a known attached file. */
+export const toDraftReference = ({ id, title, kind, known }: DraftReference): DraftReference =>
+  known ? { id, title, kind, known } : { id, title, kind };
+
 /** Adds a reference once, at the end, and never past the limit (a question's, unless told). */
 export const addReference = (
-  references: MessageReference[],
-  added: MessageReference,
+  references: DraftReference[],
+  added: DraftReference,
   limit = MAX_REFERENCES,
-) =>
+): DraftReference[] =>
   references.some((reference) => reference.id === added.id) || references.length >= limit
     ? references
-    : [...references, toReference(added)];
+    : [...references, toDraftReference(added)];
 
-export const removeReference = (references: MessageReference[], id: string) =>
+export const removeReference = <T extends MessageReference>(references: T[], id: string) =>
   references.filter((reference) => reference.id !== id);
 
 export const sameReferences = (a: MessageReference[], b: MessageReference[]) =>

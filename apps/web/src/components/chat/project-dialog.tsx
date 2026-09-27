@@ -30,6 +30,7 @@ import {
 } from '@/lib/chat/projects';
 import {
   addReference,
+  type DraftReference,
   filterReferenceOptions,
   type MessageReference,
   removeReference,
@@ -63,7 +64,7 @@ const ProjectForm = ({ assistantId, project, onClose }: FormProps) => {
   const { update } = useProjectActions(assistantId);
   const [name, setName] = useState(project.name);
   const [instructions, setInstructions] = useState(project.instructions);
-  const [files, setFiles] = useState<MessageReference[]>(project.sources);
+  const [files, setFiles] = useState<DraftReference[]>(project.sources);
   const [filter, setFilter] = useState('');
   const [nameError, setNameError] = useState<string | undefined>();
   const fileRef = useRef<HTMLInputElement | null>(null);

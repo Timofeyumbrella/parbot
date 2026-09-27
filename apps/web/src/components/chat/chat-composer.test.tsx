@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -213,6 +213,72 @@ describe('ChatComposer', () => {
       { id: 's-harbor', title: 'harbor-club.pdf', kind: 'upload' },
     ]);
     expect(uploads).toHaveLength(0);
+  });
+
+  it('says Already in Knowledge only on the chip the attach made', async () => {
+    const user = userEvent.setup();
+    const harbor = source({
+      id: 's-harbor',
+      title: 'harbor-club.pdf',
+      kind: 'upload',
+      mime_type: 'application/pdf',
+      byte_size: 120,
+    });
+
+    db.rows = [harbor, ...db.rows];
+
+    const first = renderComposer();
+
+    await waitFor(() =>
+      expect(queryClient.getQueryData(referenceSourcesKey('asst-1'))).toBeTruthy(),
+    );
+    await user.upload(
+      screen.getByLabelText('Choose a file to attach'),
+      new File(['x'.repeat(120)], 'harbor-club.pdf', { type: 'application/pdf' }),
+    );
+    expect(chipTexts()).toEqual(['harbor-club.pdfAlready in Knowledge']);
+
+    // Another question picks the same file from the @ list: nothing was attached there.
+    first.unmount();
+    renderComposer({ draftKey: 'c2' });
+    await user.type(box(), '@harbor');
+    await user.keyboard('{Enter}');
+    expect(chipTexts()).toEqual(['harbor-club.pdfReady']);
+    expect(screen.getByTestId('reference-chip')).not.toHaveAttribute('data-known');
+    expect(screen.getByTestId('reference-chip')).toHaveAttribute('title', 'harbor-club.pdf');
+
+    // Back in the first one the attached chip still says so; taken off and picked with @, it is
+    // an ordinary reference.
+    cleanup();
+    renderComposer();
+    expect(chipTexts()).toEqual(['harbor-club.pdfAlready in Knowledge']);
+    await user.click(screen.getByRole('button', { name: 'Remove harbor-club.pdf' }));
+    await user.type(box(), '@harbor');
+    await user.keyboard('{Enter}');
+    expect(chipTexts()).toEqual(['harbor-club.pdfReady']);
+  });
+
+  it('keeps the Already in Knowledge chip when another reference is picked or removed', async () => {
+    const user = userEvent.setup();
+
+    db.rows = [
+      source({ id: 's-harbor', title: 'harbor-club.pdf', kind: 'upload', byte_size: 120 }),
+      ...db.rows,
+    ];
+    renderComposer();
+    await waitFor(() =>
+      expect(queryClient.getQueryData(referenceSourcesKey('asst-1'))).toBeTruthy(),
+    );
+    await user.upload(
+      screen.getByLabelText('Choose a file to attach'),
+      new File(['x'.repeat(120)], 'harbor-club.pdf', { type: 'application/pdf' }),
+    );
+    await user.type(box(), '@refu');
+    await user.keyboard('{Enter}');
+    expect(chipTexts()).toEqual(['harbor-club.pdfAlready in Knowledge', 'Refund policyReady']);
+
+    await user.click(screen.getByRole('button', { name: 'Remove Refund policy' }));
+    expect(chipTexts()).toEqual(['harbor-club.pdfAlready in Knowledge']);
   });
 
   it('uploads a file whose copy in Knowledge differs in size or failed, and joins an upload in flight', async () => {

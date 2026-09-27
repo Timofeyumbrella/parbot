@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { clearDraft, handOffFocus, readDraft, takeFocus, writeDraft } from '@/lib/chat/drafts';
 import {
   addReference,
+  type DraftReference,
   filterReferenceOptions,
   findMention,
   MAX_REFERENCES,
@@ -22,6 +23,7 @@ import {
   type ReferenceOption,
   removeMention,
   removeReference,
+  toDraftReference,
   toReference,
 } from '@/lib/chat/references';
 import { UPLOAD_ACCEPT } from '@/lib/uploads';
@@ -35,7 +37,7 @@ export type ComposerReferences = {
    * first, and they cannot be taken off here (they change in the project).
    */
   fixed?: { label: string; chips: ComposerChip[] };
-  onChange: (references: MessageReference[]) => void;
+  onChange: (references: DraftReference[]) => void;
   /** The picker's list; undefined while it loads. */
   options: ReferenceOption[] | undefined;
   failed?: boolean;
@@ -226,7 +228,7 @@ export const Composer = ({
       writeDraft(draftKey, next.text);
 
       if (!fixedIds.has(option.id)) {
-        references.onChange(addReference(chips.map(toReference), option));
+        references.onChange(addReference(chips.map(toDraftReference), option));
       }
 
       textareaRef.current?.focus();
@@ -423,7 +425,7 @@ export const Composer = ({
                   key={chip.id}
                   chip={chip}
                   onRemove={(id) =>
-                    references?.onChange(removeReference(chips, id).map(toReference))
+                    references?.onChange(removeReference(chips, id).map(toDraftReference))
                   }
                 />
               ))}

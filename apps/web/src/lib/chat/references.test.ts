@@ -4,6 +4,7 @@ import {
   addReference,
   chipLabel,
   chipStatus,
+  type DraftReference,
   filterReferenceOptions,
   findKnownUpload,
   findMention,
@@ -11,6 +12,7 @@ import {
   parseReferences,
   type ReferenceOption,
   removeMention,
+  toReference,
   uploadingMessage,
 } from './references';
 
@@ -87,6 +89,24 @@ describe('filterReferenceOptions', () => {
 });
 
 describe('addReference', () => {
+  it('keeps whether the reference is a file attached as the copy Knowledge had, and nothing else', () => {
+    const option: ReferenceOption = {
+      id: 'a',
+      title: 'A',
+      kind: 'upload',
+      status: 'ready',
+      detail: 'PDF · 1 KB',
+      createdAt: '2026-09-20T10:00:00Z',
+    };
+
+    const attached: DraftReference = { id: 'a', title: 'A', kind: 'upload', known: true };
+
+    expect(addReference([], option)).toEqual([{ id: 'a', title: 'A', kind: 'upload' }]);
+    expect(addReference([], attached)).toEqual([attached]);
+    // What is sent or saved never carries it.
+    expect(toReference(attached)).toEqual({ id: 'a', title: 'A', kind: 'upload' });
+  });
+
   it('adds once, at the end, and stops at the limit', () => {
     const one = { id: 'a', title: 'A', kind: 'upload' as const };
 

@@ -7,7 +7,7 @@ import { Composer } from '@/components/chat/composer';
 import { useProjectRow } from '@/hooks/use-projects';
 import { useAttachFiles, useReferenceChips } from '@/hooks/use-reference-sources';
 import { readReferenceDraft, writeReferenceDraft } from '@/lib/chat/drafts';
-import { MAX_REFERENCES, type MessageReference } from '@/lib/chat/references';
+import { type DraftReference, MAX_REFERENCES, type MessageReference } from '@/lib/chat/references';
 
 export type ChatComposerProps = {
   draftKey: string;
@@ -54,7 +54,7 @@ export const ChatComposer = ({
   const attachFiles = useAttachFiles(assistant.id);
 
   const change = useCallback(
-    (next: MessageReference[]) => {
+    (next: DraftReference[]) => {
       setEdited(next);
       writeReferenceDraft(draftKey, next);
     },

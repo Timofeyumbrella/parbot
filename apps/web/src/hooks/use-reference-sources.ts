@@ -10,6 +10,7 @@ import { CHAT_NAMESPACE } from '@/lib/chat/queries';
 import {
   addReference,
   chipStatus,
+  type DraftReference,
   findKnownUpload,
   isIndexingStatus,
   type MessageReference,
@@ -105,7 +106,7 @@ const serverSnapshot = () => 0;
  */
 export const useReferenceChips = (
   assistantId: string,
-  references: MessageReference[],
+  references: DraftReference[],
   fixed: MessageReference[] = [],
 ) => {
   const watched = useMemo(
@@ -120,14 +121,15 @@ export const useReferenceChips = (
     () => new Map((sources.data ?? []).map((option) => [option.id, option])),
     [sources.data],
   );
-  const toChip = (reference: MessageReference): ComposerChip => {
+  // A chip is "already in Knowledge" only when its own reference says so (the attach made it),
+  // never because the same source was attached somewhere else.
+  const toChip = (reference: DraftReference): ComposerChip => {
     const upload = composerUploads.state(reference.id);
 
     return {
       ...reference,
       status: chipStatus({ upload, source: byId.get(reference.id), loaded: sources.isSuccess }),
       error: upload?.status === 'failed' ? upload.error : undefined,
-      ...(composerUploads.isKnown(reference.id) ? { known: true } : {}),
     };
   };
 
@@ -150,9 +152,9 @@ export const useAttachFiles = (assistantId: string) => {
   return useCallback(
     (
       files: File[],
-      current: MessageReference[],
+      current: DraftReference[],
       options: { limit: number; limitMessage: string },
-    ) => {
+    ): DraftReference[] => {
       let next = current;
       const listed = queryClient.getQueryData<ReferenceOption[]>(referenceSourcesKey(assistantId));
 
@@ -166,8 +168,8 @@ export const useAttachFiles = (assistantId: string) => {
 
         const inKnowledge = listed ? findKnownUpload(listed, file) : undefined;
         const inFlight = inKnowledge ? null : composerUploads.find(assistantId, file);
-        const same: MessageReference | null = inKnowledge
-          ? toReference(inKnowledge)
+        const same: DraftReference | null = inKnowledge
+          ? { ...toReference(inKnowledge), known: true }
           : inFlight
             ? { id: inFlight, title: uploadTitle(file.name), kind: 'upload' }
             : null;
@@ -183,7 +185,6 @@ export const useAttachFiles = (assistantId: string) => {
 
         if (same) {
           if (inKnowledge) {
-            composerUploads.markKnown(same.id);
             // The list may be a few seconds old: read it again, so a copy deleted in the
             // meantime shows as Removed on its chip rather than as Ready.
             void queryClient.invalidateQueries({

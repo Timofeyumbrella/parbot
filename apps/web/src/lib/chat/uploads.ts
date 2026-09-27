@@ -18,8 +18,6 @@ type Entry = {
 };
 
 const entries = new Map<string, Entry>();
-/** Sources a file attached from the chat turned out to be already (see `findKnownUpload`). */
-const known = new Set<string>();
 const listeners = new Set<() => void>();
 let version = 0;
 
@@ -123,14 +121,6 @@ export const composerUploads = {
     return null;
   },
 
-  /** Records that an attached file was already in Knowledge, so its chip can say so. */
-  markKnown: (id: string) => {
-    known.add(id);
-    notify();
-  },
-
-  isKnown: (id: string) => known.has(id),
-
   state: (id: string): UploadState | undefined => entries.get(id)?.state,
 
   /** Resolves once every listed upload has finished, with the ids that were saved. */
@@ -166,7 +156,6 @@ export const composerUploads = {
   /** Test hook. */
   reset: () => {
     entries.clear();
-    known.clear();
     notify();
   },
 };
