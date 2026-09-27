@@ -22,9 +22,15 @@ describe('mergeContextSources', () => {
     expect(merged.map((item) => item.id)).toEqual(['mine', 'shared', 'pricing', 'faq']);
   });
 
-  it('stops at the cap', () => {
-    const project = Array.from({ length: 30 }, (_, index) => source(`p${index}`));
-    const merged = mergeContextSources([source('mine')], project);
+  it('keeps a full project beside a full set of references, and stops at the cap', () => {
+    const own = Array.from({ length: 10 }, (_, index) => source(`r${index}`));
+    const project = Array.from({ length: 20 }, (_, index) => source(`p${index}`));
+
+    expect(mergeContextSources(own, project)).toHaveLength(30);
+    expect(MAX_CONTEXT_SOURCES).toBe(30);
+
+    const tooMany = Array.from({ length: 40 }, (_, index) => source(`x${index}`));
+    const merged = mergeContextSources([source('mine')], tooMany);
 
     expect(merged).toHaveLength(MAX_CONTEXT_SOURCES);
     expect(merged[0]!.id).toBe('mine');

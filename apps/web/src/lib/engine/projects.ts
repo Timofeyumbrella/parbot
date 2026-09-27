@@ -1,3 +1,5 @@
+import { MAX_REFERENCES } from '@parbot/shared';
+
 import { MAX_PROJECT_SOURCES } from '@/lib/chat/projects';
 
 import type { ReferencedSource } from './references';
@@ -17,8 +19,13 @@ export type ProjectContext = {
   sources: ReferencedSource[];
 };
 
-/** Every source one question reads: the conversation's own references plus the project's files. */
-export const MAX_CONTEXT_SOURCES = 20;
+/**
+ * Every source one question reads: the conversation's own references plus the project's files,
+ * each list at its own limit, so none is dropped here. What bounds the prompt is the passage
+ * budget in retrieval: passages come each source's best first, so with many files the ones
+ * closest to the question are the ones that fit.
+ */
+export const MAX_CONTEXT_SOURCES = MAX_REFERENCES + MAX_PROJECT_SOURCES;
 
 const PROJECT_CONTEXT_COLUMNS =
   'id, name, instructions, project_sources(position, sources(id, title, kind, status))';
