@@ -57,6 +57,8 @@ export type ComposerProps = {
 };
 
 const MAX_HEIGHT = 200;
+/** A project's files shown before "N more files", so a big project does not crowd the box. */
+const FIXED_SHOWN = 3;
 
 const isComposing = (event: React.KeyboardEvent<HTMLTextAreaElement>) =>
   event.nativeEvent.isComposing || event.keyCode === 229;
@@ -85,6 +87,7 @@ export const Composer = ({
   const [dismissed, setDismissed] = useState<number | null>(null);
   const [active, setActive] = useState({ query: '', index: 0 });
   const [dragging, setDragging] = useState(false);
+  const [showAllFixed, setShowAllFixed] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
   const handedFocus = useRef(false);
@@ -349,9 +352,21 @@ export const Composer = ({
                 <FolderClosed className="size-3.5 shrink-0" aria-hidden="true" />
                 <span className="max-w-32 truncate font-medium sm:max-w-48">{fixed.label}</span>
               </span>
-              {fixed.chips.map((chip) => (
+              {(showAllFixed ? fixed.chips : fixed.chips.slice(0, FIXED_SHOWN)).map((chip) => (
                 <ProjectFileChip key={chip.id} chip={chip} project={fixed.label} />
               ))}
+              {fixed.chips.length > FIXED_SHOWN ? (
+                <button
+                  type="button"
+                  onClick={() => setShowAllFixed((shown) => !shown)}
+                  aria-expanded={showAllFixed}
+                  className="text-muted-foreground hover:text-foreground focus-visible:ring-ring/50 h-7 rounded-md px-1.5 text-xs outline-none focus-visible:ring-2"
+                >
+                  {showAllFixed
+                    ? 'Show fewer'
+                    : `${fixed.chips.length - FIXED_SHOWN} more ${fixed.chips.length - FIXED_SHOWN === 1 ? 'file' : 'files'}`}
+                </button>
+              ) : null}
             </div>
           ) : null}
           {chips.length > 0 ? (

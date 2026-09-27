@@ -1,13 +1,18 @@
 'use client';
 
 import type { RealtimeChannel, RealtimePostgresChangesPayload } from '@supabase/supabase-js';
-import { type InfiniteData, useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  type InfiniteData,
+  useInfiniteQuery,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
 import { cn } from 'cn';
 import { MessageSquare } from 'lucide-react';
 import Link, { useLinkStatus } from 'next/link';
 import { useEffect, useState } from 'react';
 
-import { ChannelBadge, UnansweredBadge } from '@/components/inbox/channel-badge';
+import { ChannelBadge, ProjectBadge, UnansweredBadge } from '@/components/inbox/channel-badge';
 import {
   activityStamp,
   compareActivity,
@@ -17,9 +22,12 @@ import {
   type ConversationRow,
   inboxCountsKey,
   type InboxCounts,
+  inboxProjectsKey,
   matchesFilter,
   type PageCursor,
   pageOf,
+  projectNames,
+  type ProjectNames,
 } from '@/components/inbox/conversation-query';
 import { LocalTime } from '@/components/inbox/local-time';
 import { Button } from '@/components/ui/button';
@@ -126,7 +134,11 @@ export type ConversationListProps = {
   initialRows: ConversationRow[];
   /** The request's clock, shared by every relative time on the page. */
   now: number;
+  /** The chat projects' names as the server read them, to label in-app conversations. */
+  projects?: ProjectNames;
 };
+
+const NO_PROJECTS: ProjectNames = {};
 
 /**
  * Marks a row the moment it is clicked while the router still waits for a route it has not
@@ -167,10 +179,22 @@ export const ConversationList = ({
   filter,
   initialRows,
   now,
+  projects,
 }: ConversationListProps) => {
   const queryClient = useQueryClient();
   const key = conversationListKey(assistantId, filter);
   const [fresh, setFresh] = useState<ReadonlySet<string>>(() => new Set());
+  // Read again when the chat changes a project (it invalidates the inbox), so a row moved into a
+  // project made after this page loaded still gets its label.
+  const { data: names } = useQuery({
+    queryKey: inboxProjectsKey(assistantId),
+    queryFn: () => projectNames(getSupabaseBrowserClient(), assistantId),
+    initialData: projects,
+    initialDataUpdatedAt: now,
+    enabled: projects !== undefined,
+  });
+  const projectName = (row: ConversationRow) =>
+    row.project_id ? (names ?? NO_PROJECTS)[row.project_id] : undefined;
 
   const query = useInfiniteQuery({
     queryKey: key,
@@ -317,6 +341,7 @@ export const ConversationList = ({
         {rows.map((row) => {
           const host = row.channel === 'widget' ? hostnameOf(row.page_url) : null;
           const isNew = fresh.has(row.id);
+          const project = projectName(row);
 
           return (
             <li key={row.id} data-conversation-id={row.id} data-new={isNew ? 'true' : undefined}>
@@ -344,6 +369,7 @@ export const ConversationList = ({
                   </div>
                   <div className="text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
                     <ChannelBadge channel={row.channel} />
+                    {project ? <ProjectBadge name={project} /> : null}
                     {host ? (
                       <span className="truncate" title={row.page_url ?? undefined}>
                         {host}
