@@ -3,6 +3,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 import { stubEmbedding } from '../src/lib/ai/stub';
 
+import { testEmail } from './support/accounts';
 import { visit } from './support/navigation';
 
 /**
@@ -10,12 +11,13 @@ import { visit } from './support/navigation';
  * placeholder land before the server answers, switching reads from the cache, Stop and Retry
  * work, the list stays correct across navigation, and the phone layout is usable.
  *
- * Runs as the demo account against an assistant the spec creates and removes.
+ * Runs as a throwaway account with the one assistant it owns, both created here and removed after.
  */
 
-const DEMO_USER = '00000000-0000-4000-8000-000000000001';
-const DEMO_EMAIL = 'demo@parbot.dev';
-const DEMO_PASSWORD = 'parbot-demo';
+const OWNER_EMAIL = testEmail('chat');
+const OWNER_PASSWORD = 'chat-e2e-password';
+/** Set once the account exists. */
+let ownerId = '';
 
 const unique = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 
@@ -66,13 +68,28 @@ const docs = [
   },
 ];
 
-/** An assistant with a couple of indexed chunks, embedded the way the stub provider embeds queries. */
+/**
+ * An account and its assistant with a couple of indexed chunks, embedded the way the stub provider
+ * embeds queries. An account owns one assistant, so each run gets its own account.
+ */
 const seedAssistant = async (service: SupabaseClient) => {
+  const { data: created, error: userError } = await service.auth.admin.createUser({
+    email: OWNER_EMAIL,
+    password: OWNER_PASSWORD,
+    email_confirm: true,
+  });
+
+  if (userError || !created.user) {
+    throw new Error(userError?.message ?? 'The chat e2e account could not be created.');
+  }
+
+  ownerId = created.user.id;
+
   const slug = `chat-e2e-${unique()}`;
   const { data: assistant, error } = await service
     .from('assistants')
     .insert({
-      owner_id: DEMO_USER,
+      owner_id: ownerId,
       name: 'Acme Docs (chat e2e)',
       slug,
       welcome_message: 'Ask me anything about the Acme docs.',
@@ -93,7 +110,7 @@ const seedAssistant = async (service: SupabaseClient) => {
     .from('sources')
     .insert({
       assistant_id: assistant.id,
-      owner_id: DEMO_USER,
+      owner_id: ownerId,
       kind: 'text',
       title: 'Handbook',
       storage_path: slug,
@@ -107,7 +124,7 @@ const seedAssistant = async (service: SupabaseClient) => {
       .from('documents')
       .insert({
         assistant_id: assistant.id,
-        owner_id: DEMO_USER,
+        owner_id: ownerId,
         source_id: source!.id,
         title: doc.title,
         url: doc.url,
@@ -120,7 +137,7 @@ const seedAssistant = async (service: SupabaseClient) => {
     await service.from('chunks').insert(
       doc.passages.map((passage, position) => ({
         assistant_id: assistant.id,
-        owner_id: DEMO_USER,
+        owner_id: ownerId,
         document_id: document!.id,
         position,
         heading: passage.heading,
@@ -135,8 +152,8 @@ const seedAssistant = async (service: SupabaseClient) => {
 
 const signIn = async (page: Page, next: string) => {
   await visit(page, `/login?next=${encodeURIComponent(next)}`);
-  await page.getByLabel('Email').fill(DEMO_EMAIL);
-  await page.getByLabel('Password').fill(DEMO_PASSWORD);
+  await page.getByLabel('Email').fill(OWNER_EMAIL);
+  await page.getByLabel('Password').fill(OWNER_PASSWORD);
   await page.getByRole('button', { name: 'Sign in' }).click();
   await expect(page).toHaveURL(new RegExp(next.replace(/[/[\]]/g, '\\$&')));
 };
@@ -206,8 +223,9 @@ test.describe('the in-app chat', () => {
   test.afterAll(async () => {
     await page?.close();
 
-    if (assistantId) {
-      await service.from('assistants').delete().eq('id', assistantId);
+    if (ownerId) {
+      // The assistant and everything it owns go with the account.
+      await service.auth.admin.deleteUser(ownerId);
     }
   });
 
@@ -596,7 +614,7 @@ test.describe('the in-app chat', () => {
     const { error: conversationError } = await service.from('conversations').insert({
       id: conversationId,
       assistant_id: assistantId,
-      owner_id: DEMO_USER,
+      owner_id: ownerId,
       channel: 'app',
       title: 'Seeded rotation thread',
     });
@@ -609,7 +627,7 @@ test.describe('the in-app chat', () => {
         {
           conversation_id: conversationId,
           assistant_id: assistantId,
-          owner_id: DEMO_USER,
+          owner_id: ownerId,
           role: 'user',
           content: `Question ${index + 1}: how do I rotate a key?`,
           citations: [],
@@ -617,7 +635,7 @@ test.describe('the in-app chat', () => {
         {
           conversation_id: conversationId,
           assistant_id: assistantId,
-          owner_id: DEMO_USER,
+          owner_id: ownerId,
           role: 'assistant',
           content: answer,
           citations,

@@ -38,7 +38,4 @@ export default async function globalTeardown() {
       console.warn(`[e2e teardown] could not delete ${profile.email}: ${deleteError.message}`);
     }
   }
-
-  // The chat spec seeds assistants on the demo account; an interrupted run leaves them there.
-  await admin.from('assistants').delete().like('slug', 'chat-e2e-%').lt('created_at', staleBefore);
 }

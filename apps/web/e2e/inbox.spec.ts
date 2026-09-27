@@ -261,7 +261,7 @@ test.describe('the inbox and the overview', () => {
     service = admin();
     seeded = await seed(service);
     page = await browser.newPage();
-    await signIn(page, seeded.email, '/dashboard');
+    await signIn(page, seeded.email, `/a/${seeded.assistantId}`);
   });
 
   test.afterAll(async () => {
