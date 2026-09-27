@@ -138,6 +138,62 @@ export type Database = {
           },
         ]
       }
+      conversation_references: {
+        Row: {
+          assistant_id: string
+          conversation_id: string
+          created_at: string
+          owner_id: string
+          position: number
+          source_id: string
+        }
+        Insert: {
+          assistant_id: string
+          conversation_id: string
+          created_at?: string
+          owner_id: string
+          position?: number
+          source_id: string
+        }
+        Update: {
+          assistant_id?: string
+          conversation_id?: string
+          created_at?: string
+          owner_id?: string
+          position?: number
+          source_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_references_assistant_id_fkey"
+            columns: ["assistant_id"]
+            isOneToOne: false
+            referencedRelation: "assistants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_references_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_references_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_references_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       conversations: {
         Row: {
           assistant_id: string
@@ -381,6 +437,7 @@ export type Database = {
           owner_id: string
           prompt_tokens: number | null
           role: Database["public"]["Enums"]["message_role"]
+          source_references: Json
         }
         Insert: {
           answered?: boolean | null
@@ -397,6 +454,7 @@ export type Database = {
           owner_id: string
           prompt_tokens?: number | null
           role: Database["public"]["Enums"]["message_role"]
+          source_references?: Json
         }
         Update: {
           answered?: boolean | null
@@ -413,6 +471,7 @@ export type Database = {
           owner_id?: string
           prompt_tokens?: number | null
           role?: Database["public"]["Enums"]["message_role"]
+          source_references?: Json
         }
         Relationships: [
           {
@@ -749,6 +808,25 @@ export type Database = {
           document_url: string
           heading: string
           similarity: number
+        }[]
+      }
+      match_chunks_in_sources: {
+        Args: {
+          assistant: string
+          per_source?: number
+          query_embedding: string
+          source_ids: string[]
+        }
+        Returns: {
+          chunk_id: string
+          content: string
+          document_id: string
+          document_title: string
+          document_url: string
+          heading: string
+          similarity: number
+          source_id: string
+          source_rank: number
         }[]
       }
       overview_totals: {

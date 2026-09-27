@@ -133,7 +133,7 @@ describe('TranscriptMessage', () => {
   });
 
   it('can be linked to by its id, which the Overview uses for disliked answers', () => {
-    render(<TranscriptMessage message={base} now={NOW} />);
+    render(<TranscriptMessage assistantId="asst" message={base} now={NOW} />);
 
     expect(screen.getByLabelText('Assistant message')).toHaveAttribute('id', `message-${base.id}`);
   });

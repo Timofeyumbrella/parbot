@@ -65,7 +65,8 @@ test.describe('the Overview', () => {
     email = testEmail('overview-e2e');
     seeded = await seedOverview(service, email);
     page = await browser.newPage();
-    await signIn(page, email, '/dashboard');
+    // Sign-in lands on the account's one assistant.
+    await signIn(page, email, `/a/${seeded.assistantId}`);
   });
 
   test.afterAll(async () => {

@@ -288,7 +288,8 @@ test.describe('long messages on a phone', () => {
     service = admin();
     seeded = await seed(service);
     page = await browser.newPage({ viewport: { width: PHONE_WIDTHS[0]!, height: 800 } });
-    await signIn(page, seeded.email, '/dashboard');
+    // Sign-in lands on the account's one assistant.
+    await signIn(page, seeded.email, `/a/${seeded.assistantId}`);
   });
 
   test.afterAll(async () => {
