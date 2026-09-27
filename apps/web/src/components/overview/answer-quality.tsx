@@ -92,8 +92,10 @@ export const AnswerQuality = ({
             Read the {plural(current.unanswered, 'unanswered question', 'unanswered questions')} in
             the Inbox
           </NextStep>
-        ) : (
+        ) : rate.whole > 0 ? (
           'Every finished answer in this period came from the docs.'
+        ) : (
+          <NextStep href={`/a/${assistantId}/chat`}>Ask the assistant something in Chat</NextStep>
         )
       }
     >

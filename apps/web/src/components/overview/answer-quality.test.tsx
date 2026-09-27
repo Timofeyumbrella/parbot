@@ -124,6 +124,11 @@ describe('AnswerQuality', () => {
     expect(metric('metric-answer-rate').caption).toBe('No finished answers in this period.');
     expect(metric('metric-helpful').caption).toMatch(/^No ratings yet/);
     expect(metric('metric-time').value).toBe('–');
+    // Nothing finished, so nothing to claim about the docs: the next step is to ask.
+    expect(screen.queryByText(/Every finished answer/)).toBeNull();
+    expect(
+      screen.getByRole('link', { name: /Ask the assistant something in Chat/ }),
+    ).toHaveAttribute('href', `/a/${ASSISTANT}/chat`);
   });
 
   it('reads a small move in answer time as no change', () => {

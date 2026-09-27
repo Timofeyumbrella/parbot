@@ -110,10 +110,8 @@ export default async function OverviewPage({
         .from('documents')
         .select('id', { count: 'exact', head: true })
         .eq('assistant_id', assistantId),
-      supabase
-        .from('messages')
-        .select('id', { count: 'exact', head: true })
-        .eq('assistant_id', assistantId),
+      // One row tells a new assistant from a quiet period; there is no need to count them all.
+      supabase.from('messages').select('id').eq('assistant_id', assistantId).limit(1),
     ]);
 
   const failure = [
@@ -133,7 +131,7 @@ export default async function OverviewPage({
     console.error('[overview] a query failed', failure);
   }
 
-  const firstUse = !failure && (messages.count ?? 0) === 0;
+  const firstUse = !failure && (messages.data ?? []).length === 0;
   const clock = now.getTime();
   const totalsRows = (totals.data ?? []) as TotalsRow[];
   const current = toTotals(totalsRows.find((row) => row.period === 'current'));
