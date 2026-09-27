@@ -6,10 +6,18 @@ import { UUID_PATTERN, VISITOR_ID_PATTERN } from '@parbot/shared';
  * cookies); every access is guarded and the widget still works for the current page.
  */
 
+export type StoredCitation = {
+  index: number;
+  title: string;
+  url: string | null;
+  /** Groups the passages of one document into one source row; older transcripts have none. */
+  documentId?: string;
+};
+
 export type StoredMessage = {
   role: 'user' | 'assistant';
   text: string;
-  citations: { index: number; title: string; url: string | null }[];
+  citations: StoredCitation[];
   answered?: boolean;
 };
 

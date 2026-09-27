@@ -1,5 +1,6 @@
 import {
   type ChatStreamEvent,
+  type Citation,
   encodeSseEvent,
   type WidgetConfig,
   type WidgetScheme,
@@ -651,7 +652,8 @@ describe('widget', () => {
     expect(shadow.querySelector('.pb-error')?.textContent).not.toContain('Failed to fetch');
   });
 
-  it('shows a source with an unsafe url as plain text', async () => {
+  /** Answers every question with `text` and these citations, in the order given. */
+  const stubAnswer = (text: string, citations: Citation[]) =>
     vi.stubGlobal(
       'fetch',
       vi.fn<typeof fetch>(async (input, init) => {
@@ -668,30 +670,31 @@ describe('widget', () => {
             userMessageId: 'u1',
             assistantMessageId: 'a1',
           },
-          { type: 'token', text: 'See the guide [1] and the page [2].' },
-          {
-            type: 'citations',
-            citations: [
-              {
-                index: 1,
-                documentId: 'd1',
-                title: 'Guide',
-                url: 'javascript:alert(1)',
-                snippet: '',
-              },
-              {
-                index: 2,
-                documentId: 'd2',
-                title: 'Page',
-                url: 'https://docs.example.com/page',
-                snippet: '',
-              },
-            ],
-          },
+          { type: 'token', text },
+          { type: 'citations', citations },
           { type: 'done', answered: true, latencyMs: 1 },
         ]);
       }),
     );
+
+  /** Each source row as its numbers and its title, e.g. "1 2 | HonoRequest - Hono". */
+  const sourceRows = (shadow: ShadowRoot) =>
+    [...shadow.querySelectorAll('.pb-sources li')].map(
+      (row) =>
+        `${[...row.querySelectorAll('.pb-source-num')].map((number) => number.textContent).join(' ')} | ${row.querySelector('.pb-source-title')?.textContent}`,
+    );
+
+  it('shows a source with an unsafe url as plain text', async () => {
+    stubAnswer('See the guide [1] and the page [2].', [
+      { index: 1, documentId: 'd1', title: 'Guide', url: 'javascript:alert(1)', snippet: '' },
+      {
+        index: 2,
+        documentId: 'd2',
+        title: 'Page',
+        url: 'https://docs.example.com/page',
+        snippet: '',
+      },
+    ]);
 
     const widget = await boot(mountScript());
     const shadow = shadowOf(widget!);
@@ -703,8 +706,90 @@ describe('widget', () => {
 
     const [first, second] = shadow.querySelectorAll('.pb-sources li');
     expect(first?.querySelector('a')).toBeNull();
-    expect(first?.textContent).toBe('Guide');
+    expect(first?.querySelector('.pb-source-title')?.textContent).toBe('Guide');
     expect(second?.querySelector('a')?.href).toBe('https://docs.example.com/page');
+  });
+
+  it('lists each cited document once with all its numbers, by its first number', async () => {
+    const context = (index: number): Citation => ({
+      index,
+      documentId: 'd-context',
+      title: 'Context - Hono',
+      url: 'https://hono.dev/docs/api/context',
+      snippet: '',
+    });
+
+    // The answer mentions [3] first and cites the Context page three times.
+    stubAnswer('Use c.req [3], c.json [1] [2] and c.set [4] [5].', [
+      context(3),
+      {
+        index: 1,
+        documentId: 'd-request',
+        title: 'HonoRequest - Hono',
+        url: 'https://hono.dev/docs/api/request',
+        snippet: '',
+      },
+      context(2),
+      { index: 4, documentId: 'd-notes', title: 'Team notes', url: null, snippet: '' },
+      context(5),
+    ]);
+
+    const widget = await boot(mountScript());
+    const shadow = shadowOf(widget!);
+    widget!.ask('How do I read the request?');
+
+    await vi.waitFor(() => {
+      expect(shadow.querySelectorAll('.pb-sources li')).toHaveLength(3);
+    });
+
+    expect(sourceRows(shadow)).toEqual([
+      '1 | HonoRequest - Hono',
+      '2 3 5 | Context - Hono',
+      '4 | Team notes',
+    ]);
+
+    const [request, contextRow, notes] = shadow.querySelectorAll('.pb-sources li');
+    expect(request?.querySelector('a')?.href).toBe('https://hono.dev/docs/api/request');
+    expect(contextRow?.querySelectorAll('a')).toHaveLength(1);
+    expect(contextRow?.querySelector('a')?.href).toBe('https://hono.dev/docs/api/context');
+    expect(contextRow?.querySelector('a')?.target).toBe('_blank');
+    expect(notes?.querySelector('a')).toBeNull();
+
+    // The same rows come back after a reload, from the saved transcript.
+    resetForTests();
+    document.body.innerHTML = '';
+    const reloaded = await boot(mountScript());
+    const again = shadowOf(reloaded!);
+
+    expect(sourceRows(again)).toEqual([
+      '1 | HonoRequest - Hono',
+      '2 3 5 | Context - Hono',
+      '4 | Team notes',
+    ]);
+  });
+
+  it('groups a transcript saved before document ids were kept by its links', async () => {
+    window.localStorage.setItem(
+      `parbot:${KEY}:messages`,
+      JSON.stringify([
+        { role: 'user', text: 'How?', citations: [] },
+        {
+          role: 'assistant',
+          text: 'Like this [2] [1] [3].',
+          answered: true,
+          citations: [
+            { index: 2, title: 'Context - Hono', url: 'https://hono.dev/docs/api/context' },
+            { index: 1, title: 'Context - Hono', url: 'https://hono.dev/docs/api/context' },
+            { index: 3, title: 'Pasted', url: null },
+          ],
+        },
+      ]),
+    );
+    installFetch();
+
+    const widget = await boot(mountScript());
+
+    expect(sourceRows(shadowOf(widget!))).toEqual(['1 2 | Context - Hono', '3 | Pasted']);
   });
 
   it('opens at once without taking focus, and sends the preview version with the config request', async () => {
