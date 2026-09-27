@@ -2,9 +2,9 @@
 import { readFileSync } from 'node:fs';
 
 import { createClient } from '@supabase/supabase-js';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
-import { createStubProvider } from '@/lib/ai';
+import { type AiProvider, createStubProvider, ModelBusyError } from '@/lib/ai';
 import type { Database } from '@/lib/db';
 import { PLANS } from '@/lib/plans';
 import { storagePathFor, UPLOAD_TYPES } from '@/lib/uploads';
@@ -12,6 +12,7 @@ import { storagePathFor, UPLOAD_TYPES } from '@/lib/uploads';
 import { minimalPdf } from './fixtures/pdf';
 import { publicLookup } from './guard';
 import type { FetchImpl } from './http';
+import { TIMED_OUT_FAILURE } from './errors';
 import { ingestSource, PAGE_LIMIT_MESSAGE, STORAGE_BUCKET } from './index';
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'http://127.0.0.1:54321';
@@ -349,6 +350,137 @@ describe.skipIf(!serviceKey)('ingestSource against the local database', () => {
       pages: 1,
       note: expect.stringContaining('Stopped after 1 page'),
     });
+  });
+
+  /** The stub for the first `passes` embeddings; every one after that throws `error`. */
+  const failingAfter = (passes: number, error: () => unknown): AiProvider => {
+    let calls = 0;
+
+    return {
+      ...provider,
+      embed: (inputs, kind, options) => {
+        calls += 1;
+
+        return calls > passes ? Promise.reject(error()) : provider.embed(inputs, kind, options);
+      },
+    };
+  };
+
+  const busy = () => new ModelBusyError(['gemini-embedding-2']);
+
+  it('ends a run early, keeping its pages, when the embedding model stays busy', async () => {
+    const sourceId = await createSource({
+      kind: 'url',
+      title: 'Busy later',
+      uri: 'https://docs.test/guide/intro',
+    });
+
+    const result = await ingestSource({
+      service,
+      provider: failingAfter(1, busy),
+      sourceId,
+      fetchImpl: serve(siteV1),
+      lookup,
+    });
+
+    expect(result).toMatchObject({
+      status: 'ready',
+      pages: 1,
+      documents: 1,
+      note: 'The embedding model was busy, so this run stopped after 1 of 2 pages. Re-index in a few minutes to add the rest.',
+    });
+    expect(await loadSource(sourceId)).toMatchObject({
+      status: 'ready',
+      pages_found: 2,
+      pages_done: 1,
+      document_count: 1,
+    });
+
+    // With the model back, a re-index adds the rest and keeps the page it has.
+    await expect(
+      ingestSource({ service, provider, sourceId, fetchImpl: serve(siteV1), lookup }),
+    ).resolves.toMatchObject({ status: 'ready', pages: 2, unchanged: 1, note: null });
+  });
+
+  it('fails as busy when the model is busy before any page is in', async () => {
+    const sourceId = await createSource({
+      kind: 'url',
+      title: 'Busy at once',
+      uri: 'https://docs.test/guide/intro',
+    });
+
+    await expect(
+      ingestSource({
+        service,
+        provider: failingAfter(0, busy),
+        sourceId,
+        fetchImpl: serve(siteV1),
+        lookup,
+      }),
+    ).resolves.toEqual({
+      status: 'failed',
+      error: 'The embedding model is busy right now. Re-index in a few minutes.',
+    });
+  });
+
+  it('starts no page once the run is out of time, and keeps what it saved', async () => {
+    const sourceId = await createSource({
+      kind: 'url',
+      title: 'Slow',
+      uri: 'https://docs.test/guide/intro',
+    });
+    // Only the clock is fake: the first embedding takes a minute of a 30 second budget.
+    const slow: AiProvider = {
+      ...provider,
+      embed: async (inputs, kind, options) => {
+        const vectors = await provider.embed(inputs, kind, options);
+
+        vi.setSystemTime(Date.now() + 60_000);
+
+        return vectors;
+      },
+    };
+
+    vi.useFakeTimers({ toFake: ['Date'] });
+
+    try {
+      const result = await ingestSource({
+        service,
+        provider: slow,
+        sourceId,
+        fetchImpl: serve(siteV1),
+        lookup,
+        timeBudgetMs: 30_000,
+      });
+
+      expect(result).toMatchObject({
+        status: 'ready',
+        pages: 1,
+        documents: 1,
+        note: 'This run stopped after 1 of 2 pages, as much as one run has time for. Re-index to add the rest.',
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('fails as timed out when the run is out of time before its first page', async () => {
+    const sourceId = await createSource({
+      kind: 'url',
+      title: 'No time',
+      uri: 'https://docs.test/guide/intro',
+    });
+
+    await expect(
+      ingestSource({
+        service,
+        provider,
+        sourceId,
+        fetchImpl: serve(siteV1),
+        lookup,
+        timeBudgetMs: 0,
+      }),
+    ).resolves.toEqual({ status: 'failed', error: TIMED_OUT_FAILURE });
   });
 
   it('steps aside when another run holds the source', async () => {

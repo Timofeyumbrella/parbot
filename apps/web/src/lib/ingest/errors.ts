@@ -11,6 +11,8 @@ export class IngestError extends Error {
 }
 
 export const GENERIC_FAILURE = 'Something went wrong while indexing. Re-index to try again.';
+export const TIMED_OUT_FAILURE =
+  'Indexing took too long and was stopped. Re-index to pick up where it left off.';
 
 /**
  * The sentence that goes on the source row. Our own errors and fetch failures already say what
@@ -40,7 +42,7 @@ export const humanizeIngestError = (cause: unknown): string => {
   }
 
   if (cause instanceof Error && (cause.name === 'TimeoutError' || cause.name === 'AbortError')) {
-    return 'Indexing took too long and was stopped. Re-index to pick up where it left off.';
+    return TIMED_OUT_FAILURE;
   }
 
   console.error('[ingest] unexpected failure', cause);

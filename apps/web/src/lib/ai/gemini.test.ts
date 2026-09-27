@@ -8,12 +8,15 @@ import {
   firstChunkDeadlineFrom,
   type GeminiOptions,
 } from './gemini';
+import { activeDailyLimit, forgetDailyLimits } from './quota';
+import { DAILY_CHAT_QUOTA, dailyLimit, MINUTE_CHAT_QUOTA, minuteLimit } from './quota.fixtures';
 import {
   type GenerateChunk,
   type GenerateInput,
   type GenerateResult,
   ModelBusyError,
   ProviderError,
+  ProviderLimitError,
 } from './types';
 
 const PRIMARY = 'gemini-3.5-flash-lite';
@@ -30,7 +33,9 @@ type Script =
       /** Thrown after the first chunk. */
       failAfterFirst?: boolean;
     }
-  | { delay?: number; status: number };
+  | { delay?: number; status: number }
+  /** Thrown as it is, such as a quota refusal with its body. */
+  | { delay?: number; error: unknown };
 
 type Call = {
   model: string;
@@ -94,6 +99,11 @@ const fakeClient = (scripts: Record<string, Script[]>) => {
     if ('status' in script) {
       await sleep(script.delay ?? 0, signal);
       throw apiError(script.status);
+    }
+
+    if ('error' in script) {
+      await sleep(script.delay ?? 0, signal);
+      throw script.error;
     }
 
     return (async function* () {
@@ -180,6 +190,7 @@ describe('the Gemini chat stream', () => {
   afterEach(() => {
     vi.useRealTimers();
     info.mockRestore();
+    forgetDailyLimits();
   });
 
   const hedgeLogs = () =>
@@ -463,6 +474,102 @@ describe('the Gemini chat stream', () => {
 
     expect(!outcome.ok && outcome.error).toBeInstanceOf(ModelBusyError);
     expect(models(calls)).toEqual([PRIMARY, PRIMARY, SECOND, SECOND, LAST, LAST]);
+  });
+
+  it('moves down the chain at once when a per-minute quota needs longer than a reader waits', async () => {
+    const { calls, waits, provider } = setup({
+      [PRIMARY]: [{ error: minuteLimit('37s', MINUTE_CHAT_QUOTA) }],
+      [SECOND]: [{ delay: 300, chunks: ['From the second.'] }],
+    });
+
+    const done = drain(provider.stream(input()));
+
+    await vi.advanceTimersByTimeAsync(30_000);
+
+    const outcome = await done;
+
+    expect(outcome.ok && outcome.result.model).toBe(SECOND);
+    expect(models(calls)).toEqual([PRIMARY, SECOND]);
+    expect(waits).toEqual([]);
+  });
+
+  it('retries a model once when its per-minute quota frees in a moment', async () => {
+    const { calls, waits, provider } = setup({
+      [PRIMARY]: [{ error: minuteLimit('1s', MINUTE_CHAT_QUOTA) }, { delay: 300 }],
+    });
+
+    const done = drain(provider.stream(input()));
+
+    await vi.advanceTimersByTimeAsync(30_000);
+
+    const outcome = await done;
+
+    expect(outcome.ok && outcome.result.model).toBe(PRIMARY);
+    expect(models(calls)).toEqual([PRIMARY, PRIMARY]);
+    expect(waits).toEqual([2000]);
+  });
+
+  it('skips a model whose daily quota is spent, without a retry', async () => {
+    const { calls, waits, provider } = setup({
+      [PRIMARY]: [{ error: dailyLimit(DAILY_CHAT_QUOTA) }],
+      [SECOND]: [{ delay: 300, chunks: ['From the second.'] }],
+    });
+
+    const done = drain(provider.stream(input()));
+
+    await vi.advanceTimersByTimeAsync(30_000);
+
+    const outcome = await done;
+
+    expect(outcome.ok && outcome.result.model).toBe(SECOND);
+    expect(models(calls)).toEqual([PRIMARY, SECOND]);
+    expect(waits).toEqual([]);
+    // Answers went out, so the deployment is not paused.
+    expect(activeDailyLimit()).toBeNull();
+  });
+
+  it('says answers are paused for the day when every model has spent its daily quota', async () => {
+    vi.setSystemTime(new Date('2026-09-28T02:27:00Z'));
+
+    const { calls, waits, provider } = setup({
+      [PRIMARY]: [{ error: dailyLimit(DAILY_CHAT_QUOTA) }],
+      [SECOND]: [{ error: dailyLimit(DAILY_CHAT_QUOTA) }],
+      [LAST]: [{ error: dailyLimit(DAILY_CHAT_QUOTA) }],
+    });
+
+    const done = drain(provider.stream(input()));
+
+    // Each refusal comes back at once; nothing waits between models.
+    await vi.advanceTimersByTimeAsync(10);
+
+    const outcome = await done;
+
+    expect(!outcome.ok && outcome.error).toBeInstanceOf(ProviderLimitError);
+    expect(!outcome.ok && outcome.error).toMatchObject({
+      scope: 'day',
+      quotaId: DAILY_CHAT_QUOTA,
+      resetAt: new Date('2026-09-28T07:00:00Z'),
+    });
+    expect(models(calls)).toEqual([PRIMARY, SECOND, LAST]);
+    expect(waits).toEqual([]);
+    expect(activeDailyLimit()).toMatchObject({ kind: 'chat' });
+  });
+
+  it('reports busy, not paused, while a model left is only busy for the minute', async () => {
+    const { provider } = setup({
+      [PRIMARY]: [{ error: dailyLimit(DAILY_CHAT_QUOTA) }],
+      [SECOND]: [{ status: 503 }],
+      [LAST]: [{ error: minuteLimit('37s', MINUTE_CHAT_QUOTA) }],
+    });
+
+    const done = drain(provider.stream(input()));
+
+    await vi.advanceTimersByTimeAsync(30_000);
+
+    const outcome = await done;
+
+    expect(!outcome.ok && outcome.error).toBeInstanceOf(ModelBusyError);
+    expect(activeDailyLimit()).toBeNull();
   });
 
   it('reports a provider error when the chain runs out on other errors', async () => {

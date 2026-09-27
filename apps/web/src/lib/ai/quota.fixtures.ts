@@ -19,8 +19,7 @@ export const quotaBody = ({
 }: { violations?: Violation[]; retryDelay?: string | null } = {}) => ({
   error: {
     code: 429,
-    message:
-      'You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/usage?tab=rate-limit. \n* Quota exceeded for metric: generativelanguage.googleapis.com/embed_content_free_tier_requests, limit: 1000, model: gemini-embedding-2\nPlease retry in 37.270531436s.',
+    message: `You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/usage?tab=rate-limit. \n* Quota exceeded for metric: generativelanguage.googleapis.com/embed_content_free_tier_requests, limit: 1000, model: gemini-embedding-2${retryDelay === null ? '' : `\nPlease retry in ${retryDelay}.`}`,
     status: 'RESOURCE_EXHAUSTED',
     details: [
       {

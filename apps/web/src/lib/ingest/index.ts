@@ -1,14 +1,15 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-import type { AiProvider, EmbedInput } from '@/lib/ai';
+import { type AiProvider, type EmbedInput, ModelBusyError } from '@/lib/ai';
 import { entitledPlanId } from '@/lib/billing/entitlement';
 import type { Database, Source } from '@/lib/db';
+import { formatCount, plural } from '@/lib/format';
 import { checkCapacity } from '@/lib/plans';
 import { STORAGE_BUCKET, uploadTypeFor } from '@/lib/uploads';
 
 import { type Chunk, chunkMarkdown, estimateTokens } from './chunk';
 import { crawlPages, crawlScope, normalizeUrl } from './crawl';
-import { humanizeIngestError, IngestError } from './errors';
+import { humanizeIngestError, IngestError, TIMED_OUT_FAILURE } from './errors';
 import { checksumOf, extractText, extractUpload } from './extract';
 import type { HostLookup } from './guard';
 import type { FetchImpl } from './http';
@@ -26,6 +27,8 @@ export type IngestParams = {
   lookup?: HostLookup;
   /** Upper bound on pages per run. The plan's remaining pages can lower it, never raise it. */
   pageLimit?: number;
+  /** How long the run may take; tests shorten it. */
+  timeBudgetMs?: number;
 };
 
 export type IngestResult =
@@ -50,6 +53,15 @@ export const PAGE_LIMIT_MESSAGE =
   "Your plan's page limit is reached. Upgrade on the Billing page or remove a source.";
 /** A run that has not touched its row for this long is treated as dead and may be started over. */
 export const STALE_RUN_MS = 10 * 60_000;
+/**
+ * How long one run may take from its start. It runs in the route's after(), inside a maxDuration
+ * of 300 s; the rest is left for saving the page in hand and writing the outcome. A wait for a
+ * per-minute quota must end before it, and no page is started after it.
+ */
+export const INGEST_TIME_BUDGET_MS = 270_000;
+
+/** Why a run ended before its last page, with what it saved kept. */
+type EarlyStop = 'time' | 'busy';
 
 type SourceUpdate = Database['public']['Tables']['sources']['Update'];
 
@@ -254,16 +266,31 @@ export const describeRun = ({
   truncated,
   problems,
   atPlanLimit,
+  stoppedEarly = null,
+  planned = pages,
 }: {
   pages: number;
   truncated: boolean;
   problems: string[];
   atPlanLimit: boolean;
+  /** The run ended before its last page; a re-index carries on from there. */
+  stoppedEarly?: EarlyStop | null;
+  /** The pages the run set out to index. */
+  planned?: number;
 }) => {
   const notes: string[] = [];
   const count = `${pages} ${pages === 1 ? 'page' : 'pages'}`;
+  const progress = `${formatCount(pages)} of ${plural(planned, 'page')}`;
 
-  if (truncated) {
+  if (stoppedEarly === 'busy') {
+    notes.push(
+      `The embedding model was busy, so this run stopped after ${progress}. Re-index in a few minutes to add the rest.`,
+    );
+  } else if (stoppedEarly === 'time') {
+    notes.push(
+      `This run stopped after ${progress}, as much as one run has time for. Re-index to add the rest.`,
+    );
+  } else if (truncated) {
     notes.push(
       atPlanLimit
         ? `Stopped at your plan's page limit after ${count}. Upgrade on the Billing page or remove a source to index the rest.`
@@ -283,7 +310,12 @@ export const describeRun = ({
   return notes.length > 0 ? notes.join(' ').slice(0, 1000) : null;
 };
 
-const embedChunks = async (provider: AiProvider, chunks: Chunk[], title: string) => {
+const embedChunks = async (
+  provider: AiProvider,
+  chunks: Chunk[],
+  title: string,
+  deadline: number,
+) => {
   const vectors: number[][] = [];
 
   for (let start = 0; start < chunks.length; start += EMBED_BATCH_SIZE) {
@@ -291,7 +323,7 @@ const embedChunks = async (provider: AiProvider, chunks: Chunk[], title: string)
       text: chunk.heading ? `${chunk.heading}\n${chunk.content}` : chunk.content,
       title,
     }));
-    const embedded = await provider.embed(batch, 'document');
+    const embedded = await provider.embed(batch, 'document', { deadline });
 
     if (embedded.length !== batch.length) {
       throw new IngestError(
@@ -332,6 +364,7 @@ const sourceTitleAfterCrawl = (source: Source, pages: Page[]) => {
  */
 export const ingestSource = async (params: IngestParams): Promise<IngestResult> => {
   const { service, provider, sourceId, fetchImpl = fetch, lookup } = params;
+  const deadline = Date.now() + (params.timeBudgetMs ?? INGEST_TIME_BUDGET_MS);
   const progress = createProgress(service, sourceId);
 
   const update = async (fields: SourceUpdate) => {
@@ -432,6 +465,7 @@ export const ingestSource = async (params: IngestParams): Promise<IngestResult> 
     let done = 0;
     let unchanged = 0;
     let stoppedAtLimit = false;
+    let stoppedEarly: EarlyStop | null = null;
 
     for (const page of readable) {
       const key = keyOf(page.url);
@@ -465,7 +499,26 @@ export const ingestSource = async (params: IngestParams): Promise<IngestResult> 
         continue;
       }
 
-      const vectors = await embedChunks(provider, chunks, title);
+      // Past the budget no page is started: what is saved stays, and a re-index skips it.
+      if (Date.now() >= deadline) {
+        stoppedEarly = 'time';
+        break;
+      }
+
+      let vectors: number[][];
+
+      try {
+        vectors = await embedChunks(provider, chunks, title, deadline);
+      } catch (cause) {
+        // A per-minute quota that outlasts the run ends it early rather than failing it, once
+        // there is something to keep. The day's cap is not this: it fails below and says when.
+        if (cause instanceof ModelBusyError && done > 0) {
+          stoppedEarly = 'busy';
+          break;
+        }
+
+        throw cause;
+      }
 
       // The insert checks the account's page count in the same transaction, so runs that overlap
       // share one allowance. A null id means the limit is reached; the earlier copy, if any, stays.
@@ -539,16 +592,23 @@ export const ingestSource = async (params: IngestParams): Promise<IngestResult> 
       throw new IngestError(PAGE_LIMIT_MESSAGE);
     }
 
+    // Stopped before a single page was saved: nothing to show as ready.
+    if (stoppedEarly && documents.length === 0) {
+      throw stoppedEarly === 'busy' ? new ModelBusyError([]) : new IngestError(TIMED_OUT_FAILURE);
+    }
+
     const chunkCount = documents.reduce(
       (sum, document) => sum + (document.chunks[0]?.count ?? 0),
       0,
     );
-    const indexed = stoppedAtLimit ? done : readable.length;
+    const indexed = stoppedAtLimit || stoppedEarly ? done : readable.length;
     const note = describeRun({
       pages: indexed,
       truncated: truncated || stoppedAtLimit,
       problems,
       atPlanLimit: atPlanLimit || stoppedAtLimit,
+      stoppedEarly,
+      planned: readable.length,
     });
     const title = sourceTitleAfterCrawl(source, readable);
 

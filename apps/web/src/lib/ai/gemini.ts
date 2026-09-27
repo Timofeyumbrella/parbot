@@ -1,17 +1,21 @@
 import { ApiError, GoogleGenAI, ThinkingLevel, type Content } from '@google/genai';
 
+import { clearDailyLimit, nextDailyReset, noteDailyLimit, parseQuotaRefusal } from './quota';
 import {
   type AiProvider,
   collectStream,
   EMBEDDING_DIMENSIONS,
   type EmbedInput,
   type EmbeddingKind,
+  type EmbedOptions,
   type GenerateChunk,
   type GenerateInput,
   type GenerateResult,
+  isDailyLimit,
   ModelBusyError,
   normalizeVector,
   ProviderError,
+  ProviderLimitError,
 } from './types';
 
 // Flash-Lite starts answering in well under a second on the free tier; the larger Flash models
@@ -30,6 +34,22 @@ const EMBED_ATTEMPTS = 4;
 const CHAT_ATTEMPTS = 2;
 const BASE_DELAY_MS = 800;
 const MAX_DELAY_MS = 8000;
+/**
+ * The longest single wait for a per-minute quota while indexing. Gemini suggests the time until
+ * the minute frees up, usually under a minute; the ingest's own deadline bounds the total.
+ */
+export const MAX_QUOTA_WAIT_MS = 60_000;
+/** RetryInfo rounds down to whole seconds, so a wait of exactly that long can be a moment early. */
+export const QUOTA_WAIT_MARGIN_MS = 1000;
+/** The first wait for a per-minute refusal that suggested no delay; each further one doubles. */
+export const DEFAULT_QUOTA_WAIT_MS = 5000;
+/**
+ * The most a question's embedding, or an answer's model, waits for a per-minute quota, and only
+ * once: the reader is watching. A refusal that suggests longer is reported as busy at once.
+ */
+export const QUERY_QUOTA_WAIT_MS = 3000;
+/** How long document embeddings may spend waiting on quotas when the caller set no deadline. */
+export const DEFAULT_EMBED_WAIT_BUDGET_MS = 120_000;
 /**
  * Most answers start in about 1.5 s, but on the free tier roughly one call in six stalled for 13 to
  * 23 s before its first token whatever the answer's length (measured on the live site 2026-09-28).
@@ -138,6 +158,51 @@ const isNetworkError = (cause: unknown) =>
   cause instanceof TypeError ||
   (cause instanceof Error && (cause.name === 'AbortError') === false && statusOf(cause) === 0);
 
+/** A 429 as a typed error that says which quota ran out, or null for any other failure. */
+const limitFrom = (cause: unknown, models: string[]): ProviderLimitError | null => {
+  if (cause instanceof ProviderLimitError) {
+    return cause;
+  }
+
+  const refusal = parseQuotaRefusal(cause);
+
+  return refusal
+    ? new ProviderLimitError({
+        ...refusal,
+        models,
+        resetAt: refusal.scope === 'day' ? nextDailyReset() : null,
+      })
+    : null;
+};
+
+/**
+ * The one short wait a reader can be kept on for a per-minute quota: the suggested delay when it
+ * is short, a short backoff when none was given, and null when the quota needs longer to free.
+ */
+const shortQuotaWait = (limit: ProviderLimitError, attempt: number) => {
+  if (limit.retryDelayMs === null) {
+    return Math.min(backoff(attempt), QUERY_QUOTA_WAIT_MS);
+  }
+
+  return limit.retryDelayMs <= QUERY_QUOTA_WAIT_MS
+    ? Math.min(limit.retryDelayMs + QUOTA_WAIT_MARGIN_MS, QUERY_QUOTA_WAIT_MS)
+    : null;
+};
+
+/**
+ * How long indexing waits for a per-minute quota: the suggested delay and a margin, capped per
+ * wait; without a suggestion, waits that double. Null when the wait would end past the deadline.
+ */
+const documentQuotaWait = (limit: ProviderLimitError, waits: number, deadline: number) => {
+  const suggested =
+    limit.retryDelayMs === null
+      ? DEFAULT_QUOTA_WAIT_MS * 2 ** waits
+      : limit.retryDelayMs + QUOTA_WAIT_MARGIN_MS;
+  const waitMs = Math.min(suggested, MAX_QUOTA_WAIT_MS);
+
+  return Date.now() + waitMs <= deadline ? waitMs : null;
+};
+
 const thinkingLevelFrom = (value: string | undefined): ThinkingLevel => {
   switch ((value ?? 'MINIMAL').toUpperCase()) {
     case 'MINIMAL':
@@ -173,6 +238,10 @@ export const createGeminiProvider = (options: GeminiOptions): AiProvider => {
     options.firstChunkDeadlineMs ?? DEFAULT_FIRST_CHUNK_DEADLINE_MS,
   );
 
+  /**
+   * One batch, retried with backoff on server and network errors. A quota refusal comes back at
+   * once as a ProviderLimitError: whether to wait, split the batch or stop is the caller's call.
+   */
   const embedBatch = async (batch: EmbedInput[], kind: EmbeddingKind): Promise<number[][]> => {
     let lastError: unknown;
 
@@ -204,6 +273,12 @@ export const createGeminiProvider = (options: GeminiOptions): AiProvider => {
           return normalizeVector(vector);
         });
       } catch (cause) {
+        const limit = limitFrom(cause, [embeddingModel]);
+
+        if (limit) {
+          throw limit;
+        }
+
         lastError = cause;
         const status = statusOf(cause);
 
@@ -234,11 +309,69 @@ export const createGeminiProvider = (options: GeminiOptions): AiProvider => {
     );
   };
 
-  const embed = async (inputs: EmbedInput[], kind: EmbeddingKind) => {
+  /**
+   * Embeds in batches and deals with quotas. The day's cap stops at once: nothing passes before
+   * the reset. A per-minute refusal first halves the batch, since every text in it counts toward
+   * the quota and a smaller one may still fit this minute; a single text refused is waited out,
+   * for documents as long as the deadline allows, for a question once and briefly.
+   */
+  const embed = async (inputs: EmbedInput[], kind: EmbeddingKind, options: EmbedOptions = {}) => {
     const vectors: number[][] = [];
+    const deadline = options.deadline ?? Date.now() + DEFAULT_EMBED_WAIT_BUDGET_MS;
+    let size = EMBED_BATCH_SIZE;
+    let waits = 0;
 
-    for (let start = 0; start < inputs.length; start += EMBED_BATCH_SIZE) {
-      vectors.push(...(await embedBatch(inputs.slice(start, start + EMBED_BATCH_SIZE), kind)));
+    for (let start = 0; start < inputs.length;) {
+      const batch = inputs.slice(start, start + size);
+
+      try {
+        vectors.push(...(await embedBatch(batch, kind)));
+        start += batch.length;
+        clearDailyLimit('embedding');
+        continue;
+      } catch (cause) {
+        if (!(cause instanceof ProviderLimitError)) {
+          throw cause;
+        }
+
+        if (isDailyLimit(cause)) {
+          noteDailyLimit('embedding', cause.resetAt);
+          console.warn(
+            `[ai] ${embeddingModel}: the daily quota is spent (${cause.quotaId ?? 'unnamed'}); embeddings stop until ${cause.resetAt.toISOString()}`,
+          );
+          throw cause;
+        }
+
+        if (batch.length > 1) {
+          size = Math.ceil(batch.length / 2);
+          console.info(
+            `[ai] ${embeddingModel}: a batch of ${batch.length} was over the per-minute quota (${cause.quotaId ?? 'unnamed'}); trying ${size}`,
+          );
+          continue;
+        }
+
+        const waitMs =
+          kind === 'query'
+            ? waits === 0
+              ? shortQuotaWait(cause, 1)
+              : null
+            : documentQuotaWait(cause, waits, deadline);
+
+        if (waitMs === null) {
+          console.warn(
+            `[ai] ${embeddingModel}: the per-minute quota (${cause.quotaId ?? 'unnamed'}) needs ${cause.retryDelayMs ?? 'an unknown number of'} ms to free, more than this ${kind} embedding can wait`,
+          );
+          throw new ModelBusyError([embeddingModel]);
+        }
+
+        console.info(
+          `[ai] ${embeddingModel}: the per-minute quota is spent (${cause.quotaId ?? 'unnamed'}); waiting ${waitMs} ms`,
+        );
+        await waitFor(waitMs);
+        waits += 1;
+        // A new minute: full batches may fit again.
+        size = EMBED_BATCH_SIZE;
+      }
     }
 
     return vectors;
@@ -302,6 +435,8 @@ export const createGeminiProvider = (options: GeminiOptions): AiProvider => {
     const events = eventQueue<RaceEvent>();
     const lanes: Lane[] = [];
     const busy: string[] = [];
+    /** Models whose daily quota is spent. Each model has its own, so the chain goes on. */
+    const capped: ProviderLimitError[] = [];
     const last = chatModels.length - 1;
     let lastError: unknown;
     let winner: Lane | null = null;
@@ -350,6 +485,15 @@ export const createGeminiProvider = (options: GeminiOptions): AiProvider => {
           }
 
           const status = statusOf(cause);
+          const limit = limitFrom(cause, [lane.model]);
+
+          if (limit && isDailyLimit(limit)) {
+            // Nothing this model does passes before the reset; the next model has its own quota.
+            capped.push(limit);
+            events.push({ type: 'failed', lane, cause: limit });
+
+            return;
+          }
 
           if (BUSY_STATUSES.has(status) && !busy.includes(lane.model)) {
             busy.push(lane.model);
@@ -357,14 +501,22 @@ export const createGeminiProvider = (options: GeminiOptions): AiProvider => {
 
           // A 400 or 404 on one model usually means the model, not the request: try the next.
           const retryable = RETRY_STATUSES.has(status) || isNetworkError(cause);
+          // A per-minute quota that needs longer than a reader waits is left for the next model.
+          const waitMs = limit ? shortQuotaWait(limit, attempt) : backoff(attempt);
 
-          if (input.signal?.aborted || !retryable || lane.hedged || attempt >= CHAT_ATTEMPTS - 1) {
+          if (
+            input.signal?.aborted ||
+            !retryable ||
+            lane.hedged ||
+            attempt >= CHAT_ATTEMPTS - 1 ||
+            waitMs === null
+          ) {
             events.push({ type: 'failed', lane, cause });
 
             return;
           }
 
-          await waitFor(backoff(attempt));
+          await waitFor(waitMs);
 
           if (lane.over) {
             return;
@@ -413,6 +565,7 @@ export const createGeminiProvider = (options: GeminiOptions): AiProvider => {
 
         if (event.type === 'opened') {
           winner = lane;
+          clearDailyLimit('chat');
 
           if (lanes.some((other) => other.hedged)) {
             const aborted = lanes.filter((other) => other !== lane && !other.over);
@@ -470,8 +623,31 @@ export const createGeminiProvider = (options: GeminiOptions): AiProvider => {
       }
     }
 
-    if (busy.length === chatModels.length) {
-      throw new ModelBusyError(busy);
+    const cappedModels = new Set(capped.map((limit) => limit.models[0]));
+
+    if (cappedModels.size === chatModels.length) {
+      const resetAt = nextDailyReset();
+
+      noteDailyLimit('chat', resetAt);
+      console.warn(
+        `[ai] every chat model's daily quota is spent (${chatModels.join(', ')}); answers stop until ${resetAt.toISOString()}`,
+      );
+
+      throw new ProviderLimitError({
+        scope: 'day',
+        retryDelayMs: null,
+        quotaId: capped[0]?.quotaId ?? null,
+        models: chatModels,
+        resetAt,
+      });
+    }
+
+    // A model that is only capped for the day counts as busy beside ones that are busy for the
+    // minute: the chain as a whole comes back when those do.
+    const refused = new Set([...busy, ...cappedModels]);
+
+    if (refused.size === chatModels.length) {
+      throw new ModelBusyError([...refused]);
     }
 
     throw new ProviderError(
