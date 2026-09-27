@@ -46,7 +46,21 @@ export const resolveAddress = (href: unknown, base: string | null) => {
   }
 };
 
+/**
+ * The viewer's own title is the page's only h1; the document's headings sit one level below it,
+ * so a screen reader's outline reads title, then sections.
+ */
+const demoted = (Tag: 'h2' | 'h3' | 'h4' | 'h5' | 'h6'): Components['h1'] =>
+  function DemotedHeading({ children, ...rest }) {
+    return <Tag {...domProps(rest)}>{children}</Tag>;
+  };
+
 const buildComponents = (baseUrl: string | null): Components => ({
+  h1: demoted('h2'),
+  h2: demoted('h3'),
+  h3: demoted('h4'),
+  h4: demoted('h5'),
+  h5: demoted('h6'),
   pre: ({ node, children }) => {
     const element = node as unknown as HastElement | undefined;
     const code = element?.children.find((child) => child.type === 'element') as
