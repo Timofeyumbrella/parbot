@@ -86,7 +86,8 @@ and see your bubble in the same frame with the answer streaming into a placehold
   for minutes in Next 16, so Inbox and Overview showed stale data after a chat. The `loading.tsx`
   skeleton keeps navigation instant without it.
 - Dates and counts: `relativeTime`, `formatDate`, `formatDateTime`, `formatCount`, `formatPercent`
-  from `lib/format.ts`. No screen defines its own.
+  from `lib/format.ts`. No screen defines its own. A noun or verb that follows a count agrees with
+  it through `plural` / `pluralWord` ("1 of 1 rating was", never "were").
 - Row level security now also checks `owns_assistant(assistant_id)` on inserts and updates, and
   `increment_usage` is service-role only. `proxy.ts` no longer runs for `/api/sources`, `/api/health`
   and `/demo/`; those handle their own auth, and uploads up to 25 MB reach the route.
