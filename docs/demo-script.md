@@ -229,7 +229,11 @@ Then check in window B:
 **Warm up, 10 minutes before**
 
 - Open `https://parbot-web.vercel.app/api/health`. It should read
-  `{"ok":true,"ai":"gemini","billing":"mock",…}`.
+  `{"ok":true,"ai":"gemini","aiLimited":null,…,"billing":"mock",…}`. `"aiLimited":"daily"` means
+  the instance that answered has run into Gemini's daily quota, and `aiResumesAt` says when it
+  resets (midnight Pacific time). Until then no question is answered and no source is indexed, so
+  don't demo; `null` only means that instance has not run into it, so the warm-up question below is
+  the real test.
 - In window B, open Overview, Chat, Knowledge, Inbox, Widget and Billing once each, and the demo
   page from the README's bubble link. The first visit to a cold function took up to _4.3 s_ in
   rehearsal. Warm ones take _about 0.8 s_.

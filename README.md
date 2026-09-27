@@ -16,9 +16,12 @@ sign-up.
 
 ## Try it
 
-The live deployment runs on free tiers: Vercel, Supabase and the Gemini API. When the free Gemini
-quota runs out, the assistant says it is busy; wait a minute and ask again. Billing runs on the mock
-provider, so upgrading needs no card and nothing is charged.
+The live deployment runs on free tiers: Vercel, Supabase and the Gemini API. When a burst runs into
+Gemini's per-minute quota, indexing waits it out and the assistant says it is busy; wait a minute and
+ask again. When the day's quota is used up, answers and indexing pause until it resets at midnight
+Pacific time, and both say so with the time on the reader's clock; `/api/health` then reads
+`"aiLimited":"daily"`. Billing runs on the mock provider, so upgrading needs no card and nothing is
+charged.
 
 | What                                                     | Where                                                                                                                                                                                           |
 | -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
