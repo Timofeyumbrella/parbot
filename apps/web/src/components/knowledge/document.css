@@ -22,8 +22,3 @@
     -0.5rem 0 0 color-mix(in oklch, var(--primary), transparent 82%),
     0.5rem 0 0 color-mix(in oklch, var(--primary), transparent 82%);
 }
-
-.document-prose td[data-passage],
-.document-prose th[data-passage] {
-  box-shadow: none;
-}

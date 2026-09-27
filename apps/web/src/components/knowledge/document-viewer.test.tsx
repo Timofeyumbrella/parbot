@@ -102,6 +102,38 @@ describe('DocumentViewer', () => {
     expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
   });
 
+  it('lights a table or a code block whole, and never a heading on its own', () => {
+    view({
+      document: document({
+        content: [
+          '# Plans',
+          '',
+          'Plans differ in how long a refund can be asked for.',
+          '',
+          '| Plan | Window |',
+          '| --- | --- |',
+          '| Monthly | 30 days |',
+          '| Annual | 60 days |',
+          '',
+          '```bash',
+          'acme refunds create --invoice inv_123',
+          '```',
+        ].join('\n'),
+      }),
+      passage: {
+        requested: true,
+        content:
+          'Plans differ in how long a refund can be asked for.\n\n| Plan | Window |\n| --- | --- |\n| Monthly | 30 days |\n| Annual | 60 days |\n\n```bash\nacme refunds create --invoice inv_123\n```',
+      },
+    });
+
+    const marked = [...document_().querySelectorAll('[data-passage]')];
+
+    expect(marked.map((node) => node.tagName)).toEqual(['P', 'TABLE', 'DIV']);
+    expect(marked[2]).toHaveTextContent('acme refunds create');
+    expect(screen.getByRole('heading', { name: 'Plans' })).not.toHaveAttribute('data-passage');
+  });
+
   it('quotes the passage when the page no longer lays it out the same way', () => {
     view({ passage: { requested: true, content: 'A sentence this page does not contain.' } });
 

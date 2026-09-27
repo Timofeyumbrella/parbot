@@ -10,22 +10,10 @@ import { type HastElement, type HastNode, type HastRoot, hastText } from '@/lib/
 /** The id the first highlighted block carries, for scrolling to it. */
 export const PASSAGE_ANCHOR = 'passage';
 
-const BLOCK_TAGS = new Set([
-  'p',
-  'li',
-  'pre',
-  'blockquote',
-  'h1',
-  'h2',
-  'h3',
-  'h4',
-  'h5',
-  'h6',
-  'td',
-  'th',
-  'dt',
-  'dd',
-]);
+/** Blocks a passage is made of. Tables and code are taken whole: the chunker never splits a row. */
+const BLOCK_TAGS = new Set(['p', 'li', 'pre', 'table', 'blockquote', 'dt', 'dd']);
+const HEADING_TAGS = new Set(['h1', 'h2', 'h3', 'h4', 'h5', 'h6']);
+const ATOMIC_TAGS = new Set(['pre', 'table']);
 
 /** Letters and digits only, lower-cased and single-spaced. */
 export const comparableText = (text: string) =>
@@ -43,11 +31,25 @@ export const passageText = (markdown: string) =>
 const PROBE_CHARS = 80;
 
 /**
- * The blocks that make up the passage, in page order. Each block is either contained in the
- * passage or, for a paragraph the chunker split, contains the passage's end. Only the longest run
- * of neighbouring matches is kept, so a short line that happens to recur elsewhere is not lit up.
+ * Below this, a block matching the passage proves little ("Note", a one-word list item, a
+ * heading the passage happens to repeat): it is lit only between two blocks that prove more.
  */
-export const matchPassage = <T>(blocks: { text: string; item: T }[], passage: string): T[] => {
+const WEAK_CHARS = 20;
+
+export type PassageBlock<T> = {
+  text: string;
+  item: T;
+  /** Headings are never part of a passage (the chunker keeps them apart), only framed by one. */
+  heading?: boolean;
+};
+
+/**
+ * The blocks that make up the passage, in page order. A block matches when the passage contains
+ * it, or, for a paragraph the chunker split, when it contains the passage's end. Short matches
+ * and headings only join a run between longer matches, and only the longest run is kept, so a
+ * line that happens to recur elsewhere is not lit up.
+ */
+export const matchPassage = <T>(blocks: PassageBlock<T>[], passage: string): T[] => {
   const target = passageText(passage);
 
   if (!target) {
@@ -57,21 +59,43 @@ export const matchPassage = <T>(blocks: { text: string; item: T }[], passage: st
   const probe = target.length > PROBE_CHARS ? target.slice(-PROBE_CHARS) : target;
   let best: { items: T[]; size: number } = { items: [], size: 0 };
   let run: { items: T[]; size: number } = { items: [], size: 0 };
+  /** Weak matches after the run's last strong one; they join only if another strong one follows. */
+  let pending: T[] = [];
+
+  const close = () => {
+    if (run.size > best.size) {
+      best = run;
+    }
+
+    run = { items: [], size: 0 };
+    pending = [];
+  };
 
   for (const block of blocks) {
     const text = comparableText(block.text);
-    const hit = text.length > 0 && (target.includes(text) || text.includes(probe));
 
-    if (hit) {
-      run = { items: [...run.items, block.item], size: run.size + text.length };
+    if (!text) {
+      continue;
+    }
 
-      if (run.size > best.size) {
-        best = run;
+    const contained = target.includes(text);
+    const hit = contained || text.includes(probe);
+    const strong = hit && !block.heading && (text.length >= WEAK_CHARS || text === target);
+
+    if (strong) {
+      run = { items: [...run.items, ...pending, block.item], size: run.size + text.length };
+      pending = [];
+    } else if (hit) {
+      // Weak: kept aside, and lit only if the passage goes on past it.
+      if (run.items.length > 0) {
+        pending.push(block.item);
       }
-    } else if (text.length > 0) {
-      run = { items: [], size: 0 };
+    } else {
+      close();
     }
   }
+
+  close();
 
   return best.items;
 };
@@ -80,16 +104,24 @@ const isElement = (node: HastNode): node is HastElement => node.type === 'elemen
 const hasChildren = (node: HastNode): node is { type: string; children: HastNode[] } =>
   Array.isArray((node as { children?: unknown }).children);
 
-/** Blocks with no block inside them: the paragraph in a list item, not the item around it. */
-const leafBlocks = (node: HastNode): HastElement[] => {
+/** Blocks with no block inside them (the paragraph in a list item), plus headings; tables whole. */
+const leafBlocks = (node: HastNode): PassageBlock<HastElement>[] => {
   if (!hasChildren(node)) {
     return [];
+  }
+
+  if (isElement(node) && HEADING_TAGS.has(node.tagName)) {
+    return [{ text: hastText(node), item: node, heading: true }];
+  }
+
+  if (isElement(node) && ATOMIC_TAGS.has(node.tagName)) {
+    return [{ text: hastText(node), item: node }];
   }
 
   const nested = node.children.flatMap(leafBlocks);
 
   if (isElement(node) && BLOCK_TAGS.has(node.tagName) && nested.length === 0) {
-    return [node];
+    return [{ text: hastText(node), item: node }];
   }
 
   return nested;
@@ -107,10 +139,7 @@ export const rehypePassage =
       return;
     }
 
-    const marked = matchPassage(
-      leafBlocks(tree).map((block) => ({ text: hastText(block), item: block })),
-      options.passage,
-    );
+    const marked = matchPassage(leafBlocks(tree), options.passage);
 
     marked.forEach((block, index) => {
       block.properties = {

@@ -49,16 +49,34 @@ describe('matchPassage', () => {
   it('keeps only the longest run, so a line that recurs elsewhere is not lit', () => {
     const matched = matchPassage(
       blocks(
-        'Note',
-        'Something else entirely, not in the passage.',
-        'Note',
         'Limits apply to every workspace on the free plan.',
-        'Contact support to raise them.',
+        'Something else entirely, not in the passage.',
+        'Limits apply to every workspace on the free plan.',
+        'Contact support to raise them for your workspace.',
       ),
-      'Note\n\nLimits apply to every workspace on the free plan.\n\nContact support to raise them.',
+      'Limits apply to every workspace on the free plan.\n\nContact support to raise them for your workspace.',
     );
 
-    expect(matched).toEqual([2, 3, 4]);
+    expect(matched).toEqual([2, 3]);
+  });
+
+  it('lights a short line or a heading only between longer parts of the passage', () => {
+    const page = [
+      { text: 'Refunds', item: 'h', heading: true },
+      { text: 'Refunds are issued within 30 days of purchase.', item: 'p1' },
+      { text: 'Note', item: 'short' },
+      { text: 'Annual plans are refunded pro rata, by the day.', item: 'p2' },
+      { text: 'Yes', item: 'trailing' },
+    ];
+
+    expect(
+      matchPassage(
+        page,
+        'Refunds are issued within 30 days of purchase.\n\nNote\n\nAnnual plans are refunded pro rata, by the day.\n\nYes',
+      ),
+    ).toEqual(['p1', 'short', 'p2']);
+    // A passage that is one short line is still found.
+    expect(matchPassage(page, 'Note')).toEqual(['short']);
   });
 
   it('finds nothing for an empty passage or one the page does not contain', () => {
