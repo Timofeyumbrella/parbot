@@ -96,3 +96,27 @@ export const storagePathFor = (ownerId: string, assistantId: string, extension: 
 
 export const fileNameFromPath = (storagePath: string) =>
   storagePath.split('/').pop() ?? storagePath;
+
+/**
+ * The name a stored file opens or downloads under: the source's title, with the extension its
+ * type calls for when the title lacks one (pasted text is stored as Markdown).
+ */
+export const fileNameFor = (title: string, type: UploadType | null) => {
+  // Path separators, quotes and control characters have no place in a header's file name.
+  // eslint-disable-next-line no-control-regex
+  const base = title.replace(/[\\/"\u0000-\u001f\u007f]+/g, ' ').trim() || 'file';
+  const extensions = type ? UPLOAD_TYPES[type].extensions : [];
+
+  if (extensions.length === 0 || extensions.includes(extensionOf(base))) {
+    return base;
+  }
+
+  return `${base}.${extensions[0]}`;
+};
+
+/** A Content-Disposition value any browser reads, with the real name for those that take UTF-8. */
+export const contentDisposition = (disposition: 'inline' | 'attachment', fileName: string) => {
+  const ascii = fileName.replace(/[^\x20-\x7e]+/g, '_').replace(/["\\]/g, '_');
+
+  return `${disposition}; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(fileName)}`;
+};
