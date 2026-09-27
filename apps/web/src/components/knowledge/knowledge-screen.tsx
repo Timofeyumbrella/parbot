@@ -18,7 +18,6 @@ export type KnowledgeScreenProps = {
   /** The signed-in account, stamped on rows the screen draws before the server has answered. */
   ownerId: string;
   initialSources: Source[];
-  initialPagesUsed: number;
   plan: MeterPlan;
   /** False when answers come from the deterministic stub rather than a model. */
   liveAi: boolean;
@@ -62,7 +61,6 @@ export const KnowledgeScreen = ({
   assistantId,
   ownerId,
   initialSources,
-  initialPagesUsed,
   plan,
   liveAi,
   initialAddTab = null,
@@ -72,11 +70,7 @@ export const KnowledgeScreen = ({
     tab: initialAddTab ?? 'url',
   });
   const { sources, pagesUsed, error, refetch, addPending, settleAdd, reindex, remove } = useSources(
-    {
-      assistantId,
-      initialSources,
-      initialPagesUsed,
-    },
+    { assistantId, initialSources },
   );
 
   const openDialog = (tab: AddSourceTab) => setDialog({ open: true, tab });

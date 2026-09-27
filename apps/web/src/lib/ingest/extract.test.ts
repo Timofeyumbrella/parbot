@@ -3,8 +3,9 @@ import { readFileSync } from 'node:fs';
 
 import { describe, expect, it, vi } from 'vitest';
 
+import { chunkMarkdown } from './chunk';
 import { checksumOf, extractText, extractUpload, markdownTitle } from './extract';
-import { minimalPdf } from './fixtures/pdf';
+import { buildPdf, layoutPdf, minimalPdf } from './fixtures/pdf';
 
 const bytes = (text: string) => new TextEncoder().encode(text);
 
@@ -71,6 +72,179 @@ describe('extractUpload', () => {
         'Contact support with the order number to start one.',
       ].join('\n\n'),
     );
+  });
+});
+
+describe('extractUpload with the layout of a PDF', () => {
+  const handbook = [
+    '# Handbook',
+    'Welcome to the Parbot handbook. It explains how the assistant answers, where its knowledge comes from and what to do when it is wrong.',
+    '## Refunds',
+    'Refunds are issued within 30 days of purchase. They go back to the card that paid, and the customer gets an email once the bank has the money.',
+    'Contact support with the order number to start one.',
+    '## Shipping',
+    'Orders leave the warehouse within two working days.',
+  ].join('\n\n');
+
+  it('rebuilds headings and paragraphs, so the file chunks like the same Markdown', async () => {
+    const pdf = layoutPdf([
+      { heading: 'Handbook', level: 1 },
+      {
+        paragraph:
+          'Welcome to the Parbot handbook. It explains how the assistant answers, where its knowledge comes from and what to do when it is wrong.',
+      },
+      { heading: 'Refunds' },
+      {
+        paragraph:
+          'Refunds are issued within 30 days of purchase. They go back to the card that paid, and the customer gets an email once the bank has the money.',
+      },
+      { paragraph: 'Contact support with the order number to start one.' },
+      { heading: 'Shipping' },
+      { paragraph: 'Orders leave the warehouse within two working days.' },
+    ]);
+    const result = await extractUpload(pdf, 'pdf');
+
+    // With no title in its metadata, the file is named after its first heading, as Markdown is.
+    expect(result).toEqual({ title: 'Handbook', markdown: handbook });
+    // One passage per section and a citation lights one section, not half the file.
+    expect(chunkMarkdown(result.markdown)).toEqual(chunkMarkdown(handbook));
+    expect(chunkMarkdown(result.markdown).map((chunk) => chunk.heading)).toEqual([
+      'Handbook',
+      'Handbook › Refunds',
+      'Handbook › Shipping',
+    ]);
+  });
+
+  it('keeps bulleted and numbered lists, each wrapped item in one piece', async () => {
+    const pdf = layoutPdf([
+      { heading: 'Returns' },
+      { paragraph: 'Before you send anything back:' },
+      {
+        bullets: [
+          'Keep the original packaging, including the inserts and the plastic film that protects the screen.',
+          'Print the label.',
+        ],
+      },
+      { steps: ['Open Billing.', 'Pick the invoice and choose Refund.'] },
+      { paragraph: 'The refund shows up within a week.' },
+    ]);
+    const { markdown } = await extractUpload(pdf, 'pdf');
+
+    expect(markdown).toBe(
+      [
+        '# Returns',
+        'Before you send anything back:',
+        [
+          '- Keep the original packaging, including the inserts and the plastic film that protects the screen.',
+          '- Print the label.',
+          '1. Open Billing.',
+          '2. Pick the invoice and choose Refund.',
+        ].join('\n'),
+        'The refund shows up within a week.',
+      ].join('\n\n'),
+    );
+  });
+
+  it('reads a two-page file as one document, joining a paragraph that runs over the break', async () => {
+    const pdf = layoutPdf(
+      [
+        { heading: 'Billing guide', level: 1 },
+        { paragraph: 'Invoices are sent on the first day of each month.' },
+        { lines: ['A refund is paid back to the card that was charged, and the bank takes'] },
+        { pageBreak: true },
+        { lines: ['up to five working days to show it.'] },
+        { heading: 'Taxes' },
+        { paragraph: 'Prices include VAT where it applies.' },
+      ],
+      { pageNumbers: true },
+    );
+    const result = await extractUpload(pdf, 'pdf');
+
+    expect(result.title).toBe('Billing guide');
+    // The page numbers at the foot of each page are not part of the text.
+    expect(result.markdown).toBe(
+      [
+        '# Billing guide',
+        'Invoices are sent on the first day of each month.',
+        'A refund is paid back to the card that was charged, and the bank takes up to five working days to show it.',
+        '## Taxes',
+        'Prices include VAT where it applies.',
+      ].join('\n\n'),
+    );
+  });
+
+  it('joins a word hyphenated at the end of a line, and keeps a hyphen that belongs', async () => {
+    const pdf = layoutPdf([
+      {
+        lines: [
+          'The assistant answers from all the infor-',
+          'mation you add, like the page about Wi-',
+          'Fi setup or the opening hours in COVID-',
+          '19 times.',
+        ],
+      },
+    ]);
+    const { markdown } = await extractUpload(pdf, 'pdf');
+
+    expect(markdown).toBe(
+      'The assistant answers from all the information you add, like the page about Wi-Fi setup or the opening hours in COVID-19 times.',
+    );
+  });
+
+  it('keeps code set in a fixed-width font as a code block, indented as it was', async () => {
+    const pdf = layoutPdf([
+      { heading: 'Install' },
+      { paragraph: 'Add the package and start it:' },
+      { code: ['npm install parbot', 'parbot init {', '  "key": "pb_123"', '}'] },
+      { paragraph: 'The key is on the Widget page.' },
+    ]);
+    const { markdown } = await extractUpload(pdf, 'pdf');
+
+    expect(markdown).toBe(
+      [
+        '# Install',
+        'Add the package and start it:',
+        '```\nnpm install parbot\nparbot init {\n  "key": "pb_123"\n}\n```',
+        'The key is on the Widget page.',
+      ].join('\n\n'),
+    );
+  });
+
+  it('follows a two-column page down one column and then the next', async () => {
+    const line = (text: string, x: number, y: number, size = 11) => ({ text, x, y, size });
+    // Columns are written one after the other, as layout programs do; a sentence runs from the
+    // foot of the left column to the top of the right one.
+    const pdf = buildPdf([
+      [
+        line('Release notes', 72, 700, 20),
+        line('Version 2 adds a command palette that', 72, 660),
+        line('opens with a shortcut and searches every', 72, 645.7),
+        line('page of the documentation while the reader', 72, 631.4),
+        line('types, and it keeps the last question in', 72, 617.1),
+        line('the box until the reader clears it.', 320, 660),
+        line('Fixes', 320, 628, 16),
+        line('Long answers no longer cut off at the end.', 320, 605),
+      ],
+    ]);
+    const { markdown } = await extractUpload(pdf, 'pdf');
+
+    expect(markdown).toBe(
+      [
+        '# Release notes',
+        'Version 2 adds a command palette that opens with a shortcut and searches every page of the documentation while the reader types, and it keeps the last question in the box until the reader clears it.',
+        '## Fixes',
+        'Long answers no longer cut off at the end.',
+      ].join('\n\n'),
+    );
+  });
+
+  it('names the file after its first heading when the metadata title is a placeholder', async () => {
+    const pdf = layoutPdf(
+      [{ heading: 'Handbook', level: 1 }, { paragraph: 'Welcome to the Parbot handbook.' }],
+      { title: 'Microsoft Word - handbook.docx' },
+    );
+
+    await expect(extractUpload(pdf, 'pdf')).resolves.toMatchObject({ title: 'Handbook' });
   });
 });
 
