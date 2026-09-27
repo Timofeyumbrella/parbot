@@ -143,6 +143,11 @@ test.describe('widget on the demo page', () => {
     await expect(page.getByRole('banner')).toContainText('Northwind docs');
     await expect(page.getByRole('banner')).not.toContainText(/docs docs/i);
     await expect(page).toHaveTitle(/Example docs for Northwind\b(?! docs)/);
+    // The demo page always versions its config request, so a save shows on the next load.
+    await expect(page.locator('script[data-parbot]')).toHaveAttribute(
+      'data-version',
+      /^[0-9a-z]+$/,
+    );
 
     const launcher = widget(page, '.pb-launcher');
     await expect(launcher).toHaveAttribute('aria-label', 'Open Northwind docs');
@@ -322,16 +327,44 @@ test.describe('widget on the demo page', () => {
       `data-parbot="${seeded!.publicKey}"`,
     );
 
+    // The frame and the demo link carry the config version of the row as loaded.
+    const iframe = page.locator('iframe[title="Widget preview"]');
+    await expect(iframe).toHaveAttribute('src', /[?&]v=[0-9a-z]+/);
+    const loadedSrc = (await iframe.getAttribute('src'))!;
+    const loadedVersion = new URL(loadedSrc, 'http://x').searchParams.get('v')!;
+    await expect(page.getByRole('link', { name: 'Open the demo page' })).toHaveAttribute(
+      'href',
+      new RegExp(`/demo/${seeded!.publicKey}\\?v=${loadedVersion}$`),
+    );
+
+    const hide = page.getByRole('switch', { name: /Hide/ });
+    await expect(hide).not.toBeChecked();
+    await hide.click();
+
     await page.getByRole('button', { name: 'Use #16a34a' }).click();
     await page.locator('label', { hasText: 'Light' }).click();
     await page.getByRole('button', { name: 'Save changes' }).click();
     await expect(page.getByText('Widget settings saved')).toBeVisible();
 
+    // The switch shows the saved value after React resets the form, not the page-load one.
+    await expect(hide).toBeChecked();
+
+    // A save moves the version on, for the frame and for the link alike.
+    await expect(iframe).not.toHaveAttribute('src', loadedSrc);
+    const savedSrc = (await iframe.getAttribute('src'))!;
+    const savedVersion = new URL(savedSrc, 'http://x').searchParams.get('v')!;
+    await expect(page.getByRole('link', { name: 'Open the demo page' })).toHaveAttribute(
+      'href',
+      new RegExp(`\\?v=${savedVersion}$`),
+    );
+
     const frame = page.frameLocator('iframe[title="Widget preview"]');
     await expect(frame.locator('#parbot-widget .pb-panel.pb-open')).toBeAttached({
       timeout: 20_000,
     });
-    const preview = page.frames().find((candidate) => candidate.url().includes('v=1'));
+    const preview = page
+      .frames()
+      .find((candidate) => candidate.url().includes(`v=${savedVersion}`));
     expect(preview).toBeDefined();
     await expect
       .poll(() =>
@@ -346,5 +379,17 @@ test.describe('widget on the demo page', () => {
         }),
       )
       .toEqual({ accent: '#16a34a', scheme: 'light' });
+
+    // A second save keeps the switch on; it used to send the page-load value back.
+    await page.getByRole('button', { name: 'Save changes' }).click();
+    await expect(iframe).not.toHaveAttribute('src', savedSrc);
+    await expect(hide).toBeChecked();
+
+    const { data: row } = await seeded!.admin
+      .from('assistants')
+      .select('hide_branding')
+      .eq('id', seeded!.assistantId)
+      .single();
+    expect(row?.hide_branding).toBe(true);
   });
 });

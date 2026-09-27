@@ -13,7 +13,7 @@ export type ScriptOptions = {
   api: string;
   mode: WidgetMode | null;
   launcher: boolean;
-  /** A settings version from the preview page; it makes the config request skip every cache. */
+  /** A config version from Parbot's own pages; it makes the config request skip every cache. */
   version: string | null;
   /** Open the panel as soon as the widget mounts, without taking focus. The preview uses it. */
   open: boolean;
@@ -106,8 +106,9 @@ export const normalizeConfig = (value: unknown): WidgetConfig | null => {
 };
 
 /**
- * Loads the config fresh on every page load: the browser never caches it, and a version from
- * the preview page also defeats any shared cache in front of the API, so a save shows at once.
+ * Loads the config fresh on every page load: the browser never caches it, and a version (Parbot's
+ * settings preview and demo page always pass one) also defeats any shared cache in front of the
+ * API, so a save shows at once there. A customer's site passes none and gets the cached minute.
  */
 export const fetchConfig = async (
   api: string,

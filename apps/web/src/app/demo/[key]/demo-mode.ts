@@ -9,18 +9,17 @@ export type DemoMode = {
   active: WidgetMode;
 };
 
-const VERSION_PATTERN = /^[A-Za-z0-9_-]{1,32}$/;
-
 export type DemoPreview = {
-  /** A save counter from the settings preview; the widget sends it along so its config skips every cache. */
-  version: string | null;
   /** Open the panel as soon as the widget mounts, so the preview shows the conversation, not a launcher. */
   open: boolean;
 };
 
-/** Reads the two query parameters the settings preview adds to the demo address. */
-export const resolveDemoPreview = (query: { v?: unknown; open?: unknown }): DemoPreview => ({
-  version: typeof query.v === 'string' && VERSION_PATTERN.test(query.v) ? query.v : null,
+/**
+ * Reads the flag the settings preview adds to the demo address. The `?v=` it also adds is not
+ * read: the page always hands the widget the version of the row it has just loaded, which is
+ * never older than the one in an address someone kept open or bookmarked.
+ */
+export const resolveDemoPreview = (query: { open?: unknown }): DemoPreview => ({
   open: query.open === '1' || query.open === 'true',
 });
 
