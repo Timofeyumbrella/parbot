@@ -1,9 +1,14 @@
-import { createGeminiProvider } from './gemini';
+import { createGeminiProvider, firstChunkDeadlineFrom } from './gemini';
 import { createStubProvider } from './stub';
 import type { AiProvider } from './types';
 
 export * from './types';
-export { createGeminiProvider, embeddingText } from './gemini';
+export {
+  createGeminiProvider,
+  DEFAULT_FIRST_CHUNK_DEADLINE_MS,
+  embeddingText,
+  firstChunkDeadlineFrom,
+} from './gemini';
 export { createStubProvider, stubAnswer, stubEmbedding } from './stub';
 
 const setting = (value: string | undefined) => (value?.trim() ? value.trim() : undefined);
@@ -32,6 +37,7 @@ export const getAiProvider = (): AiProvider => {
             .filter(Boolean),
           embeddingModel: setting(process.env.GEMINI_EMBEDDING_MODEL),
           thinkingLevel: setting(process.env.GEMINI_THINKING_LEVEL),
+          firstChunkDeadlineMs: firstChunkDeadlineFrom(process.env.GEMINI_FIRST_CHUNK_DEADLINE_MS),
         })
       : createStubProvider();
 

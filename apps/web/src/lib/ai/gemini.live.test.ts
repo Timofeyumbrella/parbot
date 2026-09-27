@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { createGeminiProvider } from './gemini';
+import { createGeminiProvider, firstChunkDeadlineFrom } from './gemini';
 import { EMBEDDING_DIMENSIONS } from './types';
 
 const apiKey = process.env.GEMINI_API_KEY;
@@ -17,6 +17,7 @@ describe.skipIf(!live)('Gemini provider against the live API', () => {
     fallbackModels: process.env.GEMINI_CHAT_FALLBACKS?.split(',').map((model) => model.trim()),
     embeddingModel: process.env.GEMINI_EMBEDDING_MODEL,
     thinkingLevel: process.env.GEMINI_THINKING_LEVEL,
+    firstChunkDeadlineMs: firstChunkDeadlineFrom(process.env.GEMINI_FIRST_CHUNK_DEADLINE_MS),
   });
 
   it('embeds documents and a query into the same space at the configured size', async () => {

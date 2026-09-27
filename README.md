@@ -99,6 +99,8 @@ card. Everything else in `.env.example` is optional.
 2. The closest passages, trimmed to a context budget, go to the model with a system prompt that
    allows answering only from them and asks for `[n]` citations. A project's instructions are
    added after the assistant's own, and the prompt tells the model they never override that rule.
+   A model that sends nothing within `GEMINI_FIRST_CHUNK_DEADLINE_MS` (3.5 s) gets the next model
+   in the chain started beside it; the first to send a chunk answers and the other is aborted.
 3. The answer streams to the client as server-sent events (`packages/shared` defines them): `meta`,
    `status` (in the app, while a file the reader just attached finishes indexing), `token`,
    `citations`, `done`, or `error`. The first characters are held back so a refusal marker
