@@ -8,7 +8,13 @@ import {
   type ConversationRow,
   type ConversationSnapshot,
 } from './conversations';
-import { PROJECT_COLUMNS, projectFromRow, type ProjectRow, type ProjectSnapshot, sortProjects } from './projects';
+import {
+  PROJECT_COLUMNS,
+  projectFromRow,
+  type ProjectRow,
+  type ProjectSnapshot,
+  sortProjects,
+} from './projects';
 import { mergeThread, type MessageRow, type Thread, THREAD_MESSAGE_COLUMNS } from './thread';
 
 type Client = SupabaseClient<Database>;

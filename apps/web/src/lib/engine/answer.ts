@@ -280,7 +280,8 @@ export async function* streamAnswer(params: AnswerParams): AsyncGenerator<ChatSt
       : {
           type: 'error',
           code: 'not_found',
-          message: 'That project no longer exists. Start the chat outside it, or pick another project.',
+          message:
+            'That project no longer exists. Start the chat outside it, or pick another project.',
         };
 
     return;
@@ -415,7 +416,8 @@ export async function* streamAnswer(params: AnswerParams): AsyncGenerator<ChatSt
         yield {
           type: 'error',
           code: 'not_found',
-          message: 'That project no longer exists. Start the chat outside it, or pick another project.',
+          message:
+            'That project no longer exists. Start the chat outside it, or pick another project.',
         };
 
         return;

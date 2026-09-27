@@ -13,8 +13,7 @@ import {
 import { getSession } from '@/lib/session';
 
 export type ProjectActionResult<T = undefined> =
-  | ({ ok: true } & (T extends undefined ? unknown : { project: T }))
-  | { ok: false; error: string };
+  ({ ok: true } & (T extends undefined ? unknown : { project: T })) | { ok: false; error: string };
 
 /** Postgres unique_violation: a project with that name already exists on the assistant. */
 const UNIQUE_VIOLATION = '23505';
@@ -172,7 +171,10 @@ export const updateProject = async (input: {
     .maybeSingle();
 
   if (readError || !row) {
-    return { ok: false, error: 'The project was saved but could not be read back. Reload the page.' };
+    return {
+      ok: false,
+      error: 'The project was saved but could not be read back. Reload the page.',
+    };
   }
 
   return { ok: true, project: projectFromRow(row) };

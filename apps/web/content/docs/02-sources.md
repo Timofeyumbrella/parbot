@@ -28,6 +28,8 @@ In Chat, type @ in the message box to pick a file or source from the assistant's
 
 The files you pick are read first, even when the question does not name them, so "what does this file say about limits?" finds the right passages. They stay with the conversation: follow-up questions keep using them until you remove the chip from the message box. The widget does not offer this, since visitors cannot see your files.
 
+To have a whole set of chats read the same files, put them in a project: every chat in a project reads its files, and follows its instructions, without picking anything. See Projects.
+
 ## Keeping sources fresh
 
 Re-index a source from its menu at any time. Pages whose content has not changed are skipped, pages that disappeared are removed, and new or changed pages are indexed again. Parbot does not crawl on a schedule yet.

@@ -99,8 +99,8 @@ export const ConversationList = ({
     };
   }, [data, query, projects]);
   const matches = loose.length + shownProjects.length;
-  const outOfProject = useConversationDrop((conversationId) =>
-    void projectActions.move(conversationId, null),
+  const outOfProject = useConversationDrop(
+    (conversationId) => void projectActions.move(conversationId, null),
   );
 
   const follow =

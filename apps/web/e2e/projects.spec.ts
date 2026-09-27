@@ -168,7 +168,9 @@ const composer = (page: Page) => page.getByRole('textbox', { name: 'Message' });
 const projectChips = (page: Page) => page.getByTestId('project-chip');
 const answers = (page: Page) => page.locator('[data-role="assistant"]');
 const chatsSection = (page: Page) =>
-  sidebar(page).locator('section').filter({ has: page.getByRole('heading', { name: 'Chats' }) });
+  sidebar(page)
+    .locator('section')
+    .filter({ has: page.getByRole('heading', { name: 'Chats' }) });
 
 const openMenu = async (trigger: Locator) => {
   await trigger.hover();
@@ -210,7 +212,9 @@ test.describe('projects in the chat', () => {
     await signIn(page, seeded!, `/a/${assistantId}/chat`);
 
     // The chat from before sits under Chats, outside any project.
-    await expect(chatsSection(page).getByRole('link', { name: new RegExp(OTHER_CHAT) })).toBeVisible();
+    await expect(
+      chatsSection(page).getByRole('link', { name: new RegExp(OTHER_CHAT) }),
+    ).toBeVisible();
 
     // New project: named in place, shown at once, and its home opens.
     await sidebar(page).getByRole('button', { name: 'New project' }).click();
@@ -274,10 +278,14 @@ test.describe('projects in the chat', () => {
       .single();
 
     expect(stored?.project_id).toEqual(expect.any(String));
-    await expect(folder(page, 'Billing').getByRole('link', { name: /What does it say/ })).toBeVisible();
+    await expect(
+      folder(page, 'Billing').getByRole('link', { name: /What does it say/ }),
+    ).toBeVisible();
 
     // The chat from before has no project and no fixed chips.
-    await chatsSection(page).getByRole('link', { name: new RegExp(OTHER_CHAT) }).click();
+    await chatsSection(page)
+      .getByRole('link', { name: new RegExp(OTHER_CHAT) })
+      .click();
     await expect(page).toHaveURL(new RegExp(`/chat/${otherChatId}$`));
     await expect(answers(page).first()).toContainText('100 requests');
     await expect(projectChips(page)).toHaveCount(0);
@@ -287,8 +295,12 @@ test.describe('projects in the chat', () => {
     await page.getByRole('menuitem', { name: 'Move to project' }).click();
     await page.getByRole('menuitem', { name: 'Billing' }).click();
     await expect(projectChips(page)).toHaveText([/Refund policy/], { timeout: 1_000 });
-    await expect(folder(page, 'Billing').getByRole('link', { name: new RegExp(OTHER_CHAT) })).toBeVisible();
-    await expect(chatsSection(page).getByRole('link', { name: new RegExp(OTHER_CHAT) })).toHaveCount(0);
+    await expect(
+      folder(page, 'Billing').getByRole('link', { name: new RegExp(OTHER_CHAT) }),
+    ).toBeVisible();
+    await expect(
+      chatsSection(page).getByRole('link', { name: new RegExp(OTHER_CHAT) }),
+    ).toHaveCount(0);
 
     // From the next question on, it answers with the project's file too.
     await composer(page).fill('What does it say?');
@@ -300,9 +312,9 @@ test.describe('projects in the chat', () => {
 
     // At phone width nothing spills sideways, the fixed chips included.
     await page.setViewportSize({ width: 390, height: 780 });
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
-      true,
-    );
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+    ).toBe(true);
     await page.setViewportSize({ width: 1280, height: 800 });
 
     // The Inbox labels both chats with their project, in the list and on the transcript.
@@ -333,12 +345,16 @@ test.describe('projects in the chat', () => {
     await confirm.getByRole('button', { name: 'Delete project' }).click();
     await expect(folder(page, 'Billing')).toHaveCount(0);
     await expect(projectChips(page)).toHaveCount(0);
-    await expect(chatsSection(page).getByRole('link', { name: new RegExp(OTHER_CHAT) })).toBeVisible();
+    await expect(
+      chatsSection(page).getByRole('link', { name: new RegExp(OTHER_CHAT) }),
+    ).toBeVisible();
     await expect(chatsSection(page).getByRole('link', { name: /What does it say/ })).toBeVisible();
 
     await reload(page);
     await expect(sidebar(page).getByTestId('project-folder')).toHaveCount(0);
-    await expect(chatsSection(page).getByRole('link', { name: new RegExp(OTHER_CHAT) })).toBeVisible();
+    await expect(
+      chatsSection(page).getByRole('link', { name: new RegExp(OTHER_CHAT) }),
+    ).toBeVisible();
     await expect(chatsSection(page).getByRole('link', { name: /What does it say/ })).toBeVisible();
     await expect(answers(page)).toHaveCount(2);
 

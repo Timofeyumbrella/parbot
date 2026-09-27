@@ -71,7 +71,11 @@ const FileLink = ({ chip, assistantId }: { chip: ComposerChip; assistantId: stri
 };
 
 const HomeSkeleton = () => (
-  <div className="flex h-full min-h-0 flex-col" data-testid="project-home-loading" aria-hidden="true">
+  <div
+    className="flex h-full min-h-0 flex-col"
+    data-testid="project-home-loading"
+    aria-hidden="true"
+  >
     <div className="min-h-0 flex-1 overflow-hidden">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-4 py-8 sm:px-6">
         <div className="flex items-center gap-3">
@@ -191,8 +195,8 @@ export const ProjectHome = ({ projectId }: ProjectHomeProps) => {
               </p>
             ) : (
               <p className="text-muted-foreground text-sm">
-                None yet. Add some in Edit project to shape how chats here answer, for example
-                which team they are for.
+                None yet. Add some in Edit project to shape how chats here answer, for example which
+                team they are for.
               </p>
             )}
           </section>

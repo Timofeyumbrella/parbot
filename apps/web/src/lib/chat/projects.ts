@@ -58,7 +58,9 @@ export const projectFromRow = (row: ProjectQueryRow): ProjectRow => ({
 
 /** Newest first, the way the sidebar lists them. */
 export const sortProjects = (rows: ProjectRow[]) =>
-  [...rows].sort((a, b) => (a.created_at < b.created_at ? 1 : a.created_at > b.created_at ? -1 : 0));
+  [...rows].sort((a, b) =>
+    a.created_at < b.created_at ? 1 : a.created_at > b.created_at ? -1 : 0,
+  );
 
 export const upsertProject = (rows: ProjectRow[], row: ProjectRow) =>
   sortProjects(

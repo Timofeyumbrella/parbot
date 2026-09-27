@@ -59,7 +59,9 @@ describe('the prompt in a project', () => {
   it("adds the project's instructions after the assistant's own, labelled, under the rules", () => {
     const prompt = buildSystemPrompt(assistant, [], project);
     const own = prompt.indexOf('Additional instructions from the team:');
-    const label = prompt.indexOf('Project instructions from the team, for conversations in "Billing".');
+    const label = prompt.indexOf(
+      'Project instructions from the team, for conversations in "Billing".',
+    );
     const rule = prompt.indexOf('Answer only from those sources.');
 
     expect(rule).toBeGreaterThanOrEqual(0);

@@ -267,7 +267,10 @@ const ProjectForm = ({ assistantId, project, onClose }: FormProps) => {
                           added && 'bg-accent/60',
                         )}
                       >
-                        <Icon className="text-muted-foreground size-4 shrink-0" aria-hidden="true" />
+                        <Icon
+                          className="text-muted-foreground size-4 shrink-0"
+                          aria-hidden="true"
+                        />
                         <span className="flex min-w-0 flex-1 flex-col">
                           <span className="truncate text-sm">{option.title}</span>
                           <span className="text-muted-foreground truncate text-xs">
@@ -319,7 +322,12 @@ export const ProjectDialog = ({ assistantId, project, open, onClose }: ProjectDi
   <Dialog open={open && Boolean(project)} onOpenChange={(next) => (next ? null : onClose())}>
     <DialogContent className="flex max-h-[calc(100svh-2rem)] flex-col sm:max-w-lg">
       {project ? (
-        <ProjectForm key={project.id} assistantId={assistantId} project={project} onClose={onClose} />
+        <ProjectForm
+          key={project.id}
+          assistantId={assistantId}
+          project={project}
+          onClose={onClose}
+        />
       ) : null}
     </DialogContent>
   </Dialog>

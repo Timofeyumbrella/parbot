@@ -5,12 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
 
-import {
-  createProject,
-  deleteProject,
-  moveConversation,
-  updateProject,
-} from '@/actions/projects';
+import { createProject, deleteProject, moveConversation, updateProject } from '@/actions/projects';
 import type { ConversationRow } from '@/lib/chat/conversations';
 import {
   deletedProjects,
@@ -29,12 +24,7 @@ import {
   removeProject,
   upsertProject,
 } from '@/lib/chat/projects';
-import {
-  conversationsKey,
-  fetchProjects,
-  INBOX_NAMESPACE,
-  projectsKey,
-} from '@/lib/chat/queries';
+import { conversationsKey, fetchProjects, INBOX_NAMESPACE, projectsKey } from '@/lib/chat/queries';
 import type { MessageReference } from '@/lib/chat/references';
 import { composerUploads } from '@/lib/chat/uploads';
 import { getSupabaseBrowserClient, realtimeReadyClient } from '@/lib/supabase/client';
@@ -291,7 +281,10 @@ export const useProjectActions = (assistantId: string) => {
           name: patch.name?.trim(),
           instructions: patch.instructions,
           sourceIds: sources?.map((source) => source.id),
-        }).catch(() => ({ ok: false as const, error: `The project could not be saved. ${OFFLINE}` }));
+        }).catch(() => ({
+          ok: false as const,
+          error: `The project could not be saved. ${OFFLINE}`,
+        }));
 
         if (!result.ok) {
           return fail(result.error);
