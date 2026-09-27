@@ -670,6 +670,38 @@ export type Database = {
           unanswered: number
         }[]
       }
+      cited_citations: {
+        Args: { assistant: string; since: string }
+        Returns: {
+          document_id: string
+          message_id: string
+          title: string
+          url: string
+        }[]
+      }
+      cited_documents: {
+        Args: { assistant: string; max_rows?: number; since: string }
+        Returns: {
+          answers: number
+          document_id: string
+          source_kind: Database["public"]["Enums"]["source_kind"]
+          source_title: string
+          title: string
+          total: number
+          url: string
+        }[]
+      }
+      disliked_answers: {
+        Args: { assistant: string; max_rows?: number; since: string }
+        Returns: {
+          answer: string
+          answered_at: string
+          conversation_id: string
+          message_id: string
+          question: string
+          total: number
+        }[]
+      }
       increment_usage: {
         Args: {
           delta?: number
@@ -693,6 +725,15 @@ export type Database = {
         }
         Returns: string
       }
+      knowledge_gaps: {
+        Args: { assistant: string; max_rows?: number; since: string }
+        Returns: {
+          asks: number
+          conversation_id: string
+          last_asked_at: string
+          question: string
+        }[]
+      }
       match_chunks: {
         Args: {
           assistant: string
@@ -710,7 +751,34 @@ export type Database = {
           similarity: number
         }[]
       }
+      overview_totals: {
+        Args: { assistant: string; previous_since: string; since: string }
+        Returns: {
+          answered: number
+          leads: number
+          median_latency_ms: number
+          negative: number
+          new_leads: number
+          period: string
+          positive: number
+          questions: number
+          unanswered: number
+        }[]
+      }
       owns_assistant: { Args: { assistant: string }; Returns: boolean }
+      page_activity: {
+        Args: { assistant: string; max_rows?: number; since: string }
+        Returns: {
+          answered: number
+          host: string
+          last_asked_at: string
+          page_url: string
+          path: string
+          questions: number
+          total: number
+          unanswered: number
+        }[]
+      }
       release_message: { Args: { owner: string }; Returns: undefined }
       reserve_message: {
         Args: { max_allowed: number; owner: string }
@@ -745,6 +813,18 @@ export type Database = {
           conversation_id: string
           last_asked_at: string
           question: string
+        }[]
+      }
+      uncited_documents: {
+        Args: { assistant: string; max_rows?: number; since: string }
+        Returns: {
+          created_at: string
+          document_id: string
+          source_kind: Database["public"]["Enums"]["source_kind"]
+          source_title: string
+          title: string
+          total: number
+          url: string
         }[]
       }
     }
