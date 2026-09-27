@@ -99,12 +99,30 @@ export const projectWrites = {
 
 const deleted = new Set<string>();
 
-/** Projects deleted here; a server snapshot read before the delete must not bring them back. */
+/**
+ * Projects deleted here. A read, a snapshot or a realtime row that left the server before the
+ * delete landed must not bring the folder back, nor put its chats back in it: the reader saw them
+ * move to Chats the moment they confirmed.
+ */
 export const deletedProjects = {
   add: (id: string) => deleted.add(id),
   restore: (id: string) => deleted.delete(id),
   ids: (): ReadonlySet<string> => deleted,
+  /** The rows with every chat of a deleted project moved out of it. */
+  release: (rows: ConversationRow[]) =>
+    deleted.size > 0 && rows.some((row) => row.project_id && deleted.has(row.project_id))
+      ? rows.map((row) =>
+          row.project_id && deleted.has(row.project_id) ? { ...row, project_id: null } : row,
+        )
+      : rows,
 };
+
+/**
+ * What the browser knows about projects that the server may not have applied yet, laid over
+ * server rows: moves in flight, then deleted projects.
+ */
+export const overlayProjectState = (rows: ConversationRow[], now = Date.now()) =>
+  deletedProjects.release(projectMoves.overlay(rows, now));
 
 /** Test hook. */
 export const resetProjectState = () => {

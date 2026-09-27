@@ -15,7 +15,7 @@ import {
   removeConversationRow,
   renameConversationRow,
 } from '@/lib/chat/conversations';
-import { projectMoves } from '@/lib/chat/project-state';
+import { overlayProjectState } from '@/lib/chat/project-state';
 import {
   conversationsKey,
   fetchConversations,
@@ -64,9 +64,9 @@ export const useConversations = (assistantId: string, snapshot?: ConversationSna
     const invalidated = queryClient.getQueryState(listKey)?.isInvalidated ?? false;
 
     appliedSnapshots.set(assistantId, snapshot.fetchedAt);
-    // Server rows never undo a move the reader just made (see `projectMoves`).
+    // Server rows never undo a move or a project delete the reader just made (see `project-state`).
     queryClient.setQueryData<ConversationRow[]>(listKey, (rows) =>
-      projectMoves.overlay(mergeSnapshot(rows, snapshot.rows)),
+      overlayProjectState(mergeSnapshot(rows, snapshot.rows)),
     );
 
     if (invalidated) {
@@ -79,12 +79,12 @@ export const useConversations = (assistantId: string, snapshot?: ConversationSna
     queryFn: async () => {
       const fetched = await fetchConversations(getSupabaseBrowserClient(), assistantId);
 
-      return projectMoves.overlay(
+      return overlayProjectState(
         mergeConversationLists(queryClient.getQueryData<ConversationRow[]>(key), fetched),
       );
     },
     initialData: snapshot
-      ? () => projectMoves.overlay(mergeSnapshot(undefined, snapshot.rows))
+      ? () => overlayProjectState(mergeSnapshot(undefined, snapshot.rows))
       : undefined,
     initialDataUpdatedAt: snapshot ? Date.now : undefined,
   });
@@ -161,7 +161,7 @@ export const useConversationsRealtime = (assistantId: string) => {
             }
 
             queryClient.setQueryData<ConversationRow[]>(key, (rows) =>
-              projectMoves.overlay(
+              overlayProjectState(
                 applyServerRow(rows ?? [], {
                   id: row.id,
                   title: row.title,
