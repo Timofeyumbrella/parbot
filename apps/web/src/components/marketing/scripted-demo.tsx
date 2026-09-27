@@ -1,202 +1,225 @@
 'use client';
 
-import { SendHorizontal } from 'lucide-react';
-import { useEffect, useState } from 'react';
-
+import { cn } from 'cn';
 import {
+  memo,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react';
+
+import { AnswerMarkdown } from './answer-markdown';
+import {
+  createDemoPlayer,
   DEMO_ASSISTANT_NAME,
   DEMO_SCENES,
-  DEMO_TIMING,
+  DEMO_SOURCES,
+  DEMO_SUGGESTIONS,
+  DEMO_WELCOME,
   type DemoScene,
-  splitCitationMarkers,
+  type DemoSource,
+  demoSteps,
+  type DemoTurn,
+  initialView,
 } from './demo-script';
-import { AssistantTurn, CitationMarker, DemoWindow, ThinkingDots, UserBubble } from './demo-window';
+import {
+  AssistantTurn,
+  DemoComposer,
+  DemoFrame,
+  LeadForm,
+  SourcesRow,
+  ThinkingDots,
+  UserBubble,
+} from './demo-window';
 
-type Phase =
-  | { kind: 'typing'; typed: string }
-  | { kind: 'thinking' }
-  | { kind: 'streaming'; streamed: string }
-  | { kind: 'done' };
+const REDUCED_MOTION = '(prefers-reduced-motion: reduce)';
 
-type State = { scene: number; phase: Phase };
+const subscribeReducedMotion = (onChange: () => void) => {
+  const query = window.matchMedia?.(REDUCED_MOTION);
 
-const sleep = (ms: number, signal: AbortSignal) =>
-  new Promise<void>((resolve, reject) => {
-    if (signal.aborted) {
-      reject(signal.reason);
+  query?.addEventListener('change', onChange);
 
+  return () => query?.removeEventListener('change', onChange);
+};
+
+/** The server renders the first exchange still, which is also what reduced motion keeps. */
+const usePrefersReducedMotion = () =>
+  useSyncExternalStore(
+    subscribeReducedMotion,
+    () => window.matchMedia?.(REDUCED_MOTION).matches ?? false,
+    () => false,
+  );
+
+type TurnProps = Omit<DemoTurn, 'scene'> & { scene: DemoScene };
+
+const Turn = memo(function Turn({ scene, shown, settled, lead }: TurnProps) {
+  const unanswered = scene.citations.length === 0;
+
+  return (
+    <>
+      <UserBubble>{scene.question}</UserBubble>
+      <AssistantTurn
+        name={DEMO_ASSISTANT_NAME}
+        footer={
+          settled && scene.citations.length > 0 ? (
+            <SourcesRow citations={scene.citations} />
+          ) : lead ? (
+            <LeadForm {...lead} />
+          ) : null
+        }
+      >
+        {shown === null ? (
+          <ThinkingDots />
+        ) : (
+          <AnswerMarkdown
+            content={scene.answer.slice(0, shown)}
+            citations={scene.citations}
+            streaming={!settled}
+            className={cn(unanswered && 'text-muted-foreground')}
+          />
+        )}
+      </AssistantTurn>
+    </>
+  );
+});
+
+const Welcome = ({ suggestions }: { suggestions: string[] }) => (
+  <AssistantTurn
+    name={DEMO_ASSISTANT_NAME}
+    footer={
+      <ul className="flex flex-wrap gap-1.5" data-testid="demo-suggestions">
+        {suggestions.map((question) => (
+          <li
+            key={question}
+            className="bg-background text-muted-foreground rounded-md border px-2 py-1 text-xs"
+          >
+            {question}
+          </li>
+        ))}
+      </ul>
+    }
+  >
+    <p className="text-sm leading-relaxed">{DEMO_WELCOME}</p>
+  </AssistantTurn>
+);
+
+type ScriptedDemoProps = {
+  scenes?: DemoScene[];
+  sources?: DemoSource[];
+  suggestions?: string[];
+};
+
+/**
+ * The hero's picture of the product in use: a docs assistant for a made-up payments API answers a
+ * few questions the way the widget does, typed, streamed, cited, and once honestly unanswered.
+ * It plays only while on screen and in a visible tab, and not at all under reduced motion; the
+ * first exchange is rendered finished on the server, so the frame is complete before any script.
+ * It never touches the network.
+ */
+export const ScriptedDemo = ({
+  scenes = DEMO_SCENES,
+  sources = DEMO_SOURCES,
+  suggestions = DEMO_SUGGESTIONS,
+}: ScriptedDemoProps) => {
+  const [played, setPlayed] = useState(() => initialView(scenes));
+  const reducedMotion = usePrefersReducedMotion();
+  const still = useMemo(() => initialView(scenes), [scenes]);
+  // The script starts by showing the initial view, so what `played` last held never shows again.
+  const view = reducedMotion ? still : played;
+  const figureRef = useRef<HTMLElement>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const fieldRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (reducedMotion) {
       return;
     }
 
-    const onAbort = () => {
-      clearTimeout(timer);
-      reject(signal.reason);
-    };
-    const timer = setTimeout(() => {
-      signal.removeEventListener('abort', onAbort);
-      resolve();
-    }, ms);
-
-    signal.addEventListener('abort', onAbort, { once: true });
-  });
-
-/**
- * Plays a canned conversation on a loop: a question is typed, sent, answered word by word and
- * cited, exactly as the real widget behaves. The first scene renders complete on the server so
- * the panel is meaningful before any script runs and stays that way under reduced motion.
- */
-export const ScriptedDemo = ({ scenes = DEMO_SCENES }: { scenes?: DemoScene[] }) => {
-  const [state, setState] = useState<State>({ scene: 0, phase: { kind: 'done' } });
-
-  useEffect(() => {
-    const controller = new AbortController();
-    const { signal } = controller;
-
-    const play = async () => {
-      await sleep(0, signal);
-
-      if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches || scenes.length < 2) {
-        return;
+    const player = createDemoPlayer(demoSteps(scenes), setPlayed);
+    const figure = figureRef.current;
+    let onScreen = typeof IntersectionObserver === 'undefined' || !figure;
+    const sync = () => {
+      if (onScreen && document.visibilityState !== 'hidden') {
+        player.play();
+      } else {
+        player.pause();
       }
-
-      await sleep(DEMO_TIMING.holdMs, signal);
-
-      for (let index = 1; ; index = (index + 1) % scenes.length) {
-        const scene = scenes[index]!;
-
-        setState({ scene: index, phase: { kind: 'typing', typed: '' } });
-
-        for (let length = 1; length <= scene.question.length; length += 1) {
-          await sleep(DEMO_TIMING.keystrokeMs, signal);
-          setState({
-            scene: index,
-            phase: { kind: 'typing', typed: scene.question.slice(0, length) },
+    };
+    const observer =
+      onScreen || !figure
+        ? null
+        : new IntersectionObserver((entries) => {
+            onScreen = entries.some((entry) => entry.isIntersecting);
+            sync();
           });
-        }
 
-        await sleep(DEMO_TIMING.beforeSendMs, signal);
-        setState({ scene: index, phase: { kind: 'thinking' } });
-        await sleep(DEMO_TIMING.thinkMs, signal);
+    if (observer && figure) {
+      observer.observe(figure);
+    }
 
-        const words = scene.answer.split(' ');
-        let streamed = '';
+    document.addEventListener('visibilitychange', sync);
+    sync();
 
-        for (const [position, word] of words.entries()) {
-          streamed += position === 0 ? word : ` ${word}`;
-          setState({ scene: index, phase: { kind: 'streaming', streamed } });
-          await sleep(DEMO_TIMING.wordMs, signal);
-        }
-
-        setState({ scene: index, phase: { kind: 'done' } });
-        await sleep(DEMO_TIMING.holdMs, signal);
-      }
+    return () => {
+      observer?.disconnect();
+      document.removeEventListener('visibilitychange', sync);
+      player.pause();
     };
+  }, [reducedMotion, scenes]);
 
-    play().catch(() => {
-      // Aborted on unmount; nothing to clean up beyond the timers sleep() already cleared.
-    });
+  // Like the chat: the newest line stays in view, and the composer shows the end of what is typed.
+  useLayoutEffect(() => {
+    const body = bodyRef.current;
+    const field = fieldRef.current;
 
-    return () => controller.abort();
-  }, [scenes]);
+    if (body) {
+      body.scrollTop = body.scrollHeight;
+    }
 
-  const scene = scenes[state.scene] ?? scenes[0]!;
-  const { phase } = state;
+    if (field) {
+      field.scrollLeft = field.scrollWidth;
+    }
+  }, [view]);
 
   return (
-    <div role="figure" aria-label="Example conversation with a documentation assistant">
-      <DemoWindow
-        label="Demo"
+    <figure
+      ref={figureRef}
+      aria-label="Example conversation with a documentation assistant"
+      className="m-0 flex min-w-0 flex-col"
+    >
+      {/* The frame is inert and hidden from assistive tech; this says what it shows. */}
+      <figcaption className="sr-only">
+        A scripted example on fictional docs. A reader asks the {DEMO_ASSISTANT_NAME} docs
+        assistant: {scenes.map((scene) => scene.question).join(' ')} Each answer streams in with the
+        sources it came from.
+        {scenes.some((scene) => scene.lead)
+          ? ' When the docs do not cover a question, the assistant says so and offers to take the reader’s email.'
+          : ''}
+      </figcaption>
+      <DemoFrame
         title={DEMO_ASSISTANT_NAME}
-        ariaLive="off"
-        footer={
-          <div className="flex items-center gap-2" aria-hidden="true">
-            <div className="bg-background flex h-9 min-w-0 flex-1 items-center rounded-md border px-3 text-sm">
-              {phase.kind === 'typing' && phase.typed ? (
-                <span className="streaming-caret truncate">{phase.typed}</span>
-              ) : (
-                <span className="text-muted-foreground truncate">
-                  Ask a question about the docs
-                </span>
-              )}
-            </div>
-            <span className="bg-primary text-primary-foreground flex size-9 shrink-0 items-center justify-center rounded-md">
-              <SendHorizontal className="size-4" />
-            </span>
-          </div>
-        }
+        sources={sources}
+        bodyRef={bodyRef}
+        composer={<DemoComposer draft={view.draft} sending={view.sending} fieldRef={fieldRef} />}
       >
-        {phase.kind === 'typing' ? (
-          <>
-            <AssistantTurn>
-              <p>Ask anything about the {DEMO_ASSISTANT_NAME} documentation.</p>
-            </AssistantTurn>
-            <ul className="ml-9 flex flex-wrap gap-1.5" aria-label="Suggested questions">
-              {scenes.slice(0, 3).map((item) => (
-                <li
-                  key={item.question}
-                  className="bg-background text-muted-foreground rounded-md border px-2 py-1 text-xs"
-                >
-                  {item.question}
-                </li>
-              ))}
-            </ul>
-          </>
+        {view.turns.length === 0 ? (
+          <Welcome suggestions={suggestions} />
         ) : (
-          <>
-            <UserBubble>{scene.question}</UserBubble>
-            {phase.kind === 'thinking' ? (
-              <AssistantTurn>
-                <ThinkingDots />
-              </AssistantTurn>
-            ) : null}
-            {phase.kind === 'streaming' ? (
-              <AssistantTurn streaming>
-                <p>{phase.streamed}</p>
-              </AssistantTurn>
-            ) : null}
-            {phase.kind === 'done' ? (
-              <>
-                <AssistantTurn citations={scene.citations}>
-                  <p>
-                    {splitCitationMarkers(scene.answer).map((segment, position) =>
-                      segment.type === 'text' ? (
-                        <span key={position}>{segment.text}</span>
-                      ) : (
-                        <CitationMarker
-                          key={position}
-                          index={segment.index}
-                          citation={scene.citations.find(
-                            (citation) => citation.index === segment.index,
-                          )}
-                        />
-                      ),
-                    )}
-                  </p>
-                </AssistantTurn>
-                {scene.unanswered ? <LeadCapturePreview /> : null}
-              </>
-            ) : null}
-          </>
+          view.turns.map((turn, position) => (
+            <Turn
+              // A fresh conversation replays the same scenes; its turns are new ones.
+              key={`${position}:${turn.scene}`}
+              scene={scenes[turn.scene]!}
+              shown={turn.shown}
+              settled={turn.settled}
+              lead={turn.lead}
+            />
+          ))
         )}
-      </DemoWindow>
-    </div>
+      </DemoFrame>
+    </figure>
   );
 };
-
-/** What the widget offers after an unanswered question on plans with lead capture. Decorative. */
-const LeadCapturePreview = () => (
-  <div
-    className="bg-muted/60 ml-9 flex flex-col gap-2 rounded-lg border p-3 text-xs"
-    aria-hidden="true"
-  >
-    <p className="font-medium">Want the team to follow up? Leave your email.</p>
-    <div className="flex gap-2">
-      <div className="bg-background text-muted-foreground flex h-8 flex-1 items-center rounded-md border px-2">
-        you@company.com
-      </div>
-      <span className="bg-primary text-primary-foreground flex h-8 items-center rounded-md px-3 font-medium">
-        Send
-      </span>
-    </div>
-  </div>
-);

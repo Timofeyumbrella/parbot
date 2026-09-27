@@ -43,7 +43,7 @@ export default function LandingPage() {
 
   return (
     <main id="main" tabIndex={-1} className="flex-1 outline-none">
-      <Hero demoKey={demoKey} />
+      <Hero paletteHint={Boolean(demoKey)} />
       <EmbedModes appUrl={publicEnv.appUrl} />
       <HowItWorks />
       <Features />

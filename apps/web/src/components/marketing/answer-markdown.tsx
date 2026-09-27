@@ -1,11 +1,16 @@
 'use client';
 
 import { cn } from 'cn';
-import { useMemo } from 'react';
+import { Copy } from 'lucide-react';
+import { memo, useMemo } from 'react';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
-import { CitationMarker, type DemoCitation } from './demo-window';
+import { codeLanguage, type HastElement, rehypeStreamingCaret } from '@/lib/chat/markdown';
+
+import '@/components/chat/answer.css';
+
+import { CitationChip } from './demo-window';
 
 const CODE_PATTERN = /(```[\s\S]*?```|`[^`\n]*`)/g;
 const MARKER_PATTERN = /\[(\d{1,2}(?:\s*,\s*\d{1,2})*)\]/g;
@@ -28,74 +33,157 @@ export const linkCitationMarkers = (text: string) =>
     )
     .join('');
 
-const buildComponents = (citations: DemoCitation[]): Components => ({
+type Token = { text: string; kind: string | null };
+
+/**
+ * Just enough highlighting for the demo's shell and JavaScript samples, in the hljs class names the
+ * chat's stylesheet colours. The in-app chat uses highlight.js; the landing should not ship it.
+ */
+const GRAMMARS: Record<string, { pattern: RegExp; kinds: string[] }> = {
+  bash: {
+    pattern: /(#.*)|('[^'\n]*'|"[^"\n]*")|(\$\w+)|((?:^|\s)--?[\w-]+)|(^\s*[a-z][\w-]*)/gm,
+    kinds: ['comment', 'string', 'variable', 'attr', 'built_in'],
+  },
+  js: {
+    pattern:
+      /(\/\/.*)|('[^'\n]*'|"[^"\n]*"|`[^`]*`)|(\b(?:const|let|await|async|return|if|else|new|function|import|from|export)\b)|(\b\d+(?:\.\d+)?\b)|(\b[A-Za-z_$][\w$]*(?=\())/g,
+    kinds: ['comment', 'string', 'keyword', 'number', 'title'],
+  },
+};
+
+export const highlight = (code: string, language: string | null): Token[] => {
+  const grammar = language
+    ? GRAMMARS[language === 'javascript' || language === 'ts' ? 'js' : language]
+    : undefined;
+
+  if (!grammar) {
+    return [{ text: code, kind: null }];
+  }
+
+  const tokens: Token[] = [];
+  let cursor = 0;
+
+  for (const match of code.matchAll(new RegExp(grammar.pattern.source, grammar.pattern.flags))) {
+    const kind = grammar.kinds[match.slice(1).findIndex((group) => group !== undefined)];
+
+    if (!kind || match[0].length === 0) {
+      continue;
+    }
+
+    if (match.index > cursor) {
+      tokens.push({ text: code.slice(cursor, match.index), kind: null });
+    }
+
+    tokens.push({ text: match[0], kind });
+    cursor = match.index + match[0].length;
+  }
+
+  if (cursor < code.length) {
+    tokens.push({ text: code.slice(cursor), kind: null });
+  }
+
+  return tokens;
+};
+
+const textOf = (children: React.ReactNode): string =>
+  Array.isArray(children)
+    ? children.map(textOf).join('')
+    : typeof children === 'string' || typeof children === 'number'
+      ? String(children)
+      : '';
+
+const buildComponents = (citations: { index: number }[]): Components => ({
   a: ({ href, children }) => {
     if (href?.startsWith(CITE_PREFIX)) {
       const index = Number(href.slice(CITE_PREFIX.length));
 
-      return (
-        <CitationMarker
-          index={index}
-          citation={citations.find((citation) => citation.index === index)}
-        />
+      return citations.some((citation) => citation.index === index) ? (
+        <CitationChip index={index} />
+      ) : (
+        <>[{index}]</>
       );
     }
 
+    // Nothing in the demo leads anywhere: a link reads as one and stays put.
+    return <span className="text-primary underline underline-offset-2">{children}</span>;
+  },
+  pre: ({ node, children }) => {
+    const code = (node as unknown as HastElement | undefined)?.children.find(
+      (child) => child.type === 'element',
+    ) as HastElement | undefined;
+
     return (
-      <a
-        href={href}
-        target="_blank"
-        rel="noreferrer"
-        className="text-primary underline underline-offset-2"
+      <div
+        className="bg-background my-3 max-w-full overflow-hidden rounded-lg border"
+        data-testid="demo-code-block"
       >
-        {children}
-      </a>
+        <div className="bg-muted/60 flex h-8 items-center justify-between border-b pl-3 pr-2.5">
+          <span className="text-muted-foreground font-mono text-[11px] uppercase tracking-wide">
+            {codeLanguage(code?.properties?.className) ?? 'text'}
+          </span>
+          <span className="text-muted-foreground inline-flex items-center gap-1 text-xs">
+            <Copy className="size-3" aria-hidden="true" />
+            Copy
+          </span>
+        </div>
+        <pre>{children}</pre>
+      </div>
     );
   },
-  p: ({ children }) => <p className="my-2 first:mt-0 last:mb-0">{children}</p>,
-  ul: ({ children }) => <ul className="my-2 list-disc pl-5">{children}</ul>,
-  ol: ({ children }) => <ol className="my-2 list-decimal pl-5">{children}</ol>,
-  li: ({ children }) => <li className="my-0.5">{children}</li>,
-  h1: ({ children }) => <p className="my-2 font-semibold">{children}</p>,
-  h2: ({ children }) => <p className="my-2 font-semibold">{children}</p>,
-  h3: ({ children }) => <p className="my-2 font-semibold">{children}</p>,
-  pre: ({ children }) => (
-    <pre className="bg-muted my-2 overflow-x-auto rounded-md p-3 font-mono text-xs leading-relaxed">
-      {children}
-    </pre>
-  ),
-  code: ({ children, className }) => (
-    <code
-      className={cn(
-        'bg-muted rounded px-1 py-0.5 font-mono text-[0.85em] [pre_&]:bg-transparent [pre_&]:p-0',
-        className,
-      )}
-    >
-      {children}
-    </code>
-  ),
-  table: ({ children }) => (
-    <div className="my-2 overflow-x-auto">
-      <table className="w-full border-collapse text-xs [&_td]:border [&_td]:px-2 [&_td]:py-1 [&_th]:border [&_th]:px-2 [&_th]:py-1 [&_th]:text-left">
-        {children}
-      </table>
-    </div>
-  ),
+  code: ({ className, children }) => {
+    const language = codeLanguage(className);
+
+    if (!language) {
+      return <code className={className}>{children}</code>;
+    }
+
+    return (
+      <code className={cn('hljs', className)}>
+        {highlight(textOf(children), language).map((token, position) =>
+          token.kind ? (
+            <span key={position} className={`hljs-${token.kind}`}>
+              {token.text}
+            </span>
+          ) : (
+            token.text
+          ),
+        )}
+      </code>
+    );
+  },
 });
 
-/** Renders an answer's Markdown with its [n] markers as citation chips. */
-export const AnswerMarkdown = ({
+const remarkPlugins = [remarkGfm];
+
+type AnswerMarkdownProps = {
+  content: string;
+  citations: { index: number }[];
+  /** Puts the blinking caret after the last character, as the chat does while an answer streams. */
+  streaming?: boolean;
+  className?: string;
+};
+
+/**
+ * An answer's Markdown in the chat's own prose styles, with [n] markers as chips. Nothing in it
+ * is a link or a button: the landing demo is a picture of the product, not a way out of the page.
+ */
+export const AnswerMarkdown = memo(function AnswerMarkdown({
   content,
   citations,
-}: {
-  content: string;
-  citations: DemoCitation[];
-}) => {
+  streaming = false,
+  className,
+}: AnswerMarkdownProps) {
   const components = useMemo(() => buildComponents(citations), [citations]);
 
   return (
-    <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
-      {linkCitationMarkers(content)}
-    </ReactMarkdown>
+    <div className={cn('answer-prose', className)} data-testid="demo-answer">
+      <ReactMarkdown
+        remarkPlugins={remarkPlugins}
+        rehypePlugins={streaming ? [rehypeStreamingCaret] : []}
+        components={components}
+      >
+        {linkCitationMarkers(content)}
+      </ReactMarkdown>
+    </div>
   );
-};
+});
