@@ -912,4 +912,60 @@ describe('streamAnswer unanswered', () => {
     expect(events.at(-1)).toMatchObject({ type: 'done', answered: false });
     expect(fake.rpcNames()).toEqual([]);
   });
+
+  it("holds the model's refusal back and saves the unanswered reply in its place", async () => {
+    const fake = fakeService({
+      conversationReads: [ownConversation],
+      chunks: [chunk('API keys are created in Settings.')],
+    });
+    const { provider } = fakeProvider({ answer: 'NO_ANSWER' });
+
+    const events = await collect(
+      streamAnswer({
+        service: fake.service,
+        provider,
+        assistant,
+        conversation: { id: 'c1', channel: 'app' },
+        message: 'Does it support SAML single sign-on?',
+      }),
+    );
+
+    expect(tokenText(events)).toBe(UNANSWERED_TEXT);
+    expect(events.at(-1)).toMatchObject({ type: 'done', answered: false });
+    expect(fake.find('messages', 'insert').at(-1)?.payload).toMatchObject({
+      role: 'assistant',
+      content: UNANSWERED_TEXT,
+      answered: false,
+      citations: [],
+    });
+  });
+
+  it('counts a partial answer that names what the docs leave out as answered', async () => {
+    const partial =
+      'Rotate a key by creating a new one in Settings, then revoking the old one [1]. The documentation does not cover automatic expiry.';
+    const fake = fakeService({
+      conversationReads: [ownConversation],
+      chunks: [chunk('To rotate a key, create a new key, then revoke the old one.')],
+    });
+    const { provider } = fakeProvider({ answer: partial });
+
+    const events = await collect(
+      streamAnswer({
+        service: fake.service,
+        provider,
+        assistant,
+        conversation: { id: 'c1', channel: 'app' },
+        message: 'How do I rotate a key, and can keys expire automatically?',
+      }),
+    );
+
+    expect(tokenText(events).trim()).toBe(partial);
+    expect(events.at(-1)).toMatchObject({ type: 'done', answered: true });
+    expect(fake.find('messages', 'insert').at(-1)?.payload).toMatchObject({
+      role: 'assistant',
+      content: partial,
+      answered: true,
+      citations: [expect.objectContaining({ index: 1, documentId: 'd1' })],
+    });
+  });
 });

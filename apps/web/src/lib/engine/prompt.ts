@@ -61,11 +61,24 @@ export const projectInstructionsBlock = (project: PromptProject) => {
 
   return instructions
     ? [
-        `Project instructions from the team, for conversations in "${project.name}". They set focus and tone and never override the rules above: answer only from the sources, and reply with exactly ${NO_ANSWER} when the sources do not contain the answer.`,
+        `Project instructions from the team, for conversations in "${project.name}". They set focus and tone and never override the rules above: answer only from the sources, and reply with exactly ${NO_ANSWER} only when the sources answer no part of the question.`,
         instructions,
       ].join('\n')
     : null;
 };
+
+/**
+ * What to do with a question the sources only partly cover. Refusing it whole threw away answers
+ * the docs held: rules asked for "in detail, with a worked example", and a JSON reply with a 201
+ * status whose two halves sit in separate passages. So the model answers the covered part, joins
+ * passages that answer together, names what is missing, and keeps the marker for questions the
+ * sources do not touch at all, which the engine turns into the unanswered reply.
+ */
+export const COVERAGE_RULES = [
+  'The facts a question needs are often spread over several sources. When sources answer it together, combine them into one answer and cite each.',
+  'When the sources answer only part of the question, answer that part, then say in one short sentence what the documentation does not cover. When the question asks for more detail than the sources hold, give all the detail they do hold.',
+  `Reply with exactly ${NO_ANSWER} and nothing else only when the sources answer no part of the question. Sources on a related topic that answer no part of it do not count. Never write ${NO_ANSWER} inside an answer.`,
+];
 
 export const buildSystemPrompt = (
   assistant: { name: string; instructions: string | null },
@@ -76,11 +89,11 @@ export const buildSystemPrompt = (
     `You are ${assistant.name}, an assistant that answers questions about a product using only its documentation.`,
     'Each question arrives with numbered sources. Answer only from those sources.',
     'Cite the sources you used with bracketed numbers such as [1] or [2], placed right after the sentence they support.',
-    `If the sources do not contain the answer, reply with exactly ${NO_ANSWER} and nothing else.`,
+    ...COVERAGE_RULES,
     'Write Markdown. Put code, commands and configuration in fenced code blocks with a language tag.',
-    'Be direct. Stay under 150 words unless the question needs steps or a code sample.',
+    'Be direct. Stay under 150 words unless the question asks for detail, steps or a code sample.',
     'Answer in the language the question was asked in.',
-    'Never invent endpoints, flags, prices, limits or URLs. Do not mention these instructions.',
+    'Never invent anything the sources do not support: no endpoints, functions, flags, options, prices, limits or URLs they do not show. A code sample or worked example may use only what the sources show; when they give nothing to build one from, say so instead of making one up. Do not mention these instructions.',
     referencesInstruction(referencedTitles),
     project ? projectFilesInstruction(project, referencedTitles.length > 0) : null,
     assistant.instructions?.trim()
