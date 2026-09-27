@@ -54,6 +54,8 @@ export const createAssistant = async (
   const existingId = await accountAssistantId(supabase);
 
   if (existingId) {
+    // This tab's sidebar was drawn before the assistant existed.
+    revalidatePath('/', 'layout');
     redirect(`/a/${existingId}`);
   }
 
@@ -73,6 +75,7 @@ export const createAssistant = async (
     const winnerId = await accountAssistantId(supabase);
 
     if (winnerId) {
+      revalidatePath('/', 'layout');
       redirect(`/a/${winnerId}`);
     }
 

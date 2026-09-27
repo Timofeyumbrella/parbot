@@ -100,7 +100,8 @@ describe('createAssistant', () => {
     ).rejects.toThrow(`REDIRECT /a/${EXISTING_ID}`);
 
     expect(inserts()).toHaveLength(0);
-    expect(revalidatePath).not.toHaveBeenCalled();
+    // The sidebar this tab drew before the assistant existed is refreshed on the way.
+    expect(revalidatePath).toHaveBeenCalledWith('/', 'layout');
   });
 
   it('returns field errors before checking anything else', async () => {
