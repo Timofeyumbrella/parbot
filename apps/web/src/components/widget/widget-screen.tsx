@@ -13,6 +13,8 @@ type WidgetScreenProps = {
   assistantId: string;
   publicKey: string;
   settings: WidgetSettings;
+  /** The config version of the row as loaded; every save hands back the next one. */
+  version: string;
   gates: WidgetPlanGates;
   snippet: string;
   appUrl: string;
@@ -24,14 +26,15 @@ export const WidgetScreen = ({
   assistantId,
   publicKey,
   settings,
+  version,
   gates,
   snippet,
   appUrl,
   hasSources,
 }: WidgetScreenProps) => {
-  const [preview, setPreview] = useState<{ mode: WidgetMode; version: number }>({
+  const [preview, setPreview] = useState<{ mode: WidgetMode; version: string }>({
     mode: gates.palette ? settings.mode : 'bubble',
-    version: 0,
+    version,
   });
 
   return (
@@ -40,9 +43,7 @@ export const WidgetScreen = ({
         assistantId={assistantId}
         settings={settings}
         gates={gates}
-        onSaved={(saved) =>
-          setPreview((current) => ({ mode: saved.mode, version: current.version + 1 }))
-        }
+        onSaved={(saved, next) => setPreview({ mode: saved.mode, version: next })}
       />
       <div className="flex min-w-0 flex-col gap-4">
         <InstallCard snippet={snippet} />

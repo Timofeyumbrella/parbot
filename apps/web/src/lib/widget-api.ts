@@ -253,9 +253,25 @@ export const jsonError = (
   return Response.json(body, { status, headers: { ...corsHeaders(), ...headers } });
 };
 
-/** Cache-control for a config response: a versioned request is a preview and must not be served stale. */
+/**
+ * Cache-control for a config response. A versioned request comes from Parbot's own pages (the
+ * settings preview and the demo page) and must never be served stale; an installed widget on a
+ * customer's site sends no version and keeps the minute of caching.
+ */
 export const configCacheControl = (request: Request) =>
   new URL(request.url).searchParams.has('v') ? 'no-store' : 'public, max-age=60';
+
+/**
+ * The config version Parbot's own pages hand the widget (`data-version`, `?v=`): the assistant
+ * row's last change, which a trigger stamps on every update, as base 36 milliseconds so it fits
+ * the widget's version pattern. Every save changes it, so a page opened after a save asks for
+ * fresh config instead of a cached one.
+ */
+export const widgetConfigVersion = (updatedAt: string): string => {
+  const time = Date.parse(updatedAt);
+
+  return Number.isFinite(time) ? time.toString(36) : '0';
+};
 
 /**
  * The address a request came from, as the platform saw it. A client writes whatever it likes at
@@ -329,10 +345,11 @@ export type WidgetAssistant = Pick<
   | 'allowed_origins'
   | 'hide_branding'
   | 'lead_capture'
+  | 'updated_at'
 >;
 
 export const WIDGET_ASSISTANT_COLUMNS =
-  'id, owner_id, name, instructions, welcome_message, suggested_questions, mode, theme, allowed_origins, hide_branding, lead_capture';
+  'id, owner_id, name, instructions, welcome_message, suggested_questions, mode, theme, allowed_origins, hide_branding, lead_capture, updated_at';
 
 export const findAssistantByKey = async (
   service: ServiceClient,

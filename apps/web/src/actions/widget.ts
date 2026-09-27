@@ -8,6 +8,7 @@ import { requireUser } from '@/lib/session';
 import {
   gateWidgetSettings,
   parseWidgetSettings,
+  widgetConfigVersion,
   widgetFormValues,
   type WidgetFormValues,
   type WidgetSettings,
@@ -15,13 +16,14 @@ import {
 
 export type WidgetFormState =
   | { status: 'idle' }
-  | { status: 'saved'; at: number; settings: WidgetSettings }
+  | { status: 'saved'; at: number; settings: WidgetSettings; version: string }
   | { status: 'error'; at: number; error: string; values: WidgetFormValues };
 
 /**
  * Saves the widget settings of an assistant the visitor owns. The plan gates are checked here
  * as well as in the form, so a disabled control cannot be re-enabled from the browser. A failed
- * save hands the typed values back, because React resets the form once the action returns.
+ * save hands the typed values back, because React resets the form once the action returns. A
+ * good one hands back what was stored and the config version the widget is now served at.
  */
 export const saveWidgetSettings = async (
   _previous: WidgetFormState,
@@ -71,7 +73,7 @@ export const saveWidgetSettings = async (
     })
     .eq('id', assistantId)
     .eq('owner_id', user.id)
-    .select('id')
+    .select('id, updated_at')
     .maybeSingle();
 
   if (error) {
@@ -84,5 +86,10 @@ export const saveWidgetSettings = async (
 
   revalidatePath(`/a/${assistantId}/widget`);
 
-  return { status: 'saved', at: Date.now(), settings };
+  return {
+    status: 'saved',
+    at: Date.now(),
+    settings,
+    version: widgetConfigVersion(data.updated_at),
+  };
 };
