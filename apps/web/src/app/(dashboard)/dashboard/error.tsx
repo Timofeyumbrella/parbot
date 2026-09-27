@@ -41,7 +41,7 @@ export default function DashboardError({
             Try again
           </Button>
           <Button asChild variant="outline">
-            <Link href="/dashboard">Go to assistants</Link>
+            <Link href="/dashboard">Open your assistant</Link>
           </Button>
         </div>
       </div>

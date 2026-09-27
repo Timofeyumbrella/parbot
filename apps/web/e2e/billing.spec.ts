@@ -135,9 +135,7 @@ test.describe('billing in test mode', () => {
     await expect(page.getByRole('link', { name: /^Billing/ })).toContainText('Hobby');
 
     await visit(page, '/account');
-    await expect(
-      page.getByText('Hobby, Free. Upgrade for more assistants, pages and answers.'),
-    ).toBeVisible();
+    await expect(page.getByText('Hobby, Free. Upgrade for more pages and answers.')).toBeVisible();
   });
 
   test('the Stripe webhook refuses a forged event without saying how billing is set up', async ({

@@ -26,24 +26,20 @@ describe('UsageMeter', () => {
   });
 
   it('says what to do at the limit', () => {
-    render(<UsageMeter label="Assistants" used={1} limit={1} />);
+    render(<UsageMeter label="Indexed pages" used={100} limit={100} />);
 
-    expect(screen.getByText('1 of 1')).toHaveClass('text-destructive');
+    expect(screen.getByText('100 of 100')).toHaveClass('text-destructive');
     expect(screen.getByText(/Move to a bigger plan/)).toBeInTheDocument();
   });
 });
 
 describe('UsageMeters', () => {
-  it('renders the three limits of the plan', () => {
-    render(
-      <UsageMeters
-        plan={PLANS.starter}
-        usage={{ assistants: 2, pages: 150, messagesThisMonth: 40 }}
-      />,
-    );
+  it('renders the pages and answers limits of the plan, and no assistants meter', () => {
+    render(<UsageMeters plan={PLANS.starter} usage={{ pages: 150, messagesThisMonth: 40 }} />);
 
-    expect(screen.getByText('2 of 3')).toBeInTheDocument();
     expect(screen.getByText('150 of 2,000')).toBeInTheDocument();
     expect(screen.getByText('40 of 3,000')).toBeInTheDocument();
+    expect(screen.getAllByRole('progressbar')).toHaveLength(2);
+    expect(screen.queryByText(/assistant/i)).not.toBeInTheDocument();
   });
 });

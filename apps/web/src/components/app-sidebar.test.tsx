@@ -32,16 +32,16 @@ vi.mock('next/link', () => ({
 
 vi.mock('@/actions/auth', () => ({ signOut: vi.fn() }));
 
+import type { AssistantSummary } from '@/lib/assistants';
+
 import { AppSidebar } from './app-sidebar';
 import { NavPendingProvider, PendingMain } from './nav-pending';
 
-const Frame = () => (
+const ACME: AssistantSummary = { id: 'asst', name: 'Acme Docs', slug: 'acme-docs' };
+
+const Frame = ({ assistant = ACME }: { assistant?: AssistantSummary | null }) => (
   <NavPendingProvider>
-    <AppSidebar
-      assistants={[{ id: 'asst', name: 'Acme Docs', slug: 'acme-docs' }]}
-      email="owner@acme.test"
-      planName="Hobby"
-    />
+    <AppSidebar assistant={assistant} email="owner@acme.test" planName="Hobby" />
     <PendingMain>
       <h1>Overview</h1>
     </PendingMain>
@@ -50,9 +50,57 @@ const Frame = () => (
 
 const assistantNav = () => within(screen.getAllByRole('navigation', { name: 'Assistant' })[0]!);
 
+const linksOf = (scope: ReturnType<typeof within>) =>
+  scope
+    .getAllByRole('link')
+    .map((link: HTMLElement) => [link.textContent, link.getAttribute('href')]);
+
 describe('AppSidebar', () => {
   beforeEach(() => {
     navigation.pathname = '/a/asst';
+  });
+
+  it("shows the account's one assistant by name and its sections directly, with nothing to switch", () => {
+    render(<Frame />);
+
+    const sidebar = within(screen.getByRole('complementary'));
+
+    expect(sidebar.getByText('Acme Docs')).toBeInTheDocument();
+    expect(linksOf(assistantNav())).toEqual([
+      ['Overview', '/a/asst'],
+      ['Chat', '/a/asst/chat'],
+      ['Knowledge', '/a/asst/knowledge'],
+      ['Inbox', '/a/asst/inbox'],
+      ['Widget', '/a/asst/widget'],
+      ['Settings', '/a/asst/settings'],
+    ]);
+    expect(sidebar.getByRole('link', { name: /Billing/ })).toHaveAttribute('href', '/billing');
+    expect(sidebar.getByRole('link', { name: 'Account' })).toHaveAttribute('href', '/account');
+
+    // The name is a label: no switcher, no way to another assistant or to a list of them.
+    expect(sidebar.queryByRole('button', { name: /switch assistant/i })).not.toBeInTheDocument();
+    expect(sidebar.getByText('Acme Docs').closest('button, a')).toBeNull();
+    expect(screen.queryByText(/all assistants/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/new assistant/i)).not.toBeInTheDocument();
+    expect(document.querySelector('[aria-haspopup="menu"]')).toBeNull();
+    expect(screen.queryByRole('link', { name: /dashboard/i })).not.toBeInTheDocument();
+
+    // The wordmark opens the Overview directly instead of bouncing through /dashboard.
+    for (const brand of screen.getAllByRole('link', { name: 'Parbot' })) {
+      expect(brand).toHaveAttribute('href', '/a/asst');
+    }
+  });
+
+  it('points an account without an assistant yet at onboarding', () => {
+    navigation.pathname = '/onboarding';
+    render(<Frame assistant={null} />);
+
+    expect(linksOf(assistantNav())).toEqual([['Set up your assistant', '/onboarding']]);
+    expect(assistantNav().getByRole('link')).toHaveAttribute('aria-current', 'page');
+
+    for (const brand of screen.getAllByRole('link', { name: 'Parbot' })) {
+      expect(brand).toHaveAttribute('href', '/onboarding');
+    }
   });
 
   it('moves the highlight and dims the page in the click frame, before the route changes', async () => {

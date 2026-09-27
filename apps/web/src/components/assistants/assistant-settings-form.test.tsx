@@ -70,7 +70,7 @@ describe('AssistantSettingsForm', () => {
     updateAssistant.mockResolvedValue({
       status: 'error',
       error: 'Check the highlighted fields.',
-      fieldErrors: { slug: 'Another of your assistants already uses this slug.' },
+      fieldErrors: { slug: 'This slug is already in use. Choose another.' },
       values: { slug: 'taken' },
     });
     const user = userEvent.setup();
@@ -80,7 +80,7 @@ describe('AssistantSettingsForm', () => {
     await user.click(screen.getByRole('button', { name: 'Save changes' }));
 
     expect(
-      await screen.findByText('Another of your assistants already uses this slug.'),
+      await screen.findByText('This slug is already in use. Choose another.'),
     ).toBeInTheDocument();
     expect(screen.getByLabelText('Slug')).toHaveValue('taken');
     expect(toast.success).not.toHaveBeenCalled();

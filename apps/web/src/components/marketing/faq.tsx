@@ -33,7 +33,7 @@ export const FAQ_ITEMS = [
   },
   {
     question: 'Is there a free plan?',
-    answer: `Yes. ${hobby.name} is free with no card: ${formatCount(hobby.assistants)} assistant, ${formatCount(hobby.pages)} indexed pages and ${formatCount(hobby.messagesPerMonth)} answers a month with the bubble widget. Upgrade when you need more assistants, more pages, the palette or lead capture.`,
+    answer: `Yes. ${hobby.name} is free with no card: ${formatCount(hobby.pages)} indexed pages and ${formatCount(hobby.messagesPerMonth)} answers a month with the bubble widget. Upgrade when you need more pages, more answers, the palette or lead capture.`,
   },
 ];
 

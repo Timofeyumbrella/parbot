@@ -10,8 +10,8 @@ const accounts = trackAccounts();
 // A failed assertion must not leave its account behind in the shared database.
 test.afterEach(accounts.cleanup);
 
-test.describe('signing up and creating the first assistant', () => {
-  test('a new visitor lands on onboarding, creates an assistant and sees the dashboard', async ({
+test.describe('signing up and creating the assistant', () => {
+  test('a new visitor lands on onboarding, creates the one assistant and every way in leads to it', async ({
     page,
   }) => {
     const email = accounts.email('e2e');
@@ -26,6 +26,7 @@ test.describe('signing up and creating the first assistant', () => {
     await page.getByRole('button', { name: /create account|sign up|start/i }).click();
 
     await expect(page).toHaveURL(/\/onboarding/);
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Create your assistant');
 
     // Every account-level screen puts its title in the same place, so moving between them does not jump.
     const titleX = async () =>
@@ -37,19 +38,22 @@ test.describe('signing up and creating the first assistant', () => {
 
     await expect(page).toHaveURL(/\/a\/[0-9a-f-]{36}\/knowledge/);
 
+    const overview = new URL(page.url()).pathname.replace(/\/knowledge$/, '');
+    const sidebar = page.getByRole('complementary');
+
+    // The sidebar names the assistant as a label and lists its sections; there is nothing to switch.
+    await expect(sidebar.getByTestId('sidebar-assistant')).toContainText('Acme Docs');
+    await expect(
+      sidebar.getByRole('navigation', { name: 'Assistant' }).getByRole('link'),
+    ).toHaveText(['Overview', 'Chat', 'Knowledge', 'Inbox', 'Widget', 'Settings']);
+    await expect(sidebar.getByRole('button', { name: /switch assistant/i })).toHaveCount(0);
+    await expect(page.getByText(/all assistants|new assistant/i)).toHaveCount(0);
+
+    // The old list of assistants and onboarding both lead to the one there is.
     await visit(page, '/dashboard');
-    await expect(page.getByText('Acme Docs').first()).toBeVisible();
-
-    // At three cards a row "conversations in 30 days" wraps; both numbers still share one line.
-    const [pages, conversations] = await page
-      .getByRole('list', { name: 'Your assistants' })
-      .locator('dd')
-      .all();
-    const top = async (locator: typeof pages) => (await locator!.boundingBox())!.y;
-
-    expect(Math.abs((await top(pages)) - (await top(conversations)))).toBeLessThan(1);
-
-    titles.push(await titleX());
+    await expect(page).toHaveURL(new RegExp(`${overview}$`));
+    await visit(page, '/onboarding');
+    await expect(page).toHaveURL(new RegExp(`${overview}$`));
 
     for (const path of ['/account', '/billing']) {
       await visit(page, path);
@@ -57,6 +61,19 @@ test.describe('signing up and creating the first assistant', () => {
     }
 
     expect(new Set(titles).size).toBe(1);
+
+    // Billing meters what a plan limits, which no longer includes assistants.
+    await expect(page.getByTestId('meter-indexed-pages')).toBeVisible();
+    await expect(page.getByTestId('meter-answers-this-month')).toBeVisible();
+    await expect(page.getByTestId('meter-assistants')).toHaveCount(0);
+
+    // Signing in again lands on the assistant, not on a list.
+    await page.getByRole('complementary').getByRole('button', { name: 'Sign out' }).click();
+    await expect(page).toHaveURL(/\/login/);
+    await page.getByLabel(/email/i).fill(email);
+    await page.getByLabel(/^password/i).fill('correct-horse-battery');
+    await page.getByRole('button', { name: /sign in/i }).click();
+    await expect(page).toHaveURL(new RegExp(`${overview}$`));
   });
 
   test('guarded routes bounce to login and keep the destination', async ({ page }) => {

@@ -114,7 +114,7 @@ const multipart = (fields: Record<string, string | File>) => {
 describe('POST /api/sources', () => {
   beforeEach(() => {
     vi.mocked(getAccountPlan).mockResolvedValue({ plan: PLANS.hobby } as never);
-    vi.mocked(getAccountUsage).mockResolvedValue({ assistants: 1, pages: 3, messagesThisMonth: 0 });
+    vi.mocked(getAccountUsage).mockResolvedValue({ pages: 3, messagesThisMonth: 0 });
   });
 
   it('refuses anonymous callers', async () => {
@@ -179,7 +179,6 @@ describe('POST /api/sources', () => {
 
     signIn(fake);
     vi.mocked(getAccountUsage).mockResolvedValue({
-      assistants: 1,
       pages: PLANS.hobby.pages,
       messagesThisMonth: 0,
     });

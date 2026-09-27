@@ -45,14 +45,28 @@ const seedStoredSource = async (admin: Admin, ownerId: string, assistantId: stri
   return path;
 };
 
+/** A file in the account's folder with no row behind it, the way a crashed upload leaves one. */
+const seedStrayFile = async (admin: Admin, ownerId: string) => {
+  const path = `${ownerId}/${crypto.randomUUID()}/stray.md`;
+  const { error } = await admin.storage
+    .from(BUCKET)
+    .upload(path, new Blob(['# Stray'], { type: 'text/markdown' }), {
+      contentType: 'text/markdown',
+    });
+
+  expect(error).toBeNull();
+
+  return path;
+};
+
 const storedNames = async (admin: Admin, folder: string) => {
   const { data } = await admin.storage.from(BUCKET).list(folder);
 
   return (data ?? []).map((entry) => entry.name);
 };
 
-test.describe('deleting an assistant and the account', () => {
-  test('removes the stored files with the rows, then the account with everything it owned', async ({
+test.describe('starting the assistant over and deleting the account', () => {
+  test('a reset removes the stored files with the rows and returns to onboarding, then the account goes with everything it owned', async ({
     page,
   }) => {
     const admin = adminClient();
@@ -91,12 +105,27 @@ test.describe('deleting an assistant and the account', () => {
       );
       expect(await storedNames(admin!, `${ownerId}/${assistantId}`)).toHaveLength(2);
 
-      // The assistant: Settings, Danger zone, type the name.
+      // An account owns one assistant, and the database holds to that too.
+      const { error: secondError } = await admin!
+        .from('assistants')
+        .insert({ owner_id: ownerId, name: 'Second', slug: `second-${unique()}` });
+
+      expect(secondError?.code).toBe('23505');
+
+      // The reset: Settings, Danger zone, type the name, and onboarding takes over.
       await visit(page, `/a/${assistantId}/settings`);
-      await page.getByRole('button', { name: 'Delete assistant' }).click();
+      await expect(
+        page.getByText('then takes you to onboarding to create a new one', { exact: false }),
+      ).toBeVisible();
+      await page.getByRole('button', { name: 'Delete and start over' }).click();
       await page.getByLabel('Type Acme Docs to confirm').fill('Acme Docs');
       await page.getByRole('button', { name: 'Delete for good' }).click();
-      await expect(page).toHaveURL(/\/(dashboard|onboarding)/);
+      await expect(page).toHaveURL(/\/onboarding$/);
+      await expect(page.getByRole('heading', { level: 1 })).toHaveText('Create your assistant');
+      await expect(
+        page.getByRole('complementary').getByRole('link', { name: 'Set up your assistant' }),
+      ).toBeVisible();
+      await expect(page.getByRole('complementary').getByText('Acme Docs')).toHaveCount(0);
 
       expect(await storedNames(admin!, `${ownerId}/${assistantId}`)).toEqual([]);
 
@@ -107,14 +136,24 @@ test.describe('deleting an assistant and the account', () => {
 
       expect(count).toBe(0);
 
-      // The account: a second assistant with a file shows the whole folder goes, not one subfolder.
-      const { data: second } = await admin!
-        .from('assistants')
-        .insert({ owner_id: ownerId, name: 'Second', slug: `second-${unique()}` })
-        .select('id')
-        .single();
+      // The next assistant starts empty under a new id.
+      await page.getByLabel('Name', { exact: true }).fill('Acme Docs Two');
+      await page.getByRole('button', { name: /create assistant/i }).click();
+      await expect(page).toHaveURL(/\/a\/[0-9a-f-]{36}\/knowledge/);
 
-      paths.push(await seedStoredSource(admin!, ownerId, second!.id));
+      const nextId = page.url().match(/\/a\/([0-9a-f-]{36})\//)?.[1] ?? '';
+
+      expect(nextId).not.toBe(assistantId);
+      await expect(page.getByRole('complementary').getByTestId('sidebar-assistant')).toContainText(
+        'Acme Docs Two',
+      );
+
+      // The account: files under the assistant and a stray one beside it show the whole folder
+      // goes, not one subfolder.
+      paths.push(
+        await seedStoredSource(admin!, ownerId, nextId),
+        await seedStrayFile(admin!, ownerId),
+      );
 
       await visit(page, '/account');
       await page.getByRole('button', { name: 'Delete account' }).click();

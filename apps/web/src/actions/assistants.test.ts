@@ -1,7 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { PLANS } from '@/lib/plans';
-
 import {
   createAssistant,
   deleteAssistant,
@@ -11,6 +9,7 @@ import {
 
 const USER_ID = '00000000-0000-4000-8000-000000000001';
 const ASSISTANT_ID = '3fa85f64-5717-4562-b3fc-2c963f66afa6';
+const EXISTING_ID = '9b2c7d1e-4f3a-4b5c-8d6e-7f8091a2b3c4';
 
 type Row = Record<string, unknown>;
 
@@ -34,7 +33,17 @@ const builder = () => {
       return api;
     };
 
-  for (const method of ['from', 'select', 'insert', 'update', 'delete', 'eq', 'order', 'like']) {
+  for (const method of [
+    'from',
+    'select',
+    'insert',
+    'update',
+    'delete',
+    'eq',
+    'order',
+    'like',
+    'limit',
+  ]) {
     api[method] = chain(method);
   }
 
@@ -46,17 +55,7 @@ const builder = () => {
   return api;
 };
 
-const {
-  getAccountPlan,
-  getAccountUsage,
-  redirect,
-  revalidatePath,
-  requireUser,
-  removeStoredFiles,
-  service,
-} = vi.hoisted(() => ({
-  getAccountPlan: vi.fn(),
-  getAccountUsage: vi.fn(),
+const { redirect, revalidatePath, requireUser, removeStoredFiles, service } = vi.hoisted(() => ({
   redirect: vi.fn((url: string) => {
     throw new Error(`REDIRECT ${url}`);
   }),
@@ -66,7 +65,6 @@ const {
   service: { role: 'service' },
 }));
 
-vi.mock('@/lib/account', () => ({ getAccountPlan, getAccountUsage }));
 vi.mock('@/lib/session', () => ({ requireUser }));
 vi.mock('@/lib/source-files', () => ({ removeStoredFiles }));
 vi.mock('@/lib/supabase/service', () => ({ createSupabaseServiceClient: () => service }));
@@ -89,31 +87,21 @@ beforeEach(() => {
   queue.length = 0;
   calls.length = 0;
   requireUser.mockResolvedValue({ supabase: builder(), user: { id: USER_ID } });
-  getAccountPlan.mockResolvedValue({ plan: PLANS.hobby, status: 'active' });
-  getAccountUsage.mockResolvedValue({ assistants: 0, pages: 0, messagesThisMonth: 0 });
 });
 
+const inserts = () => calls.filter((call) => call.method === 'insert');
+
 describe('createAssistant', () => {
-  it('refuses when the plan limit is reached and never touches the database', async () => {
-    getAccountUsage.mockResolvedValue({ assistants: 1, pages: 0, messagesThisMonth: 0 });
-
-    const state = await createAssistant(idle, form({ name: 'Acme', slug: '', description: '' }));
-
-    expect(state.status).toBe('error');
-    expect(state.error).toMatch(/Hobby plan includes 1 assistant/);
-    expect(state.values).toMatchObject({ name: 'Acme' });
-    expect(calls.some((call) => call.method === 'insert')).toBe(false);
-    expect(redirect).not.toHaveBeenCalled();
-  });
-
-  it('lets a bigger plan through', async () => {
-    getAccountPlan.mockResolvedValue({ plan: PLANS.starter, status: 'active' });
-    getAccountUsage.mockResolvedValue({ assistants: 2, pages: 0, messagesThisMonth: 0 });
-    queue.push({ data: [], error: null }, { data: { id: ASSISTANT_ID }, error: null });
+  it('sends an account that already has its assistant there, and never inserts a second', async () => {
+    queue.push({ data: { id: EXISTING_ID }, error: null });
 
     await expect(
-      createAssistant(idle, form({ name: 'Acme', slug: '', description: '' })),
-    ).rejects.toThrow(`REDIRECT /a/${ASSISTANT_ID}/knowledge`);
+      createAssistant(idle, form({ name: 'Second', slug: '', description: '' })),
+    ).rejects.toThrow(`REDIRECT /a/${EXISTING_ID}`);
+
+    expect(inserts()).toHaveLength(0);
+    // The sidebar this tab drew before the assistant existed is refreshed on the way.
+    expect(revalidatePath).toHaveBeenCalledWith('/', 'layout');
   });
 
   it('returns field errors before checking anything else', async () => {
@@ -127,46 +115,64 @@ describe('createAssistant', () => {
       name: 'Give the assistant a name.',
       slug: '2 to 48 lowercase letters, numbers and single hyphens.',
     });
-    expect(getAccountPlan).not.toHaveBeenCalled();
+    expect(requireUser).not.toHaveBeenCalled();
   });
 
-  it('derives the slug, suffixes it past the ones already taken and redirects to knowledge', async () => {
-    queue.push({ data: [{ slug: 'acme-docs' }, { slug: 'acme-docs-2' }], error: null });
+  it('creates the first assistant with a slug from its name and opens its knowledge', async () => {
+    queue.push({ data: null, error: null });
     queue.push({ data: { id: ASSISTANT_ID }, error: null });
 
     await expect(
       createAssistant(idle, form({ name: 'Acme Docs', slug: '', description: 'Notes' })),
     ).rejects.toThrow(`REDIRECT /a/${ASSISTANT_ID}/knowledge`);
 
-    const insert = calls.find((call) => call.method === 'insert');
-
-    expect(insert?.args[0]).toEqual({
-      owner_id: USER_ID,
-      name: 'Acme Docs',
-      slug: 'acme-docs-3',
-      description: 'Notes',
-    });
-    expect(revalidatePath).toHaveBeenCalledWith('/dashboard');
+    expect(inserts().map((call) => call.args[0])).toEqual([
+      { owner_id: USER_ID, name: 'Acme Docs', slug: 'acme-docs', description: 'Notes' },
+    ]);
+    // The sidebar in the shared layout starts naming the assistant.
+    expect(revalidatePath).toHaveBeenCalledWith('/', 'layout');
   });
 
-  it('moves to the next suffix when the insert loses a race', async () => {
-    queue.push({ data: [], error: null });
-    queue.push({ data: null, error: { code: '23505', message: 'duplicate key' } });
+  it('keeps a slug the visitor typed', async () => {
+    queue.push({ data: null, error: null });
     queue.push({ data: { id: ASSISTANT_ID }, error: null });
 
     await expect(
-      createAssistant(idle, form({ name: 'Acme', slug: 'acme', description: '' })),
+      createAssistant(idle, form({ name: 'Acme Docs', slug: 'help', description: '' })),
     ).rejects.toThrow('REDIRECT');
 
-    const inserts = calls
-      .filter((call) => call.method === 'insert')
-      .map((call) => (call.args[0] as Row).slug);
+    expect((inserts()[0]?.args[0] as Row).slug).toBe('help');
+  });
 
-    expect(inserts).toEqual(['acme', 'acme-2']);
+  it('sends a second tab that lost the race to the assistant the first one created', async () => {
+    queue.push({ data: null, error: null });
+    queue.push({ data: null, error: { code: '23505', message: 'duplicate key' } });
+    queue.push({ data: { id: EXISTING_ID }, error: null });
+
+    await expect(
+      createAssistant(idle, form({ name: 'Acme', slug: 'acme', description: '' })),
+    ).rejects.toThrow(`REDIRECT /a/${EXISTING_ID}`);
+
+    expect(inserts()).toHaveLength(1);
+  });
+
+  it('explains a lost race when the winner cannot be read', async () => {
+    queue.push({ data: null, error: null });
+    queue.push({ data: null, error: { code: '23505', message: 'duplicate key' } });
+    queue.push({ data: null, error: null });
+
+    const state = await createAssistant(idle, form({ name: 'Acme', slug: '', description: '' }));
+
+    expect(state).toMatchObject({
+      status: 'error',
+      error: 'This account already has an assistant. Reload the page to open it.',
+      values: { name: 'Acme' },
+    });
+    expect(redirect).not.toHaveBeenCalled();
   });
 
   it('explains a database failure instead of throwing', async () => {
-    queue.push({ data: [], error: null });
+    queue.push({ data: null, error: null });
     queue.push({ data: null, error: { code: '42501', message: 'permission denied' } });
 
     const state = await createAssistant(idle, form({ name: 'Acme', slug: '', description: '' }));
@@ -215,7 +221,7 @@ describe('updateAssistant', () => {
     const state = await updateAssistant(idle, form(fields));
 
     expect(state.fieldErrors).toEqual({
-      slug: 'Another of your assistants already uses this slug.',
+      slug: 'This slug is already in use. Choose another.',
     });
   });
 
@@ -262,7 +268,7 @@ describe('deleteAssistant', () => {
     expect(calls.some((call) => call.method === 'delete')).toBe(false);
   });
 
-  it('removes the stored files through the service role, then the row, and redirects', async () => {
+  it('removes the stored files through the service role, then the row, and returns to onboarding', async () => {
     queue.push({ data: { id: ASSISTANT_ID, name: 'Acme' }, error: null });
     queue.push({ data: null, error: null });
     let deletedBeforeFiles = false;
@@ -274,11 +280,13 @@ describe('deleteAssistant', () => {
 
     await expect(
       deleteAssistant(idle, form({ assistantId: ASSISTANT_ID, confirmName: ' Acme ' })),
-    ).rejects.toThrow('REDIRECT /dashboard');
+    ).rejects.toThrow('REDIRECT /onboarding');
 
     expect(removeStoredFiles).toHaveBeenCalledWith(service, `${USER_ID}/${ASSISTANT_ID}`);
     expect(deletedBeforeFiles).toBe(false);
     expect(calls.some((call) => call.method === 'delete')).toBe(true);
+    // It was the account's only assistant, so every screen's sidebar changes.
+    expect(revalidatePath).toHaveBeenCalledWith('/', 'layout');
   });
 
   it('keeps the row when the files could not be removed, so nothing is orphaned', async () => {

@@ -18,7 +18,7 @@ export default async function SignupPage({ searchParams }: PageProps<'/signup'>)
   const interval = plan && isBillingInterval(intervalParam) ? intervalParam : undefined;
   const description =
     plan && plan.id !== 'hobby'
-      ? `Start on ${plan.name}${interval ? `, billed ${interval}` : ''}. You set up billing after your first assistant exists.`
+      ? `Start on ${plan.name}${interval ? `, billed ${interval}` : ''}. You set up billing after your assistant exists.`
       : 'Free to start. No card needed.';
 
   return (

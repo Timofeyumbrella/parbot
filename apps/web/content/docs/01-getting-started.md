@@ -10,7 +10,7 @@ Parbot turns your documentation into an assistant. Readers ask a question in pla
 
 ## The three steps
 
-1. **Create an assistant.** An assistant is one knowledge base plus one widget. Most products need one; agencies and multi-product companies create one per product.
+1. **Create your assistant.** An assistant is one knowledge base plus one widget. Each account has one, created right after you sign up; to answer for a second product from separate docs, use a second account.
 2. **Add sources.** Open Knowledge and add a website, a sitemap, a file or pasted text. Parbot crawls, cleans and indexes the pages. Indexing runs in the background and the page shows progress.
 3. **Try it, then install it.** Open Chat to ask questions as your readers would. When the answers look right, open Widget, copy the one-line script tag and add it to your site.
 

@@ -22,7 +22,7 @@ Answers start streaming within a second or two and finish in a few seconds. The 
 
 ## Can I use it on more than one site?
 
-Yes. One assistant can be installed on any number of pages. To keep the knowledge separate, for example for two products, create two assistants.
+Yes. Your assistant can be installed on any number of pages and sites; restrict where it loads with allowed origins on the Widget page. Each account has one assistant, so to keep the knowledge of two products separate, use a separate account for each.
 
 ## Can I export my data?
 

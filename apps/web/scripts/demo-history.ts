@@ -47,8 +47,7 @@ export const demoExchanges = (appUrl: string): Exchange[] => [
   },
   {
     question: 'How many pages can I index on the Starter plan?',
-    answer:
-      'Starter includes 2,000 indexed pages across all of your assistants, with 3,000 answers a month [1].',
+    answer: 'Starter includes 2,000 indexed pages and 3,000 answers a month [1].',
     doc: 'Plans and billing',
     page: 'https://docs.example.com/pricing',
   },

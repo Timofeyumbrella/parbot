@@ -34,7 +34,7 @@ Re-index a source from its menu at any time. Pages whose content has not changed
 
 ## Limits
 
-Each plan includes a number of indexed pages across all of your assistants: 100 on Hobby, 2,000 on Starter and 20,000 on Growth. A crawl stops when the limit is reached and the source shows how many pages were indexed. Remove a source or move up a plan to index more.
+Each plan includes a number of indexed pages: 100 on Hobby, 2,000 on Starter and 20,000 on Growth. A crawl stops when the limit is reached and the source shows how many pages were indexed. Remove a source or move up a plan to index more.
 
 ## Disabling or removing a source
 

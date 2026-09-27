@@ -77,7 +77,7 @@ const source = (overrides: Partial<Source> = {}): Source => ({
 
 /** What the database would answer a refetch with. Tests move it as the server would. */
 let serverRows: Source[] = [];
-/** Pages the account has in its other assistants; the meter counts them too. */
+/** Pages the server counts that the rows on screen do not show, such as a source another tab added. */
 let otherPages = 0;
 
 const pagesOnServer = () =>
@@ -441,7 +441,7 @@ describe('KnowledgeScreen', () => {
     expect(meter()).toHaveTextContent(/^11 of 100 pages/);
     expect(screen.getByRole('heading', { name: 'Point Parbot at your docs' })).toBeInTheDocument();
 
-    // Once it has, the meter reads the count again: pages in other assistants still count.
+    // Once it has, the meter reads the server's count again, pages the list does not show included.
     otherPages = 10;
     act(() => finishDelete());
     await waitFor(() => expect(meter()).toHaveTextContent(/^10 of 100 pages/));

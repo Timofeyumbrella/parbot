@@ -1,10 +1,12 @@
 # Parbot
 
 Parbot turns a product's documentation into an assistant: a ChatGPT-style chat inside the app, and an
-embeddable widget (floating bubble or ⌘K palette) customers drop onto their docs site. One account
-owns many assistants. There are no teams, roles or invites. Plans are Hobby (free), Starter and
-Growth; billing is Stripe in test mode with a mock provider when no key is set. AI runs on the Gemini
-free tier with a deterministic stub when no key is set.
+embeddable widget (floating bubble or ⌘K palette) customers drop onto their docs site. Each account
+owns exactly one assistant, created at onboarding; a unique index on `assistants.owner_id` enforces
+it, and deleting it in Settings is a reset back to onboarding. There are no teams, roles or
+invites. Plans are Hobby (free), Starter and Growth; they differ in pages, answers and widget
+features, not in assistants. Billing is Stripe in test mode with a mock provider when no key is
+set. AI runs on the Gemini free tier with a deterministic stub when no key is set.
 
 Perceived speed is a first-class requirement, not polish. A reviewer of a sibling product called out
 exactly this: switching chats took seconds, and a sent message only appeared after the answer came
@@ -40,15 +42,16 @@ and see your bubble in the same frame with the answer streaming into a placehold
 - `apps/web/src/lib/supabase`: `server.ts` (visitor's session, RLS applies), `client.ts` (browser,
   RLS applies), `service.ts` (service role, bypasses RLS: verify ownership first).
 - `apps/web/src/lib/session.ts`: `getSession()` is request-cached; `requireUser()` redirects.
-- `apps/web/src/lib/assistants.ts`: `listAssistants()`, `getAssistant(id)`, request-cached.
+- `apps/web/src/lib/assistants.ts`: `getAccountAssistant()` (the account's one assistant, or null
+  before onboarding), `getAssistant(id)`, request-cached.
 - `apps/web/src/components/ui`: shadcn (radix-nova). Import `cn` from `'cn'`. Icons from lucide-react.
 - `apps/web/src/components/page-header.tsx`: `PageContainer` and `PageHeader` for every dashboard
   screen except the chat.
 - `apps/web/src/components/assistant-context.tsx`: `useAssistant()` under `/a/[assistantId]`.
 - Routes: `(marketing)` landing, `(auth)` login/signup, `(dashboard)` everything signed in:
-  `/dashboard`, `/onboarding`, `/a/[assistantId]/{,chat,knowledge,inbox,widget,settings}`,
-  `/billing`, `/account`. API under `src/app/api`. The widget script is built to
-  `apps/web/public/widget.js` by `pnpm widget:build`.
+  `/dashboard` (redirects to the assistant's Overview, or to onboarding), `/onboarding`,
+  `/a/[assistantId]/{,chat,knowledge,inbox,widget,settings}`, `/billing`, `/account`. API under
+  `src/app/api`. The widget script is built to `apps/web/public/widget.js` by `pnpm widget:build`.
 
 ## Patterns
 

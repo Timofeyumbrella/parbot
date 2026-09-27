@@ -1,7 +1,6 @@
 import type { PlanId } from '@parbot/shared';
 
 export type PlanLimits = {
-  assistants: number;
   pages: number;
   messagesPerMonth: number;
   hideBranding: boolean;
@@ -30,14 +29,13 @@ export const PLANS: Record<PlanId, Plan> = {
     tagline: 'Put an assistant on one docs site and see what people ask.',
     monthlyCents: 0,
     yearlyCents: 0,
-    assistants: 1,
     pages: 100,
     messagesPerMonth: 200,
     hideBranding: false,
     palette: false,
     customTheme: false,
     leadCapture: false,
-    highlights: ['1 assistant', '100 indexed pages', '200 answers a month', 'Bubble widget'],
+    highlights: ['100 indexed pages', '200 answers a month', 'Bubble widget'],
   },
   starter: {
     id: 'starter',
@@ -45,7 +43,6 @@ export const PLANS: Record<PlanId, Plan> = {
     tagline: 'For a product with real documentation and real users.',
     monthlyCents: 2900,
     yearlyCents: yearlyCents(2900),
-    assistants: 3,
     pages: 2000,
     messagesPerMonth: 3000,
     hideBranding: true,
@@ -53,7 +50,6 @@ export const PLANS: Record<PlanId, Plan> = {
     customTheme: true,
     leadCapture: true,
     highlights: [
-      '3 assistants',
       '2,000 indexed pages',
       '3,000 answers a month',
       '⌘K palette mode and custom theme',
@@ -65,10 +61,9 @@ export const PLANS: Record<PlanId, Plan> = {
   growth: {
     id: 'growth',
     name: 'Growth',
-    tagline: 'Several products, large docs, and a team reading the inbox.',
+    tagline: 'For large documentation and a steady stream of questions.',
     monthlyCents: 9900,
     yearlyCents: yearlyCents(9900),
-    assistants: 10,
     pages: 20000,
     messagesPerMonth: 20000,
     hideBranding: true,
@@ -76,11 +71,10 @@ export const PLANS: Record<PlanId, Plan> = {
     customTheme: true,
     leadCapture: true,
     highlights: [
-      '10 assistants',
       '20,000 indexed pages',
       '20,000 answers a month',
       'Everything in Starter',
-      'Room for several products and their docs',
+      'Room for large docs sites',
     ],
   },
 };
@@ -102,7 +96,7 @@ export type CapacityVerdict = {
 export const checkCapacity = (
   planId: unknown,
   used: number,
-  resource: 'assistants' | 'pages' | 'messagesPerMonth',
+  resource: 'pages' | 'messagesPerMonth',
 ): CapacityVerdict => {
   const limit = planFor(planId)[resource];
 

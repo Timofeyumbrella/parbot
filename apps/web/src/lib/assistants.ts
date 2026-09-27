@@ -5,20 +5,26 @@ import { getSession } from '@/lib/session';
 
 export type AssistantSummary = Pick<Assistant, 'id' | 'name' | 'slug'>;
 
-/** The signed-in visitor's assistants, oldest first. Resolved once per request. */
-export const listAssistants = cache(async (): Promise<AssistantSummary[]> => {
+/**
+ * The signed-in account's assistant, or null before onboarding has created it. An account owns at
+ * most one (a unique index on owner_id). Resolved once per request.
+ */
+export const getAccountAssistant = cache(async (): Promise<AssistantSummary | null> => {
   const { supabase, user } = await getSession();
 
   if (!user) {
-    return [];
+    return null;
   }
 
+  // Row level security limits the read to the visitor's own row.
   const { data } = await supabase
     .from('assistants')
     .select('id, name, slug')
-    .order('created_at', { ascending: true });
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle();
 
-  return data ?? [];
+  return data ?? null;
 });
 
 /** One assistant the visitor owns, or null. Row level security does the ownership check. */

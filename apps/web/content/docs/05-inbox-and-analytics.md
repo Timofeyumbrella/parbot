@@ -28,4 +28,4 @@ The Leads tab lists every email left through the widget, with the reader's note,
 
 ## Retention
 
-Conversations are kept for as long as the assistant exists. Deleting a conversation removes its messages. Deleting an assistant removes everything it owns: sources, pages, conversations and leads.
+Conversations are kept for as long as the assistant exists. Deleting a conversation removes its messages. Deleting your assistant in Settings removes everything it owns: sources, pages, conversations and leads. You then create a new one from scratch.

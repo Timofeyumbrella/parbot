@@ -8,11 +8,11 @@ export default function NotFound() {
       <p className="text-muted-foreground font-mono text-xs uppercase tracking-widest">404</p>
       <h1 className="text-2xl font-semibold tracking-tight">There is nothing at this address</h1>
       <p className="text-muted-foreground max-w-sm text-sm">
-        The page may have moved, or the link was wrong. Your assistants are on the dashboard.
+        The page may have moved, or the link was wrong. Your assistant is one click away.
       </p>
       <div className="flex gap-2">
         <Button asChild>
-          <Link href="/dashboard">Go to the dashboard</Link>
+          <Link href="/dashboard">Open your assistant</Link>
         </Button>
         <Button asChild variant="outline">
           <Link href="/">Home</Link>

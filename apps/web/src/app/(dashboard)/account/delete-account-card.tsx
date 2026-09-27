@@ -36,7 +36,7 @@ export const DeleteAccountCard = ({ email }: { email: string }) => {
       <CardHeader>
         <CardTitle className="text-destructive">Delete this account</CardTitle>
         <CardDescription>
-          Removes every assistant with its uploaded files, indexed pages, conversations and leads,
+          Removes your assistant with its uploaded files, indexed pages, conversations and leads,
           then the account itself. Installed widgets stop answering. There is no undo.
         </CardDescription>
       </CardHeader>

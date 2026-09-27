@@ -30,28 +30,3 @@ export const slugify = (input: string): string => {
 
 export const isSlug = (value: string) =>
   value.length >= SLUG_MIN_LENGTH && value.length <= SLUG_MAX_LENGTH && SLUG_PATTERN.test(value);
-
-/** `base-n`, shortening the base so the result still fits the column. */
-export const withSuffix = (base: string, n: number) => {
-  const suffix = `-${n}`;
-  const room = SLUG_MAX_LENGTH - suffix.length;
-
-  return `${trimHyphens(base.slice(0, room))}${suffix}`;
-};
-
-/** The base slug when it is free, otherwise the first of base-2, base-3, ... that is. */
-export const uniqueSlug = (base: string, taken: Iterable<string>): string => {
-  const used = new Set(taken);
-
-  if (!used.has(base)) {
-    return base;
-  }
-
-  for (let n = 2; ; n += 1) {
-    const candidate = withSuffix(base, n);
-
-    if (!used.has(candidate)) {
-      return candidate;
-    }
-  }
-};

@@ -104,17 +104,18 @@ const putOnStarter = async (ownerId: string) => {
   }
 };
 
+/** The demo account's one assistant: the one it has, or Parbot Docs created now. */
 const ensureAssistant = async (ownerId: string) => {
   if (flag('reset')) {
-    await service.from('assistants').delete().eq('owner_id', ownerId).eq('slug', SLUG);
+    await service.from('assistants').delete().eq('owner_id', ownerId);
     log('deleted the previous demo assistant');
   }
 
+  // Looked up by owner, not slug: an account owns one assistant, so a renamed slug is still it.
   const { data: existing } = await service
     .from('assistants')
     .select('id, public_key')
     .eq('owner_id', ownerId)
-    .eq('slug', SLUG)
     .maybeSingle();
 
   if (existing) {
