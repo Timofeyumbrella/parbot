@@ -48,7 +48,7 @@ export const ChangeLine = ({
       <span className={cn('inline-flex items-center gap-0.5 font-medium', TONE[change.tone])}>
         <Icon aria-hidden="true" className="size-3.5" />
         {label}
-      </span>
+      </span>{' '}
       <span className="text-muted-foreground">on the {days} days before</span>
     </p>
   );

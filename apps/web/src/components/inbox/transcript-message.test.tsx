@@ -125,6 +125,12 @@ describe('TranscriptMessage', () => {
     expect(screen.getByText('Helpful')).toBeInTheDocument();
     expect(screen.queryByRole('link')).toBeNull();
   });
+
+  it('can be linked to by its id, which the Overview uses for disliked answers', () => {
+    render(<TranscriptMessage message={base} now={NOW} />);
+
+    expect(screen.getByLabelText('Assistant message')).toHaveAttribute('id', `message-${base.id}`);
+  });
 });
 
 describe('parseCitations', () => {
