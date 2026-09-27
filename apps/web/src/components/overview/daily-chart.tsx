@@ -1,5 +1,5 @@
 import { type DailyRow, dayLabel, labelIndexes, niceTicks } from '@/lib/analytics';
-import { formatCount } from '@/lib/format';
+import { formatCount, plural } from '@/lib/format';
 
 /**
  * Two drawings of the same data: a wide one for desktop widths and a narrower one below the `sm`
@@ -36,7 +36,7 @@ const roundedTop = (x: number, y: number, width: number, height: number) => {
 };
 
 export const describeDay = (row: DailyRow) =>
-  `${dayLabel(row.day)}: ${formatCount(row.questions)} ${row.questions === 1 ? 'question' : 'questions'}, ${formatCount(row.answered)} answered, ${formatCount(row.unanswered)} unanswered`;
+  `${dayLabel(row.day)}: ${plural(row.questions, 'question')}, ${formatCount(row.answered)} answered, ${formatCount(row.unanswered)} unanswered`;
 
 const Legend = () => (
   <ul className="text-muted-foreground flex items-center gap-4 text-xs" aria-label="Legend">

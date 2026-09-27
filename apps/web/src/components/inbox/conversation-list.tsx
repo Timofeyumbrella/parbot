@@ -32,7 +32,7 @@ import {
 import { LocalTime } from '@/components/inbox/local-time';
 import { Button } from '@/components/ui/button';
 import { type ConversationFilter, hostnameOf } from '@/lib/analytics';
-import { formatCount } from '@/lib/format';
+import { plural } from '@/lib/format';
 import { getSupabaseBrowserClient, realtimeReadyClient } from '@/lib/supabase/client';
 
 export type ListData = InfiniteData<ConversationPage, PageCursor | null>;
@@ -375,10 +375,7 @@ export const ConversationList = ({
                         {host}
                       </span>
                     ) : null}
-                    <span className="tabular-nums">
-                      {formatCount(row.message_count)}{' '}
-                      {row.message_count === 1 ? 'message' : 'messages'}
-                    </span>
+                    <span className="tabular-nums">{plural(row.message_count, 'message')}</span>
                     {row.unanswered_count > 0 ? (
                       <UnansweredBadge count={row.unanswered_count} />
                     ) : null}

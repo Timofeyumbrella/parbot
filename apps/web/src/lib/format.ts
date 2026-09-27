@@ -53,6 +53,17 @@ export const relativeTime = (value: string | number | Date, now: Date = new Date
 /** "1,234" */
 export const formatCount = (value: number) => value.toLocaleString('en-US');
 
+/**
+ * The form of a word that agrees with a count: `pluralWord(1, 'was', 'were')` is "was", any other
+ * count (zero included) "were". The plural defaults to the word with an "s".
+ */
+export const pluralWord = (count: number, one: string, many = `${one}s`) =>
+  count === 1 ? one : many;
+
+/** "1 answer", "1,204 answers", "0 answers": a formatted count and the noun that agrees with it. */
+export const plural = (count: number, one: string, many = `${one}s`) =>
+  `${formatCount(count)} ${pluralWord(count, one, many)}`;
+
 /** "42%" from a numerator and denominator, tolerant of zero. */
 export const formatPercent = (part: number, whole: number) =>
   whole === 0 ? '0%' : `${Math.round((part / whole) * 100)}%`;

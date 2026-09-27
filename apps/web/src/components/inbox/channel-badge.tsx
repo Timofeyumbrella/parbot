@@ -3,6 +3,7 @@ import { FolderClosed, Globe, MessageSquare } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import type { Enums } from '@/lib/db';
+import { formatCount } from '@/lib/format';
 
 export type Channel = Enums<'chat_channel'>;
 
@@ -56,6 +57,6 @@ export const UnansweredBadge = ({ count, className }: { count?: number; classNam
     className={cn('border-warning/40 bg-warning/10 text-foreground gap-1.5 font-normal', className)}
   >
     <span aria-hidden="true" className="bg-warning size-1.5 rounded-full" />
-    {count && count > 1 ? `${count} unanswered` : 'Unanswered'}
+    {count && count > 1 ? `${formatCount(count)} unanswered` : 'Unanswered'}
   </Badge>
 );

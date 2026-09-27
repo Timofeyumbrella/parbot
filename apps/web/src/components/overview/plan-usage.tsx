@@ -2,7 +2,7 @@ import { cn } from 'cn';
 
 import { dayLabel } from '@/lib/analytics';
 import { USAGE_WARNING_PERCENT, usagePercent } from '@/lib/billing/pricing';
-import { formatCount } from '@/lib/format';
+import { formatCount, plural } from '@/lib/format';
 import type { UsageProjection } from '@/lib/overview';
 
 import { NextStep, Section } from './section';
@@ -44,7 +44,7 @@ export const PlanUsage = ({ planName, projection }: PlanUsageProps) => {
             <span className="text-2xl font-semibold tracking-tight" data-testid="usage-used">
               {formatCount(used)}
             </span>{' '}
-            <span className="text-muted-foreground">of {formatCount(limit)} answers used</span>
+            <span className="text-muted-foreground">of {plural(limit, 'answer')} used</span>
           </p>
           <span className="text-muted-foreground text-xs tabular-nums">{usedPercent}%</span>
         </div>

@@ -64,6 +64,31 @@ describe('ReaderPages', () => {
     expect(screen.getByText('2 more pages with fewer questions.')).toBeInTheDocument();
   });
 
+  it('agrees with one in the footer and in the rate hint', () => {
+    render(
+      <ReaderPages
+        assistantId={ASSISTANT}
+        pages={[
+          {
+            host: 'docs.acme.test',
+            path: '/pricing',
+            pageUrl: 'https://docs.acme.test/pricing',
+            questions: 1,
+            answered: 1,
+            unanswered: 0,
+          },
+        ]}
+        total={2}
+      />,
+    );
+
+    expect(screen.getByText('1 more page with fewer questions.')).toBeInTheDocument();
+    expect(screen.getByTestId('page-rate')).toHaveAttribute(
+      'title',
+      '1 of 1 answer came from the docs',
+    );
+  });
+
   it('explains that it fills once the widget is installed', () => {
     render(<ReaderPages assistantId={ASSISTANT} pages={[]} total={0} />);
 

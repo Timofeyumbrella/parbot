@@ -10,7 +10,7 @@ describe('PagesMeter', () => {
     expect(screen.getByText('40')).toBeInTheDocument();
     expect(screen.getByText('of 2,000 pages')).toBeInTheDocument();
     expect(screen.getByText('Starter')).toBeInTheDocument();
-    expect(screen.getByLabelText('40 of 2000 pages used on the Starter plan')).toBeInTheDocument();
+    expect(screen.getByLabelText('40 of 2,000 pages used on the Starter plan')).toBeInTheDocument();
     expect(screen.queryByRole('link')).not.toBeInTheDocument();
   });
 

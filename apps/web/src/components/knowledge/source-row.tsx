@@ -40,9 +40,11 @@ import { StatusBadge } from './status-badge';
 /** What goes with the source: its pages and passages, and the stored file when there is one. */
 export const deleteWarning = (source: Pick<Source, 'document_count' | 'storage_path'>) => {
   const pages =
-    source.document_count > 0
-      ? `The ${plural(source.document_count, 'page')} it added, and their passages, are removed from the assistant's knowledge.`
-      : 'Nothing has been indexed from it yet.';
+    source.document_count === 1
+      ? "The page it added, and its passages, are removed from the assistant's knowledge."
+      : source.document_count > 0
+        ? `The ${plural(source.document_count, 'page')} it added, and their passages, are removed from the assistant's knowledge.`
+        : 'Nothing has been indexed from it yet.';
   const file = source.storage_path ? ' The stored file is deleted too.' : '';
 
   return `${pages}${file} This cannot be undone.`;

@@ -3,7 +3,7 @@ import { Code2, TriangleAlert } from 'lucide-react';
 import Link from 'next/link';
 
 import { Button } from '@/components/ui/button';
-import { formatCount } from '@/lib/format';
+import { formatCount, plural, pluralWord } from '@/lib/format';
 import { answerRate, EMPTY_TOTALS, pageLabel } from '@/lib/overview';
 
 import { Section, SectionEmpty } from './section';
@@ -38,7 +38,7 @@ export const ReaderPages = ({ assistantId, pages, total }: ReaderPagesProps) => 
     why="The pages readers need help on most. A low answer rate on a page means its topic is thin in the docs."
     footer={
       total > pages.length
-        ? `${formatCount(total - pages.length)} more ${total - pages.length === 1 ? 'page' : 'pages'} with fewer questions.`
+        ? `${formatCount(total - pages.length)} more ${pluralWord(total - pages.length, 'page')} with fewer questions.`
         : undefined
     }
   >
@@ -118,7 +118,7 @@ export const ReaderPages = ({ assistantId, pages, total }: ReaderPagesProps) => 
                   data-testid="page-rate"
                   title={
                     rate.whole > 0
-                      ? `${formatCount(rate.part)} of ${formatCount(rate.whole)} answers came from the docs`
+                      ? `${formatCount(rate.part)} of ${plural(rate.whole, 'answer')} came from the docs`
                       : 'No finished answers yet'
                   }
                 >

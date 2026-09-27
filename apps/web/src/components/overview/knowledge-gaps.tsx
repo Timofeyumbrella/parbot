@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { LocalTime } from '@/components/inbox/local-time';
 import { Button } from '@/components/ui/button';
 import { inboxHref } from '@/lib/analytics';
-import { formatCount } from '@/lib/format';
+import { formatCount, plural } from '@/lib/format';
 import type { GapGroup } from '@/lib/overview';
 
 import { NextStep, Section, SectionEmpty } from './section';
@@ -85,10 +85,10 @@ export const KnowledgeGaps = ({ assistantId, gaps, total, now }: KnowledgeGapsPr
               <div className="flex shrink-0 flex-col items-end gap-0.5 text-xs">
                 <span
                   className="whitespace-nowrap font-medium tabular-nums"
-                  title={`Asked ${formatCount(gap.asks)} ${gap.asks === 1 ? 'time' : 'times'}`}
+                  title={`Asked ${plural(gap.asks, 'time')}`}
                   data-testid="gap-asks"
                 >
-                  {formatCount(gap.asks)} {gap.asks === 1 ? 'time' : 'times'}
+                  {plural(gap.asks, 'time')}
                 </span>
                 <LocalTime
                   value={gap.lastAskedAt}

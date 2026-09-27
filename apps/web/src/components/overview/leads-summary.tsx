@@ -49,7 +49,9 @@ export const LeadsSummary = ({
         {leads > 0
           ? newLeads > 0
             ? `${formatCount(newLeads)} not contacted yet.`
-            : 'All of them contacted.'
+            : leads === 1
+              ? 'Already contacted.'
+              : 'All of them contacted.'
           : leadCapture
             ? 'Lead capture is on. Emails show here when readers leave one.'
             : 'Lead capture is off, so the widget does not ask for an email.'}
