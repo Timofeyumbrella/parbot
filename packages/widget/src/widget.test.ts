@@ -1,4 +1,5 @@
 import {
+  answersPausedMessage,
   type ChatStreamEvent,
   type Citation,
   encodeSseEvent,
@@ -650,6 +651,42 @@ describe('widget', () => {
       );
     });
     expect(shadow.querySelector('.pb-error')?.textContent).not.toContain('Failed to fetch');
+  });
+
+  it("says answers are paused by the daily limit, and until when on the visitor's clock", async () => {
+    const retryAt = new Date(Date.now() + 5 * 3_600_000).toISOString();
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<typeof fetch>(async (input) =>
+        String(input).startsWith(`${API}/api/widget/config`)
+          ? Response.json(config)
+          : sse([
+              {
+                type: 'error',
+                code: 'provider_limit',
+                message: 'The daily quota of gemini-embedding-2 is spent.',
+                retryAt,
+              },
+            ]),
+      ),
+    );
+
+    const widget = await boot(mountScript());
+    const shadow = shadowOf(widget!);
+
+    widget!.ask('hello');
+    await vi.waitFor(() => {
+      expect(shadow.querySelector('.pb-error')?.textContent).toContain('Answers are paused');
+    });
+
+    const text = shadow.querySelector('.pb-error span')?.textContent;
+
+    expect(text).toBe(answersPausedMessage(retryAt));
+    expect(text).toMatch(
+      /^Answers are paused: the AI provider's daily limit for this deployment is used up\. Try again (tomorrow )?after \d{1,2}:\d{2}\s[AP]M\.$/,
+    );
+    expect(text).not.toMatch(/gemini|quota|busy/i);
   });
 
   /** Answers every question with `text` and these citations, in the order given. */

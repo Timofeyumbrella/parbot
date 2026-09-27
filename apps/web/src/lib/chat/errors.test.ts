@@ -1,3 +1,4 @@
+import { answersPausedMessage } from '@parbot/shared';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -70,6 +71,31 @@ describe('fromServerError', () => {
         message: 'The models gemini-x are busy',
       }).message,
     ).not.toMatch(/gemini/);
+  });
+
+  it("puts the daily limit's reset on the reader's clock, never the server's words", () => {
+    const now = new Date('2026-09-28T02:27:00Z');
+    const retryAt = '2026-09-28T07:00:00.000Z';
+    const error = fromServerError(
+      {
+        type: 'error',
+        code: 'provider_limit',
+        message: 'The daily quota of gemini-embedding-2 is spent.',
+        retryAt,
+      },
+      now,
+    );
+
+    expect(error.code).toBe('provider_limit');
+    expect(error.message).toBe(answersPausedMessage(retryAt, now));
+    expect(error.message).toMatch(
+      /^Answers are paused: the AI provider's daily limit for this deployment is used up\. Try again (tomorrow )?after \d{1,2}:\d{2}\s[AP]M\.$/,
+    );
+    expect(
+      fromServerError({ type: 'error', code: 'provider_limit', message: 'gemini' }, now).message,
+    ).toBe(
+      "Answers are paused: the AI provider's daily limit for this deployment is used up. Try again later.",
+    );
   });
 
   it('keeps the copy the route wrote for the other codes', () => {

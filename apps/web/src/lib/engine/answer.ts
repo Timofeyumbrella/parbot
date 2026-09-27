@@ -1,11 +1,19 @@
 import {
+  ANSWERS_PAUSED,
   type ChatStreamEvent,
   type Citation,
   citedIndexes,
+  inAboutHours,
   MAX_MESSAGE_LENGTH,
 } from '@parbot/shared';
 
-import { type AiProvider, type ChatTurn, ModelBusyError } from '@/lib/ai';
+import {
+  type AiProvider,
+  type ChatTurn,
+  isDailyLimit,
+  ModelBusyError,
+  ProviderLimitError,
+} from '@/lib/ai';
 import { entitledPlanId } from '@/lib/billing/entitlement';
 import { citationSnippet } from '@/lib/citations';
 import { planFor } from '@/lib/plans';
@@ -708,9 +716,25 @@ export const ANSWER_ERROR_COPY = {
   internal: 'The answer could not be produced. Try again in a moment.',
 } as const;
 
+/**
+ * The daily limit's sentence as the server can write it, in hours from now; `retryAt` lets each
+ * client put the moment on its reader's own clock instead.
+ */
+export const answersPausedEvent = (resetAt: Date, now: Date = new Date()): ChatStreamEvent => ({
+  type: 'error',
+  code: 'provider_limit',
+  message: `${ANSWERS_PAUSED} Try again ${inAboutHours(resetAt, now)}.`,
+  retryAt: resetAt.toISOString(),
+});
+
 /** Provider and driver messages name models, tables and hosts, so they go to the log, not the wire. */
 const providerError = (cause: unknown): ChatStreamEvent => {
-  if (cause instanceof ModelBusyError) {
+  // Not "busy": busy passes in a moment, the daily limit only at its reset, hours away.
+  if (isDailyLimit(cause)) {
+    return answersPausedEvent(cause.resetAt);
+  }
+
+  if (cause instanceof ModelBusyError || cause instanceof ProviderLimitError) {
     return { type: 'error', code: 'model_busy', message: ANSWER_ERROR_COPY.model_busy };
   }
 

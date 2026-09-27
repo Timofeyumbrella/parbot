@@ -1,14 +1,16 @@
 'use client';
 
 import { cn } from 'cn';
-import { CircleAlert, CircleCheck, Clock, LoaderCircle } from 'lucide-react';
+import { CircleAlert, CircleCheck, CirclePause, Clock, LoaderCircle } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import type { Source } from '@/lib/db';
 import { formatCount } from '@/lib/format';
+import { pausedUntil } from '@/lib/knowledge/indexing-paused';
 
 import { plural } from './format';
+import { SourceErrorText } from './source-error-text';
 
 type StatusBadgeProps = {
   source: Pick<Source, 'status' | 'pages_found' | 'pages_done' | 'error'>;
@@ -50,6 +52,30 @@ export const StatusBadge = ({ source, className }: StatusBadgeProps) => {
         </Badge>
       );
     case 'failed':
+      // Nothing is broken: the provider's daily limit stopped the run, and it resets on its own.
+      if (pausedUntil(source.error)) {
+        return (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Badge
+                variant="outline"
+                className={cn(
+                  'border-warning/30 bg-warning/10 text-warning cursor-help',
+                  className,
+                )}
+                tabIndex={0}
+              >
+                <CirclePause aria-hidden="true" />
+                Paused
+              </Badge>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="max-w-sm whitespace-pre-wrap">
+              <SourceErrorText error={source.error!} />
+            </TooltipContent>
+          </Tooltip>
+        );
+      }
+
       return (
         <Tooltip>
           <TooltipTrigger asChild>

@@ -1,4 +1,4 @@
-import type { ChatErrorCode, ChatStreamEvent } from '@parbot/shared';
+import { answersPausedMessage, type ChatErrorCode, type ChatStreamEvent } from '@parbot/shared';
 
 /**
  * Copy for the ways a send can fail. Nothing here echoes a browser or library message: the
@@ -57,10 +57,19 @@ const SERVER_ERROR_COPY: Partial<Record<ChatErrorCode, string>> = {
   model_busy: 'The assistant is busy right now. Wait a moment and try again.',
 };
 
-/** The error to show for an error event the server streamed. */
-export const fromServerError = (event: Extract<ChatStreamEvent, { type: 'error' }>): ChatError => ({
+/**
+ * The error to show for an error event the server streamed. The daily limit's reset is put on
+ * the reader's own clock here: the server only knows it as hours from now.
+ */
+export const fromServerError = (
+  event: Extract<ChatStreamEvent, { type: 'error' }>,
+  now: Date = new Date(),
+): ChatError => ({
   code: event.code,
-  message: SERVER_ERROR_COPY[event.code] ?? event.message,
+  message:
+    event.code === 'provider_limit'
+      ? answersPausedMessage(event.retryAt, now)
+      : (SERVER_ERROR_COPY[event.code] ?? event.message),
 });
 
 export type ErrorAction = { href: string; label: string };

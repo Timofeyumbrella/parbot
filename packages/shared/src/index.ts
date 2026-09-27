@@ -25,6 +25,12 @@ export type ChatErrorCode =
   | 'rate_limited'
   | 'quota_exceeded'
   | 'model_busy'
+  /**
+   * The AI provider's daily limit for the whole deployment is used up: nothing is answered until
+   * it resets, which the event's `retryAt` gives. Not the account's own monthly answers, which
+   * are `quota_exceeded`.
+   */
+  | 'provider_limit'
   | 'internal';
 
 /** Server-sent events emitted by POST /api/chat and POST /api/widget/chat, in order. */
@@ -39,7 +45,70 @@ export type ChatStreamEvent =
    */
   | { type: 'status'; message: string }
   | { type: 'done'; answered: boolean; latencyMs: number }
-  | { type: 'error'; code: ChatErrorCode; message: string };
+  | {
+      type: 'error';
+      code: ChatErrorCode;
+      message: string;
+      /** With `provider_limit`: when answers can resume, as an ISO 8601 moment. */
+      retryAt?: string;
+    };
+
+/** What a reader sees first while the AI provider's daily limit holds every answer back. */
+export const ANSWERS_PAUSED =
+  "Answers are paused: the AI provider's daily limit for this deployment is used up.";
+
+const HOUR_MS = 3_600_000;
+
+/**
+ * "in about 7 hours": when a moment comes, for a reader whose time zone is not known, such as a
+ * message written on the server.
+ */
+export const inAboutHours = (at: Date, now: Date = new Date()) => {
+  const hours = Math.round((at.getTime() - now.getTime()) / HOUR_MS);
+
+  return hours < 1
+    ? 'in less than an hour'
+    : hours === 1
+      ? 'in about an hour'
+      : `in about ${hours} hours`;
+};
+
+/**
+ * A moment less than a day away on the clock of whoever runs this, the reader's in a browser:
+ * "10:00 AM", and whether that is tomorrow rather than today. `timeZone` is for tests.
+ */
+export const localClockTime = (at: Date, now: Date = new Date(), timeZone?: string) => {
+  const day = new Intl.DateTimeFormat('en-US', { dateStyle: 'short', timeZone });
+
+  return {
+    time: new Intl.DateTimeFormat('en-US', { timeStyle: 'short', timeZone }).format(at),
+    tomorrow: day.format(at) !== day.format(now),
+  };
+};
+
+/**
+ * The sentence for a `provider_limit` error, with the reset on the reader's own clock: "Try
+ * again after 10:00 AM." A missing or unreadable moment reads as later.
+ */
+export const answersPausedMessage = (
+  retryAt: string | null | undefined,
+  now: Date = new Date(),
+  timeZone?: string,
+) => {
+  const at = retryAt ? new Date(retryAt) : null;
+
+  if (!at || Number.isNaN(at.getTime())) {
+    return `${ANSWERS_PAUSED} Try again later.`;
+  }
+
+  if (at <= now) {
+    return `${ANSWERS_PAUSED} Try again in a moment.`;
+  }
+
+  const { time, tomorrow } = localClockTime(at, now, timeZone);
+
+  return `${ANSWERS_PAUSED} Try again ${tomorrow ? 'tomorrow ' : ''}after ${time}.`;
+};
 
 export type WidgetScheme = 'auto' | 'light' | 'dark';
 export type WidgetPosition = 'left' | 'right';

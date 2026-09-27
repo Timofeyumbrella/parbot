@@ -2,7 +2,13 @@
 import type { ChatStreamEvent } from '@parbot/shared';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { type AiProvider, type GenerateChunk, type GenerateResult, ModelBusyError } from '@/lib/ai';
+import {
+  type AiProvider,
+  type GenerateChunk,
+  type GenerateResult,
+  ModelBusyError,
+  ProviderLimitError,
+} from '@/lib/ai';
 import { PLANS } from '@/lib/plans';
 
 import { ANSWER_ERROR_COPY, historyTurns, streamAnswer } from './answer';
@@ -165,6 +171,8 @@ const chunk = (content: string): Row => ({
 type ProviderOptions = {
   answer?: string;
   failWith?: Error;
+  /** Thrown by the question's embedding, before any model is asked. */
+  embedFailWith?: Error;
   /** A pause before each word, like a model streaming over the network. */
   delayMs?: number;
 };
@@ -204,6 +212,10 @@ const fakeProvider = (options: ProviderOptions = {}) => {
   const provider: AiProvider = {
     name: 'stub',
     embed: (inputs) => {
+      if (options.embedFailWith) {
+        return Promise.reject(options.embedFailWith);
+      }
+
       embedded.push(...inputs.map((input) => input.text));
 
       return Promise.resolve(inputs.map(() => [1, 0, 0]));
@@ -392,6 +404,110 @@ describe('streamAnswer error copy', () => {
       message: ANSWER_ERROR_COPY.model_busy,
     });
     expect(JSON.stringify(events)).not.toMatch(/gemini/);
+  });
+
+  const dailyLimit = (models: string[], resetAt: Date) =>
+    new ProviderLimitError({
+      scope: 'day',
+      retryDelayMs: 37_000,
+      quotaId: 'EmbedContentRequestsPerDayPerProjectPerModel-FreeTier',
+      models,
+      resetAt,
+    });
+
+  it('says answers are paused, and until when, when the daily limit stops the question', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-09-28T02:27:00Z'));
+
+    try {
+      const fake = fakeService({
+        conversationReads: [{ ...ownConversation, channel: 'widget', visitor_id: 'visitor-1' }],
+        chunks: [chunk('A.')],
+      });
+      const resetAt = new Date('2026-09-28T07:00:00Z');
+      const { provider } = fakeProvider({
+        embedFailWith: dailyLimit(['gemini-embedding-2'], resetAt),
+      });
+
+      const events = await collect(
+        streamAnswer({
+          service: fake.service,
+          provider,
+          assistant,
+          conversation: { id: 'c1', channel: 'widget', visitorId: 'visitor-1' },
+          message: 'A question',
+        }),
+      );
+
+      expect(events.at(-1)).toEqual({
+        type: 'error',
+        code: 'provider_limit',
+        message:
+          "Answers are paused: the AI provider's daily limit for this deployment is used up. Try again in about 5 hours.",
+        retryAt: '2026-09-28T07:00:00.000Z',
+      });
+      expect(JSON.stringify(events)).not.toMatch(/gemini|quota|429|busy/i);
+      // Nothing was answered: the question is rolled back and the slot given back.
+      expect(fake.rpcNames()).toEqual(['release_message']);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('says the same when every chat model is capped for the day', async () => {
+    const { service } = fakeService({
+      conversationReads: [ownConversation],
+      chunks: [chunk('A.')],
+    });
+    const { provider } = fakeProvider({
+      failWith: dailyLimit(['gemini-3.5-flash-lite'], new Date(Date.now() + 3 * 3_600_000)),
+    });
+
+    const events = await collect(
+      streamAnswer({
+        service,
+        provider,
+        assistant,
+        conversation: { id: 'c1', channel: 'app' },
+        message: 'A question',
+      }),
+    );
+
+    expect(events.at(-1)).toMatchObject({
+      code: 'provider_limit',
+      message: expect.stringMatching(/Try again in about 3 hours\.$/),
+    });
+  });
+
+  it('keeps the busy sentence for a per-minute limit that outlasted the wait', async () => {
+    const { service } = fakeService({
+      conversationReads: [ownConversation],
+      chunks: [chunk('A.')],
+    });
+    const { provider } = fakeProvider({
+      embedFailWith: new ProviderLimitError({
+        scope: 'minute',
+        retryDelayMs: 37_000,
+        quotaId: 'EmbedContentRequestsPerMinutePerProjectPerModel-FreeTier',
+        models: ['gemini-embedding-2'],
+      }),
+    });
+
+    const events = await collect(
+      streamAnswer({
+        service,
+        provider,
+        assistant,
+        conversation: { id: 'c1', channel: 'app' },
+        message: 'A question',
+      }),
+    );
+
+    expect(events.at(-1)).toEqual({
+      type: 'error',
+      code: 'model_busy',
+      message: ANSWER_ERROR_COPY.model_busy,
+    });
   });
 });
 

@@ -1,9 +1,10 @@
 // @vitest-environment node
 import { describe, expect, it, vi } from 'vitest';
 
-import { ModelBusyError, ProviderError } from '@/lib/ai';
+import { ModelBusyError, ProviderError, ProviderLimitError } from '@/lib/ai';
+import { pausedUntil } from '@/lib/knowledge/indexing-paused';
 
-import { GENERIC_FAILURE, humanizeIngestError, IngestError } from './errors';
+import { BUSY_FAILURE, GENERIC_FAILURE, humanizeIngestError, IngestError } from './errors';
 import { FetchPageError } from './http';
 
 describe('humanizeIngestError', () => {
@@ -23,6 +24,38 @@ describe('humanizeIngestError', () => {
     expect(humanizeIngestError(new ProviderError(502, 'Expected 3 embeddings, received 2.'))).toBe(
       'The embedding provider could not process the passages (HTTP 502). Re-index in a moment.',
     );
+  });
+
+  it('says a run the daily limit stopped is paused, and until when, in plain words', () => {
+    const resetAt = new Date('2026-09-28T07:00:00Z');
+    const message = humanizeIngestError(
+      new ProviderLimitError({
+        scope: 'day',
+        retryDelayMs: 37_000,
+        quotaId: 'EmbedContentRequestsPerDayPerProjectPerModel-FreeTier',
+        models: ['gemini-embedding-2'],
+        resetAt,
+      }),
+    );
+
+    expect(message).toBe(
+      "Indexing paused: the AI provider's daily limit for this deployment is used up. It resets at 2026-09-28T07:00:00.000Z; re-index after that.",
+    );
+    expect(pausedUntil(message)).toEqual(resetAt);
+    expect(message).not.toMatch(/gemini|quota|429|busy/i);
+  });
+
+  it('keeps the busy sentence for a per-minute limit', () => {
+    expect(
+      humanizeIngestError(
+        new ProviderLimitError({
+          scope: 'minute',
+          retryDelayMs: 37_000,
+          quotaId: 'EmbedContentRequestsPerMinutePerProjectPerModel-FreeTier',
+          models: ['gemini-embedding-2'],
+        }),
+      ),
+    ).toBe(BUSY_FAILURE);
   });
 
   it('keeps the key setting out of the row and in the server log', () => {

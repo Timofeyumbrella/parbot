@@ -1,5 +1,6 @@
 export {
   ANSWER_ERROR_COPY,
+  answersPausedEvent,
   type AnswerAssistant,
   type AnswerConversation,
   type AnswerParams,

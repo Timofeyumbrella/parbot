@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AddSourceState } from '@/actions/sources';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import type { Source } from '@/lib/db';
+import { indexingPausedError } from '@/lib/knowledge/indexing-paused';
 
 import { parseAddSourceTab } from './add-source-tab';
 import { KnowledgeScreen, STUB_NOTICE } from './knowledge-screen';
@@ -407,6 +408,31 @@ describe('KnowledgeScreen', () => {
 
     expect(actions.reindexSource).toHaveBeenCalledWith(failed.id);
     await waitFor(() => expect(screen.getByText('Queued')).toBeInTheDocument());
+  });
+
+  it('shows a run the daily limit paused in the row, with when to re-index', () => {
+    const paused = source({
+      status: 'failed',
+      error: indexingPausedError(new Date(Date.now() + 5 * 3_600_000)),
+      document_count: 1,
+      pages_done: 1,
+    });
+
+    renderScreen([paused]);
+
+    const row = screen.getByTestId('source-row');
+
+    expect(within(row).getByText('Paused')).toBeInTheDocument();
+    expect(within(row).queryByText('Failed')).not.toBeInTheDocument();
+    // In view at once, not behind "Show what happened": it says when to come back.
+    expect(
+      within(row).queryByRole('button', { name: 'Show what happened' }),
+    ).not.toBeInTheDocument();
+    expect(
+      within(row).getByText(
+        /^Indexing paused: the AI provider's daily limit for this deployment is used up\. It resets (tomorrow )?at \d{1,2}:\d{2}\s[AP]M your time; re-index after that\.$/,
+      ),
+    ).toBeInTheDocument();
   });
 
   it('asks before deleting, in plain words, and removes the row once confirmed', async () => {

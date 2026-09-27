@@ -1,4 +1,5 @@
 import {
+  answersPausedMessage,
   type ChatErrorCode,
   MAX_MESSAGE_LENGTH,
   MAX_STOP_TEXT_LENGTH,
@@ -38,8 +39,11 @@ export type WidgetOptions = {
 type Message = StoredMessage & {
   id: string;
   streaming?: boolean;
-  /** `network` is the widget's own code for a request that never reached the server. */
-  error?: { code: ChatErrorCode | 'network' } | null;
+  /**
+   * `network` is the widget's own code for a request that never reached the server. `retryAt`
+   * comes with `provider_limit`: when answers resume.
+   */
+  error?: { code: ChatErrorCode | 'network'; retryAt?: string } | null;
   lead?: 'form' | 'sent' | null;
   leadEmail?: string;
 };
@@ -68,13 +72,19 @@ const ERROR_COPY: Record<ChatErrorCode, string> = {
   unauthorized: 'This assistant is not available here.',
   quota_exceeded: 'This assistant has reached its monthly limit. Try again later.',
   model_busy: 'The assistant is busy right now. Wait a moment and retry.',
+  provider_limit: answersPausedMessage(null),
   internal: 'The answer could not be loaded. Retry in a moment.',
 };
 
 const NETWORK_ERROR = 'Could not reach the assistant. Check your connection and retry.';
 
-const errorCopy = (code: ChatErrorCode | 'network') =>
-  code === 'network' ? NETWORK_ERROR : ERROR_COPY[code];
+/** The daily limit names its reset on the visitor's own clock; every other code has one sentence. */
+const errorCopy = ({ code, retryAt }: NonNullable<Message['error']>) =>
+  code === 'network'
+    ? NETWORK_ERROR
+    : code === 'provider_limit'
+      ? answersPausedMessage(retryAt)
+      : ERROR_COPY[code];
 
 const LEAD_FAILED = 'The message could not be sent. Try again.';
 const LEAD_BAD_EMAIL = 'Check the email address and retry.';
@@ -691,7 +701,12 @@ export class ParbotWidget {
               answer.lead = 'form';
             }
           } else if (event.type === 'error') {
-            answer.error = { code: isErrorCode(event.code) ? event.code : 'internal' };
+            answer.error = {
+              code: isErrorCode(event.code) ? event.code : 'internal',
+              ...(event.code === 'provider_limit' && event.retryAt
+                ? { retryAt: event.retryAt }
+                : {}),
+            };
           }
         }
 
@@ -925,7 +940,7 @@ export class ParbotWidget {
       const line = el('div', 'pb-error');
       line.setAttribute('role', 'alert');
       const text = el('span');
-      text.textContent = errorCopy(message.error.code);
+      text.textContent = errorCopy(message.error);
       const retry = el('button', undefined, 'Retry');
       retry.type = 'button';
       retry.addEventListener('click', () => this.retry(message.id));

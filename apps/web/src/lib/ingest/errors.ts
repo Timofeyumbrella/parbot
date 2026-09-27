@@ -1,4 +1,5 @@
-import { ModelBusyError, ProviderError } from '@/lib/ai';
+import { isDailyLimit, ModelBusyError, ProviderError, ProviderLimitError } from '@/lib/ai';
+import { indexingPausedError } from '@/lib/knowledge/indexing-paused';
 
 import { FetchPageError } from './http';
 
@@ -13,6 +14,7 @@ export class IngestError extends Error {
 export const GENERIC_FAILURE = 'Something went wrong while indexing. Re-index to try again.';
 export const TIMED_OUT_FAILURE =
   'Indexing took too long and was stopped. Re-index to pick up where it left off.';
+export const BUSY_FAILURE = 'The embedding model is busy right now. Re-index in a few minutes.';
 
 /**
  * The sentence that goes on the source row. Our own errors and fetch failures already say what
@@ -23,8 +25,13 @@ export const humanizeIngestError = (cause: unknown): string => {
     return cause.message.slice(0, 500);
   }
 
-  if (cause instanceof ModelBusyError) {
-    return 'The embedding model is busy right now. Re-index in a few minutes.';
+  // Not "busy": this lasts until the provider's daily reset, and a re-index before it fails too.
+  if (isDailyLimit(cause)) {
+    return indexingPausedError(cause.resetAt);
+  }
+
+  if (cause instanceof ModelBusyError || cause instanceof ProviderLimitError) {
+    return BUSY_FAILURE;
   }
 
   if (cause instanceof ProviderError) {

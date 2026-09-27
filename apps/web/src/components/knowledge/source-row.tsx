@@ -31,9 +31,11 @@ import {
 } from '@/components/ui/dropdown-menu';
 import type { Source } from '@/lib/db';
 import { relativeTime } from '@/lib/format';
+import { pausedUntil } from '@/lib/knowledge/indexing-paused';
 import { hasStoredFile, originalLabel, sourceFileHref, sourceHref } from '@/lib/knowledge/links';
 
 import { describeSource, isActiveStatus, plural, SOURCE_KINDS } from './format';
+import { SourceErrorText } from './source-error-text';
 import { SourcePagesSheet } from './source-pages-sheet';
 import { StatusBadge } from './status-badge';
 
@@ -67,6 +69,9 @@ export const SourceRow = ({ source, onReindex, onDelete }: SourceRowProps) => {
   // while a first run is still going.
   const readable = source.document_count > 0;
   const stored = hasStoredFile(source.kind);
+  // A run the daily limit paused says when to come back, so it is shown like a note, not hidden
+  // like a failure's details.
+  const paused = source.status === 'failed' && pausedUntil(source.error) !== null;
 
   return (
     <li className="flex items-start gap-3 px-4 py-3" data-testid="source-row">
@@ -100,14 +105,14 @@ export const SourceRow = ({ source, onReindex, onDelete }: SourceRowProps) => {
           {/* The relative time is computed on both sides of hydration and may cross a minute. */}
           <span suppressHydrationWarning>{indexed ? `indexed ${indexed}` : 'not indexed yet'}</span>
         </p>
-        {source.status === 'ready' && source.error ? (
+        {(source.status === 'ready' || paused) && source.error ? (
           // A run that finished with pages left out says so here, in the row itself.
           <p className="text-warning flex items-start gap-1.5 text-xs">
             <TriangleAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
-            <span className="break-words">{source.error}</span>
+            <SourceErrorText error={source.error} className="break-words" />
           </p>
         ) : null}
-        {source.status === 'failed' && source.error ? (
+        {source.status === 'failed' && !paused && source.error ? (
           <div className="flex flex-col items-start gap-1">
             <button
               type="button"

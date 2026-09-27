@@ -4,8 +4,9 @@ import { readFileSync } from 'node:fs';
 import { createClient } from '@supabase/supabase-js';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
-import { type AiProvider, createStubProvider, ModelBusyError } from '@/lib/ai';
+import { type AiProvider, createStubProvider, ModelBusyError, ProviderLimitError } from '@/lib/ai';
 import type { Database } from '@/lib/db';
+import { indexingPausedError } from '@/lib/knowledge/indexing-paused';
 import { PLANS } from '@/lib/plans';
 import { storagePathFor, UPLOAD_TYPES } from '@/lib/uploads';
 
@@ -400,6 +401,45 @@ describe.skipIf(!serviceKey)('ingestSource against the local database', () => {
     await expect(
       ingestSource({ service, provider, sourceId, fetchImpl: serve(siteV1), lookup }),
     ).resolves.toMatchObject({ status: 'ready', pages: 2, unchanged: 1, note: null });
+  });
+
+  it('stops at once on the daily limit, keeps the pages it saved, and says when it resets', async () => {
+    const sourceId = await createSource({
+      kind: 'url',
+      title: 'Capped for the day',
+      uri: 'https://docs.test/guide/intro',
+    });
+    const resetAt = new Date('2026-09-29T07:00:00Z');
+    let calls = 0;
+    const capped = failingAfter(1, () => {
+      calls += 1;
+
+      return new ProviderLimitError({
+        scope: 'day',
+        retryDelayMs: 37_000,
+        quotaId: 'EmbedContentRequestsPerDayPerProjectPerModel-FreeTier',
+        models: ['gemini-embedding-2'],
+        resetAt,
+      });
+    });
+
+    const result = await ingestSource({
+      service,
+      provider: capped,
+      sourceId,
+      fetchImpl: serve(siteV1),
+      lookup,
+    });
+
+    expect(result).toEqual({ status: 'failed', error: indexingPausedError(resetAt) });
+    // One refusal, and no page tried after it.
+    expect(calls).toBe(1);
+    expect(await loadSource(sourceId)).toMatchObject({
+      status: 'failed',
+      error: indexingPausedError(resetAt),
+      pages_done: 1,
+      document_count: 1,
+    });
   });
 
   it('fails as busy when the model is busy before any page is in', async () => {

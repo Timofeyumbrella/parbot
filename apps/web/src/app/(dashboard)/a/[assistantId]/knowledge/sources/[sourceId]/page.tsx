@@ -5,6 +5,7 @@ import { notFound } from 'next/navigation';
 
 import { DocumentViewer } from '@/components/knowledge/document-viewer';
 import { isActiveStatus, plural, SOURCE_KINDS } from '@/components/knowledge/format';
+import { SourceErrorText } from '@/components/knowledge/source-error-text';
 import { ViewerBack } from '@/components/knowledge/viewer-controls';
 import { PageContainer } from '@/components/page-header';
 import { RealtimeRefresh } from '@/components/realtime-refresh';
@@ -102,9 +103,13 @@ export default async function SourcePage({ params }: Props) {
               <>
                 <p className="text-destructive flex items-start gap-2">
                   <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
-                  <span className="break-words">
-                    {source.error ?? 'Indexing failed, so there is no text to show.'}
-                  </span>
+                  {source.error ? (
+                    <SourceErrorText error={source.error} className="break-words" />
+                  ) : (
+                    <span className="break-words">
+                      Indexing failed, so there is no text to show.
+                    </span>
+                  )}
                 </p>
                 <p className="text-muted-foreground">Re-index it from Knowledge to try again.</p>
               </>
