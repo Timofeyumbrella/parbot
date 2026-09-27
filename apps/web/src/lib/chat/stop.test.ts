@@ -1,7 +1,13 @@
 import { MAX_STOP_TEXT_LENGTH } from '@parbot/shared';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { recordStop, STOP_RETRY_MS } from './stop';
+import {
+  readStoppedCitations,
+  recordStop,
+  type SavedAnswerReader,
+  STOP_RETRY_MS,
+  STOPPED_ANSWER_DELAYS_MS,
+} from './stop';
 
 const input = {
   assistantId: '11111111-1111-4111-8111-111111111111',
@@ -87,5 +93,53 @@ describe('recordStop', () => {
     expect((JSON.parse(init.body as string) as { text: string }).text).toHaveLength(
       MAX_STOP_TEXT_LENGTH,
     );
+  });
+});
+
+describe('readStoppedCitations', () => {
+  const saved = [
+    { index: 1, documentId: 'd1', title: 'Keys', url: null, snippet: 'Rotate…', chunkId: 'k1' },
+    { index: 2, documentId: 'd2', title: 'Limits', url: null, snippet: '60 a minute…' },
+    { index: 3, documentId: 'd3', title: 'Billing', url: null, snippet: 'Invoices…' },
+  ];
+
+  it('reads nothing when the shown text cites nothing', async () => {
+    const read = vi.fn(async () => ({ citations: saved }));
+
+    await expect(readStoppedCitations(read, input.messageId, 'API keys are')).resolves.toBeNull();
+    expect(read).not.toHaveBeenCalled();
+  });
+
+  it('keeps only the citations the shown text carries, as the saved answer does', async () => {
+    const read = vi.fn(async () => ({ citations: saved }));
+
+    await expect(
+      readStoppedCitations(read, input.messageId, 'Rotate a key in Settings [1]. The limit is [3, 1]'),
+    ).resolves.toEqual([saved[0], saved[2]]);
+    expect(read).toHaveBeenCalledWith(input.messageId);
+  });
+
+  it('looks again until the engine has saved the stopped answer', async () => {
+    const read = vi
+      .fn<SavedAnswerReader>()
+      .mockResolvedValueOnce(null)
+      .mockRejectedValueOnce(new Error('offline'))
+      .mockResolvedValue({ citations: saved });
+    const pending = readStoppedCitations(read, input.messageId, 'Rotate a key in Settings [2]');
+
+    await vi.advanceTimersByTimeAsync(STOPPED_ANSWER_DELAYS_MS[1]! + STOPPED_ANSWER_DELAYS_MS[2]!);
+    await expect(pending).resolves.toEqual([saved[1]]);
+    expect(read).toHaveBeenCalledTimes(3);
+  });
+
+  it('gives up when the answer never shows up', async () => {
+    const read = vi.fn(async () => null);
+    const pending = readStoppedCitations(read, input.messageId, 'Rotate [1]');
+
+    await vi.advanceTimersByTimeAsync(
+      STOPPED_ANSWER_DELAYS_MS.reduce((total, delay) => total + delay, 0),
+    );
+    await expect(pending).resolves.toBeNull();
+    expect(read).toHaveBeenCalledTimes(STOPPED_ANSWER_DELAYS_MS.length);
   });
 });

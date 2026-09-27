@@ -275,6 +275,26 @@ export const stopExchange = (thread: Thread): Thread => {
   };
 };
 
+/**
+ * Gives a stopped answer the citations the server saved with it (see `readStoppedCitations`), so
+ * its markers and Sources show as they do after a reload. Any other message is left alone.
+ */
+export const setStoppedCitations = (
+  thread: Thread,
+  messageId: string,
+  citations: Citation[],
+): Thread =>
+  thread.messages.some((message) => message.id === messageId && message.status === 'stopped')
+    ? {
+        ...thread,
+        messages: thread.messages.map((message) =>
+          message.id === messageId && message.status === 'stopped'
+            ? { ...message, citations }
+            : message,
+        ),
+      }
+    : thread;
+
 /** The text of the answer a stream is writing, exactly as the reader sees it; null when none is. */
 export const activeAnswerText = (thread: Thread | undefined): string | null => {
   const active = thread?.active;

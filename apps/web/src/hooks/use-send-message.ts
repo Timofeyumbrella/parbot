@@ -25,7 +25,7 @@ import {
 import { projectCreations } from '@/lib/chat/project-state';
 import { conversationsKey, INBOX_NAMESPACE, threadKey } from '@/lib/chat/queries';
 import { type MessageReference, uploadingMessage } from '@/lib/chat/references';
-import { recordStop } from '@/lib/chat/stop';
+import { readStoppedCitations, recordStop, type SavedAnswerReader } from '@/lib/chat/stop';
 import { streamRegistry } from '@/lib/chat/streams';
 import {
   activeAnswerText,
@@ -33,14 +33,17 @@ import {
   beginExchange,
   emptyThread,
   failedMessage,
+  isTempId,
   removeExchange,
   setActiveReferences,
   setProgress,
+  setStoppedCitations,
   stopExchange,
   tempId,
   type Thread,
 } from '@/lib/chat/thread';
 import { composerUploads } from '@/lib/chat/uploads';
+import { getSupabaseBrowserClient } from '@/lib/supabase/client';
 
 export type SendInput = {
   conversationId: string;
@@ -299,16 +302,38 @@ export const sendMessage = async (
   }
 };
 
+/** The saved answer, read as the reader (row level security applies). */
+const readSavedAnswer: SavedAnswerReader = async (messageId) => {
+  const { data, error } = await getSupabaseBrowserClient()
+    .from('messages')
+    .select('citations')
+    .eq('id', messageId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data;
+};
+
 /**
  * Stops the answer at once: the stream is aborted and the partial answer stays in the thread as
  * the reader sees it. The server is told separately, without the UI waiting on it: an aborted
  * request does not reach the function on every host, and the stop request carries the text on
- * screen so the saved answer matches it, unmetered.
+ * screen so the saved answer matches it, unmetered. Once the stop has settled, the citations the
+ * server saved with that text are put on the answer, so it reads as it will after a reload.
  */
-export const stopMessage = (queryClient: QueryClient, conversationId: string) => {
+export const stopMessage = (
+  queryClient: QueryClient,
+  conversationId: string,
+  readAnswer: SavedAnswerReader = readSavedAnswer,
+) => {
   const key = threadKey(conversationId);
+  const current = queryClient.getQueryData<Thread>(key);
   // Read before the abort: once it lands, tokens still in the frame buffer are dropped, not shown.
-  const shown = activeAnswerText(queryClient.getQueryData<Thread>(key));
+  const shown = activeAnswerText(current);
+  const answerId = current?.active?.assistantId;
   const target = streamRegistry.target(conversationId);
 
   if (!streamRegistry.stop(conversationId)) {
@@ -319,8 +344,23 @@ export const stopMessage = (queryClient: QueryClient, conversationId: string) =>
   }
 
   // No active exchange means `done` already arrived: the answer is complete, there is nothing to stop.
-  if (target && shown !== null) {
-    void recordStop({ ...target, conversationId, text: shown });
+  if (!target || shown === null) {
+    return;
+  }
+
+  const recorded = recordStop({ ...target, conversationId, text: shown });
+
+  // Text arrives only after the stream named the answer, so a temporary id has nothing to cite.
+  if (answerId && !isTempId(answerId)) {
+    void recorded
+      .then((ok) => (ok ? readStoppedCitations(readAnswer, target.messageId, shown) : null))
+      .then((citations) => {
+        if (citations?.length) {
+          queryClient.setQueryData<Thread>(key, (thread) =>
+            thread ? setStoppedCitations(thread, answerId, citations) : thread,
+          );
+        }
+      });
   }
 };
 
