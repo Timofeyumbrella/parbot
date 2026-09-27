@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
 
 import { deleteConversation, renameConversation } from '@/actions/conversations';
+import { useHydrated } from '@/hooks/use-hydrated';
 import {
   applyServerRow,
   type ConversationRow,
@@ -91,27 +92,32 @@ export const useConversations = (assistantId: string, snapshot?: ConversationSna
 };
 
 /**
- * One row from the list cache, for a header that names the open conversation. Never fetches on
- * its own: the list pane owns the query, this observer only reads what it holds. The queryFn is
- * still named so TanStack does not treat the observer as misconfigured.
+ * The whole list as the cache holds it, for a screen beside the list. Never fetches on its own:
+ * the list pane owns the query, this observer only reads what it holds (the queryFn is still
+ * named so TanStack does not treat the observer as misconfigured).
+ *
+ * Nothing until the page has hydrated. The list pane seeds this cache as its own Suspense boundary
+ * renders, and on a cold load that boundary may hydrate before or after the screen reading it.
+ * The server rendered the screen without the list, so reading it during hydration made the first
+ * client render differ (React #418 on a project's home and on a chat in a project).
  */
-export const useConversationRow = (assistantId: string, conversationId: string | null) => {
+export const useConversationListCache = (assistantId: string) => {
+  const hydrated = useHydrated();
   const { data } = useQuery<ConversationRow[]>({
     queryKey: conversationsKey(assistantId),
     queryFn: () => fetchConversations(getSupabaseBrowserClient(), assistantId),
     enabled: false,
   });
 
-  return conversationId ? (data?.find((row) => row.id === conversationId) ?? null) : null;
+  return hydrated ? data : undefined;
 };
 
-/** The whole list as the cache holds it, for a screen beside the list. Never fetches on its own. */
-export const useConversationListCache = (assistantId: string) =>
-  useQuery<ConversationRow[]>({
-    queryKey: conversationsKey(assistantId),
-    queryFn: () => fetchConversations(getSupabaseBrowserClient(), assistantId),
-    enabled: false,
-  }).data;
+/** One row from the list cache, for a header that names the open conversation; see above. */
+export const useConversationRow = (assistantId: string, conversationId: string | null) => {
+  const rows = useConversationListCache(assistantId);
+
+  return conversationId ? (rows?.find((row) => row.id === conversationId) ?? null) : null;
+};
 
 /**
  * Keeps the list fresh from the database: titles the engine sets, activity, rows created in

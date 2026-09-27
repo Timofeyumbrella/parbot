@@ -2,17 +2,8 @@
 
 import { useSyncExternalStore } from 'react';
 
+import { useHydrated } from '@/hooks/use-hydrated';
 import { formatDateTime, relativeTime } from '@/lib/format';
-
-const noop = () => () => {};
-
-/** False during server rendering and hydration, true once the page runs in the browser. */
-export const useHydrated = () =>
-  useSyncExternalStore(
-    noop,
-    () => true,
-    () => false,
-  );
 
 const CLOCK_MS = 30_000;
 
