@@ -7,6 +7,7 @@ import type { AddSourceState } from '@/actions/sources';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import type { Source } from '@/lib/db';
 
+import { parseAddSourceTab } from './add-source-tab';
 import { KnowledgeScreen, STUB_NOTICE } from './knowledge-screen';
 import { sourcesQueryKey } from './use-sources';
 
@@ -508,5 +509,33 @@ describe('KnowledgeScreen', () => {
       'true',
     );
     expect(screen.getByRole('menuitem', { name: 'Open original' })).toBeInTheDocument();
+  });
+
+  it('opens the Add source dialog on the tab the address asks for, and forgets it once closed', async () => {
+    const user = userEvent.setup();
+
+    window.history.replaceState(null, '', `/a/${ASSISTANT}/knowledge?add=url`);
+    renderScreen([source()], { initialAddTab: 'url' });
+
+    const dialog = await screen.findByRole('dialog', { name: 'Add source' });
+
+    expect(within(dialog).getByRole('tab', { name: /Website/, selected: true })).toBeVisible();
+
+    await user.keyboard('{Escape}');
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    // A reload after closing lands on the list, not on the dialog again.
+    expect(window.location.search).toBe('');
+    expect(window.location.pathname).toBe(`/a/${ASSISTANT}/knowledge`);
+  });
+});
+
+describe('parseAddSourceTab', () => {
+  it('accepts the dialog tabs and nothing else', () => {
+    expect(parseAddSourceTab('url')).toBe('url');
+    expect(parseAddSourceTab(['text', 'url'])).toBe('text');
+    expect(parseAddSourceTab('upload')).toBe('upload');
+    expect(parseAddSourceTab('1')).toBeNull();
+    expect(parseAddSourceTab(undefined)).toBeNull();
   });
 });

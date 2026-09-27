@@ -65,8 +65,8 @@ describe('DailyChart', () => {
     const wide = screen.getByTestId('chart-wide');
     const narrow = screen.getByTestId('chart-narrow');
 
-    expect(wide).toHaveAttribute('viewBox', '0 0 720 220');
-    expect(narrow).toHaveAttribute('viewBox', '0 0 360 200');
+    expect(wide).toHaveAttribute('viewBox', '0 0 720 150');
+    expect(narrow).toHaveAttribute('viewBox', '0 0 360 150');
     expect(within(narrow).getAllByTestId('chart-bar')).toHaveLength(30);
 
     const wideLabels = labelsOf(wide);
@@ -93,6 +93,6 @@ describe('DailyChart', () => {
     render(<DailyChart rows={bucketDaily([], periodStart(7, NOW), 7)} days={7} />);
 
     expect(screen.queryByRole('img')).toBeNull();
-    expect(screen.getByText(/No questions in this period/)).toBeInTheDocument();
+    expect(screen.getByText(/No answers in this period/)).toBeInTheDocument();
   });
 });

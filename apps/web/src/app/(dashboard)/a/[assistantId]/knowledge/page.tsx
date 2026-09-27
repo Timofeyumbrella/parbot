@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
+import { parseAddSourceTab } from '@/components/knowledge/add-source-tab';
 import { KnowledgeScreen } from '@/components/knowledge/knowledge-screen';
 import { PageContainer } from '@/components/page-header';
 import { getAccountPlan, getAccountUsage } from '@/lib/account';
@@ -10,8 +11,11 @@ import { requireUser } from '@/lib/session';
 
 export const metadata: Metadata = { title: 'Knowledge' };
 
-export default async function KnowledgePage({ params }: PageProps<'/a/[assistantId]/knowledge'>) {
-  const { assistantId } = await params;
+export default async function KnowledgePage({
+  params,
+  searchParams,
+}: PageProps<'/a/[assistantId]/knowledge'>) {
+  const [{ assistantId }, query] = await Promise.all([params, searchParams]);
   const { supabase, user } = await requireUser();
   const [assistant, sources, { plan }, usage] = await Promise.all([
     getAssistant(assistantId),
@@ -41,6 +45,8 @@ export default async function KnowledgePage({ params }: PageProps<'/a/[assistant
         initialPagesUsed={usage.pages}
         plan={{ name: plan.name, pages: plan.pages }}
         liveAi={hasLiveAiProvider()}
+        // `?add=url` (the Overview's "Add docs") opens the Add source dialog on that tab.
+        initialAddTab={parseAddSourceTab(query.add)}
       />
     </PageContainer>
   );

@@ -56,3 +56,30 @@ export const formatCount = (value: number) => value.toLocaleString('en-US');
 /** "42%" from a numerator and denominator, tolerant of zero. */
 export const formatPercent = (part: number, whole: number) =>
   whole === 0 ? '0%' : `${Math.round((part / whole) * 100)}%`;
+
+/**
+ * "850 ms", "1.4 s", "12 s", "1 min 35 s": how long something took, as precise as it is useful.
+ * Rounded once, up front, so 59.96 s never reads as "60 s" instead of "1 min".
+ */
+export const formatDuration = (ms: number) => {
+  const value = Math.max(Math.round(ms), 0);
+
+  if (value < 1000) {
+    return `${value} ms`;
+  }
+
+  if (value < 9950) {
+    return `${(Math.round(value / 100) / 10).toFixed(1)} s`;
+  }
+
+  const seconds = Math.round(value / 1000);
+
+  if (seconds < 60) {
+    return `${seconds} s`;
+  }
+
+  const minutes = Math.floor(seconds / 60);
+  const rest = seconds % 60;
+
+  return rest === 0 ? `${minutes} min` : `${minutes} min ${rest} s`;
+};

@@ -31,9 +31,10 @@ import {
   uploadTypeFor,
 } from '@/lib/uploads';
 
+import type { AddSourceTab } from './add-source-tab';
 import { optimisticSource } from './optimistic';
 
-export type AddSourceTab = 'url' | 'sitemap' | 'upload' | 'text';
+export type { AddSourceTab } from './add-source-tab';
 
 type RemoteOrTextKind = Exclude<AddSourceTab, 'upload'>;
 

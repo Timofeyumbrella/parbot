@@ -138,62 +138,6 @@ export type Database = {
           },
         ]
       }
-      conversation_references: {
-        Row: {
-          assistant_id: string
-          conversation_id: string
-          created_at: string
-          owner_id: string
-          position: number
-          source_id: string
-        }
-        Insert: {
-          assistant_id: string
-          conversation_id: string
-          created_at?: string
-          owner_id: string
-          position?: number
-          source_id: string
-        }
-        Update: {
-          assistant_id?: string
-          conversation_id?: string
-          created_at?: string
-          owner_id?: string
-          position?: number
-          source_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "conversation_references_assistant_id_fkey"
-            columns: ["assistant_id"]
-            isOneToOne: false
-            referencedRelation: "assistants"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "conversation_references_conversation_id_fkey"
-            columns: ["conversation_id"]
-            isOneToOne: false
-            referencedRelation: "conversations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "conversation_references_owner_id_fkey"
-            columns: ["owner_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "conversation_references_source_id_fkey"
-            columns: ["source_id"]
-            isOneToOne: false
-            referencedRelation: "sources"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       conversations: {
         Row: {
           assistant_id: string
@@ -437,7 +381,6 @@ export type Database = {
           owner_id: string
           prompt_tokens: number | null
           role: Database["public"]["Enums"]["message_role"]
-          source_references: Json
         }
         Insert: {
           answered?: boolean | null
@@ -454,7 +397,6 @@ export type Database = {
           owner_id: string
           prompt_tokens?: number | null
           role: Database["public"]["Enums"]["message_role"]
-          source_references?: Json
         }
         Update: {
           answered?: boolean | null
@@ -471,7 +413,6 @@ export type Database = {
           owner_id?: string
           prompt_tokens?: number | null
           role?: Database["public"]["Enums"]["message_role"]
-          source_references?: Json
         }
         Relationships: [
           {
@@ -729,6 +670,38 @@ export type Database = {
           unanswered: number
         }[]
       }
+      cited_citations: {
+        Args: { assistant: string; since: string }
+        Returns: {
+          document_id: string
+          message_id: string
+          title: string
+          url: string
+        }[]
+      }
+      cited_documents: {
+        Args: { assistant: string; max_rows?: number; since: string }
+        Returns: {
+          answers: number
+          document_id: string
+          source_kind: Database["public"]["Enums"]["source_kind"]
+          source_title: string
+          title: string
+          total: number
+          url: string
+        }[]
+      }
+      disliked_answers: {
+        Args: { assistant: string; max_rows?: number; since: string }
+        Returns: {
+          answer: string
+          answered_at: string
+          conversation_id: string
+          message_id: string
+          question: string
+          total: number
+        }[]
+      }
       increment_usage: {
         Args: {
           delta?: number
@@ -752,6 +725,15 @@ export type Database = {
         }
         Returns: string
       }
+      knowledge_gaps: {
+        Args: { assistant: string; max_rows?: number; since: string }
+        Returns: {
+          asks: number
+          conversation_id: string
+          last_asked_at: string
+          question: string
+        }[]
+      }
       match_chunks: {
         Args: {
           assistant: string
@@ -769,26 +751,34 @@ export type Database = {
           similarity: number
         }[]
       }
-      match_chunks_in_sources: {
-        Args: {
-          assistant: string
-          per_source?: number
-          query_embedding: string
-          source_ids: string[]
-        }
+      overview_totals: {
+        Args: { assistant: string; previous_since: string; since: string }
         Returns: {
-          chunk_id: string
-          content: string
-          document_id: string
-          document_title: string
-          document_url: string
-          heading: string
-          similarity: number
-          source_id: string
-          source_rank: number
+          answered: number
+          leads: number
+          median_latency_ms: number
+          negative: number
+          new_leads: number
+          period: string
+          positive: number
+          questions: number
+          unanswered: number
         }[]
       }
       owns_assistant: { Args: { assistant: string }; Returns: boolean }
+      page_activity: {
+        Args: { assistant: string; max_rows?: number; since: string }
+        Returns: {
+          answered: number
+          host: string
+          last_asked_at: string
+          page_url: string
+          path: string
+          questions: number
+          total: number
+          unanswered: number
+        }[]
+      }
       release_message: { Args: { owner: string }; Returns: undefined }
       reserve_message: {
         Args: { max_allowed: number; owner: string }
@@ -823,6 +813,18 @@ export type Database = {
           conversation_id: string
           last_asked_at: string
           question: string
+        }[]
+      }
+      uncited_documents: {
+        Args: { assistant: string; max_rows?: number; since: string }
+        Returns: {
+          created_at: string
+          document_id: string
+          source_kind: Database["public"]["Enums"]["source_kind"]
+          source_title: string
+          title: string
+          total: number
+          url: string
         }[]
       }
     }

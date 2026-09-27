@@ -22,6 +22,8 @@ export type KnowledgeScreenProps = {
   plan: MeterPlan;
   /** False when answers come from the deterministic stub rather than a model. */
   liveAi: boolean;
+  /** Opens the Add source dialog on this tab as the screen appears. */
+  initialAddTab?: AddSourceTab | null;
 };
 
 /** Written for the account, not the operator: how to connect a model lives in the README. */
@@ -63,10 +65,11 @@ export const KnowledgeScreen = ({
   initialPagesUsed,
   plan,
   liveAi,
+  initialAddTab = null,
 }: KnowledgeScreenProps) => {
   const [dialog, setDialog] = useState<{ open: boolean; tab: AddSourceTab }>({
-    open: false,
-    tab: 'url',
+    open: initialAddTab !== null,
+    tab: initialAddTab ?? 'url',
   });
   const { sources, pagesUsed, error, refetch, addPending, settleAdd, reindex, remove } = useSources(
     {
@@ -147,7 +150,18 @@ export const KnowledgeScreen = ({
         ownerId={ownerId}
         open={dialog.open}
         tab={dialog.tab}
-        onOpenChange={(open) => setDialog((current) => ({ ...current, open }))}
+        onOpenChange={(open) => {
+          setDialog((current) => ({ ...current, open }));
+
+          // A reload after closing should not open the dialog again. The history API keeps
+          // Next's router in step without a round trip to the server.
+          if (!open && new URLSearchParams(window.location.search).has('add')) {
+            const url = new URL(window.location.href);
+
+            url.searchParams.delete('add');
+            window.history.replaceState(null, '', url);
+          }
+        }}
         onTabChange={(tab) => setDialog((current) => ({ ...current, tab }))}
         onPending={addPending}
         onSettled={handleSettled}
