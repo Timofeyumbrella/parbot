@@ -52,7 +52,9 @@ export const TranscriptMessage = ({ message, now }: TranscriptMessageProps) => {
 
   return (
     <article
-      className={cn('flex gap-3', isUser && 'flex-row-reverse')}
+      // The Overview links to a disliked answer by this id; the offset clears the phone header.
+      id={`message-${message.id}`}
+      className={cn('group/message flex scroll-mt-20 gap-3', isUser && 'flex-row-reverse')}
       data-role={message.role}
       data-testid="transcript-message"
       aria-label={isUser ? 'Visitor message' : 'Assistant message'}
@@ -73,6 +75,7 @@ export const TranscriptMessage = ({ message, now }: TranscriptMessageProps) => {
             'rounded-lg px-3 py-2 text-sm leading-relaxed',
             isUser ? 'bg-muted' : 'bg-card ring-foreground/10 ring-1',
             unanswered && 'ring-warning/40',
+            'group-target/message:ring-primary group-target/message:ring-2',
           )}
         >
           {isUser ? (

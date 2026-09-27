@@ -1,22 +1,15 @@
-import {
-  Card,
-  CardAction,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
 import { type DailyRow, dayLabel, labelIndexes, niceTicks } from '@/lib/analytics';
 import { formatCount } from '@/lib/format';
 
 /**
- * Two drawings of the same data: a wide one for the card at desktop widths and a narrower,
- * taller one below the `sm` breakpoint. A single 720-unit viewBox squeezed into a phone made
- * the labels four pixels tall; drawing at the phone's own scale keeps them legible.
+ * Two drawings of the same data: a wide one for desktop widths and a narrower one below the `sm`
+ * breakpoint. A single 720-unit viewBox squeezed into a phone made the labels four pixels tall;
+ * drawing at the phone's own scale keeps them legible. Both are short: the trend sits under the
+ * quality numbers as context, not as the page's headline.
  */
 const VARIANTS = {
-  wide: { width: 720, height: 220, className: 'hidden sm:block' },
-  narrow: { width: 360, height: 200, className: 'sm:hidden' },
+  wide: { width: 720, height: 150, className: 'hidden sm:block' },
+  narrow: { width: 360, height: 150, className: 'sm:hidden' },
 } as const;
 
 type Variant = keyof typeof VARIANTS;
@@ -199,7 +192,8 @@ export type DailyChartProps = {
 
 /**
  * One column per day, answered questions at the base and unanswered stacked on top with a
- * surface gap between them. Plain SVG so it renders on the server and scales with the card.
+ * surface gap between them: the volume and the answer rate in one compact drawing. Plain SVG so
+ * it renders on the server and scales with its container.
  */
 export const DailyChart = ({ rows, days }: DailyChartProps) => {
   const max = rows.reduce((peak, row) => Math.max(peak, row.answered + row.unanswered), 0);
@@ -207,53 +201,48 @@ export const DailyChart = ({ rows, days }: DailyChartProps) => {
   const empty = max === 0;
 
   return (
-    <Card data-testid="daily-chart">
-      <CardHeader className="border-b">
-        <CardTitle>Questions per day</CardTitle>
-        <CardDescription>
-          Answered and unanswered over the last {days} days, in UTC days.
-        </CardDescription>
-        <CardAction>
-          <Legend />
-        </CardAction>
-      </CardHeader>
-      <CardContent>
-        {empty ? (
-          <p className="text-muted-foreground py-10 text-center text-sm">
-            No questions in this period. Ask one in Chat or wait for widget traffic.
-          </p>
-        ) : (
-          <>
-            <Plot rows={rows} days={days} max={max} ticks={ticks} variant="wide" />
-            <Plot rows={rows} days={days} max={max} ticks={ticks} variant="narrow" />
-            <details className="text-muted-foreground mt-3 text-xs">
-              <summary className="hover:text-foreground cursor-pointer select-none">
-                Show as a table
-              </summary>
-              <table className="mt-2 w-full text-left tabular-nums">
-                <thead>
-                  <tr className="border-b">
-                    <th className="py-1 pr-2 font-medium">Day</th>
-                    <th className="py-1 pr-2 text-right font-medium">Questions</th>
-                    <th className="py-1 pr-2 text-right font-medium">Answered</th>
-                    <th className="py-1 text-right font-medium">Unanswered</th>
+    <div className="flex flex-col gap-2" data-testid="daily-chart">
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+        <h3 className="text-muted-foreground text-xs font-medium">
+          Questions per day, in UTC days
+        </h3>
+        {empty ? null : <Legend />}
+      </div>
+      {empty ? (
+        <p className="text-muted-foreground py-6 text-center text-sm">
+          No answers in this period. Ask one in Chat or wait for widget traffic.
+        </p>
+      ) : (
+        <>
+          <Plot rows={rows} days={days} max={max} ticks={ticks} variant="wide" />
+          <Plot rows={rows} days={days} max={max} ticks={ticks} variant="narrow" />
+          <details className="text-muted-foreground text-xs">
+            <summary className="hover:text-foreground w-fit cursor-pointer select-none">
+              Show as a table
+            </summary>
+            <table className="mt-2 w-full text-left tabular-nums">
+              <thead>
+                <tr className="border-b">
+                  <th className="py-1 pr-2 font-medium">Day</th>
+                  <th className="py-1 pr-2 text-right font-medium">Questions</th>
+                  <th className="py-1 pr-2 text-right font-medium">Answered</th>
+                  <th className="py-1 text-right font-medium">Unanswered</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row) => (
+                  <tr key={row.day} className="border-b last:border-0">
+                    <td className="py-1 pr-2">{dayLabel(row.day)}</td>
+                    <td className="py-1 pr-2 text-right">{formatCount(row.questions)}</td>
+                    <td className="py-1 pr-2 text-right">{formatCount(row.answered)}</td>
+                    <td className="py-1 text-right">{formatCount(row.unanswered)}</td>
                   </tr>
-                </thead>
-                <tbody>
-                  {rows.map((row) => (
-                    <tr key={row.day} className="border-b last:border-0">
-                      <td className="py-1 pr-2">{dayLabel(row.day)}</td>
-                      <td className="py-1 pr-2 text-right">{formatCount(row.questions)}</td>
-                      <td className="py-1 pr-2 text-right">{formatCount(row.answered)}</td>
-                      <td className="py-1 text-right">{formatCount(row.unanswered)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </details>
-          </>
-        )}
-      </CardContent>
-    </Card>
+                ))}
+              </tbody>
+            </table>
+          </details>
+        </>
+      )}
+    </div>
   );
 };

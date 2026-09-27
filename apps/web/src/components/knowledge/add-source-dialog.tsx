@@ -53,6 +53,13 @@ export const ADD_SOURCE_TABS: {
   },
 ];
 
+/** Reads `?add=` into a tab of the dialog, or null when the dialog should stay closed. */
+export const parseAddSourceTab = (value: string | string[] | undefined): AddSourceTab | null => {
+  const raw = Array.isArray(value) ? value[0] : value;
+
+  return ADD_SOURCE_TABS.find((tab) => tab.id === raw)?.id ?? null;
+};
+
 export type AddSourceDialogProps = {
   assistantId: string;
   ownerId: string;
