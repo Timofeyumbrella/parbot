@@ -10,8 +10,10 @@ Before recording:
 - A second browser window or profile signed out, for the widget on the demo page.
 - A third profile signed in as the demo account, for the Overview with history (an account has
   one assistant, so the fresh account from section 2 cannot show the seeded traffic).
-- The demo account (`demo@parbot.dev`) on Starter with the "Parbot Docs" assistant seeded with
-  `--history`, so the Inbox and Overview already have two weeks of conversations.
+- The demo account (`demo@parbot.dev`) on Starter with the "Parbot Docs" assistant, its history
+  refreshed on the day with `pnpm --filter web seed:demo --refresh-history`, so the Inbox and the
+  Overview's week (it opens on the last 7 days) have two weeks of conversations ending yesterday.
+  The public key stays the same.
 - A public docs site to index live. `https://docs.astro.build/sitemap-index.xml` or the Hono docs
   work well; pick something with a sitemap so progress is visible. Do the crawl once before
   recording so DNS and images are warm.

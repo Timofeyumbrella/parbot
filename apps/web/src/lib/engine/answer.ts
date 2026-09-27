@@ -7,6 +7,7 @@ import {
 
 import { type AiProvider, type ChatTurn, ModelBusyError } from '@/lib/ai';
 import { entitledPlanId } from '@/lib/billing/entitlement';
+import { citationSnippet } from '@/lib/citations';
 import { planFor } from '@/lib/plans';
 
 import {
@@ -92,26 +93,12 @@ export type AnswerParams = {
 };
 
 const HISTORY_TURNS = 6;
-const SNIPPET_CHARS = 240;
 /** Tokens are held back until this many characters arrived, so a NO_ANSWER never leaks. */
 const HOLD_CHARS = NO_ANSWER.length + 2;
 /** Postgres unique_violation. */
 const UNIQUE_VIOLATION = '23505';
 /** Postgres foreign_key_violation. */
 const FOREIGN_KEY_VIOLATION = '23503';
-
-const snippet = (content: string) => {
-  const text = content.replace(/\s+/g, ' ').trim();
-
-  if (text.length <= SNIPPET_CHARS) {
-    return text;
-  }
-
-  const cut = text.slice(0, SNIPPET_CHARS);
-  const lastSpace = cut.lastIndexOf(' ');
-
-  return `${cut.slice(0, lastSpace > SNIPPET_CHARS - 40 ? lastSpace : cut.length).trimEnd()}…`;
-};
 
 const toCitations = (answer: string, chunks: RetrievedChunk[]): Citation[] =>
   citedIndexes(answer, chunks.length).flatMap((index) => {
@@ -124,7 +111,7 @@ const toCitations = (answer: string, chunks: RetrievedChunk[]): Citation[] =>
             documentId: chunk.documentId,
             title: chunk.documentTitle,
             url: chunk.documentUrl,
-            snippet: snippet(chunk.content),
+            snippet: citationSnippet(chunk.content),
             chunkId: chunk.chunkId,
           },
         ]

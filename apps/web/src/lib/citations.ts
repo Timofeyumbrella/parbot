@@ -1,3 +1,23 @@
+const SNIPPET_CHARS = 240;
+
+/**
+ * The passage text a citation carries for its hover card: whitespace collapsed, cut near 240
+ * characters at a word boundary. The engine and the demo seed both use it, so a seeded citation
+ * reads like a live one.
+ */
+export const citationSnippet = (content: string) => {
+  const text = content.replace(/\s+/g, ' ').trim();
+
+  if (text.length <= SNIPPET_CHARS) {
+    return text;
+  }
+
+  const cut = text.slice(0, SNIPPET_CHARS);
+  const lastSpace = cut.lastIndexOf(' ');
+
+  return `${cut.slice(0, lastSpace > SNIPPET_CHARS - 40 ? lastSpace : cut.length).trimEnd()}…`;
+};
+
 type GroupableCitation = {
   index: number;
   url: string | null;

@@ -77,7 +77,15 @@ pnpm --filter web seed:demo --history --write-env
 Creates the demo account on the Starter plan, an assistant called Parbot Docs trained on
 `apps/web/content/docs`, two weeks of realistic conversations with one lead, and writes the
 assistant's public key into `.env` so the landing page runs the live demo and ⌘K. Re-running
-re-indexes the docs and leaves the history alone; `--reset` starts over.
+re-indexes only the docs whose text changed, moves any saved citation of a re-indexed page to its
+new copy, and leaves the history alone; `--reset` starts over with a new public key.
+
+The history is dated relative to the day it was seeded, so after a few days it drops out of the
+Overview's default week. `seed:demo --refresh-history` replaces it with two weeks ending yesterday
+and keeps the assistant, its settings and its public key: it deletes the assistant's
+conversations, leads and chat projects, seeds the history again with citations to the pages
+indexed now, sets this month's answer count to match, and prints what it deleted and created.
+Run it on the day of a demo.
 
 ## Tests
 
