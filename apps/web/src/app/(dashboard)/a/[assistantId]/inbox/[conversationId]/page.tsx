@@ -44,7 +44,7 @@ export default async function ConversationPage({
       .maybeSingle(),
     supabase
       .from('messages')
-      .select('id, role, content, citations, answered, feedback, created_at')
+      .select('id, role, content, citations, answered, feedback, created_at, source_references')
       .eq('conversation_id', conversationId)
       .eq('assistant_id', assistantId)
       .order('created_at', { ascending: true }),

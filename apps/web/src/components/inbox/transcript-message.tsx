@@ -4,9 +4,11 @@ import { Bot, ThumbsDown, ThumbsUp, UserRound } from 'lucide-react';
 import { z } from 'zod';
 
 import { AnswerMarkdown } from '@/components/chat/answer-markdown';
+import { MessageReferences } from '@/components/chat/reference-chips';
 import { Sources } from '@/components/chat/sources';
 import { UnansweredBadge } from '@/components/inbox/channel-badge';
 import { LocalTime } from '@/components/inbox/local-time';
+import { parseReferences } from '@/lib/chat/references';
 import type { Message } from '@/lib/db';
 
 const citationSchema = z.object({
@@ -37,7 +39,8 @@ export type TranscriptMessageProps = {
   message: Pick<
     Message,
     'id' | 'role' | 'content' | 'citations' | 'answered' | 'feedback' | 'created_at'
-  >;
+  > &
+    Partial<Pick<Message, 'source_references'>>;
   now: number;
 };
 
@@ -49,6 +52,8 @@ export type TranscriptMessageProps = {
 export const TranscriptMessage = ({ assistantId, message, now }: TranscriptMessageProps) => {
   const isUser = message.role === 'user';
   const citations = isUser ? [] : parseCitations(message.citations);
+  // The files an in-app question pointed at; widget questions never carry any.
+  const references = isUser ? parseReferences(message.source_references) : [];
   const unanswered = !isUser && message.answered === false;
   // The chat's id for the same row, where an inline marker without a url points.
   const sourcesId = `sources-${message.id}`;
@@ -71,6 +76,13 @@ export const TranscriptMessage = ({ assistantId, message, now }: TranscriptMessa
       </span>
 
       <div className={cn('flex min-w-0 max-w-[85%] flex-col gap-1.5', isUser && 'items-end')}>
+        {references.length > 0 ? (
+          <MessageReferences
+            references={references}
+            assistantId={assistantId}
+            className="max-w-full"
+          />
+        ) : null}
         <div
           className={cn(
             'rounded-lg px-3 py-2 text-sm leading-relaxed',

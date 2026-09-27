@@ -142,4 +142,27 @@ describe('parseCitations', () => {
       { index: 1, documentId: 'd', title: 'T', url: null, snippet: '' },
     ]);
   });
+
+  it('shows the files an in-app question pointed at, each opening its text', () => {
+    render(
+      <TranscriptMessage
+        assistantId="asst"
+        message={{
+          ...base,
+          id: 'u1',
+          role: 'user',
+          content: 'What does this say about limits?',
+          citations: [],
+          source_references: [{ id: 's1', title: 'limits.md', kind: 'upload' }],
+        }}
+        now={NOW}
+      />,
+    );
+
+    expect(
+      within(screen.getByRole('list', { name: 'Referenced files' })).getByRole('link', {
+        name: 'limits.md',
+      }),
+    ).toHaveAttribute('href', '/a/asst/knowledge/sources/s1');
+  });
 });
