@@ -145,6 +145,17 @@ describe('projectUsage', () => {
     expect(projection.limitReachedOn?.toISOString()).toBe(now.toISOString());
   });
 
+  it('treats a limit reached on the last day as exceeded, though the pace ends right on it', () => {
+    const projection = projectUsage({
+      used: 200,
+      limit: 200,
+      now: new Date('2026-09-30T23:00:00Z'),
+    });
+
+    expect(projection.projected).toBe(200);
+    expect(projection.exceedsLimit).toBe(true);
+  });
+
   it('projects nothing for an idle month', () => {
     const projection = projectUsage({ used: 0, limit: 200, now: new Date('2026-02-20T00:00:00Z') });
 

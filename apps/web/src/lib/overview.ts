@@ -143,7 +143,8 @@ export const projectUsage = ({
   const elapsedDays = Math.min(Math.max((now.getTime() - monthStart) / DAY_MS, 1), monthDays);
   const perDay = used / elapsedDays;
   const projected = Math.max(roundEstimate(perDay * monthDays), used);
-  const exceedsLimit = projected > limit;
+  // At the limit already counts: late in the month the pace may project no further than it.
+  const exceedsLimit = used >= limit || projected > limit;
   let limitReachedOn: Date | null = null;
 
   if (exceedsLimit && perDay > 0) {

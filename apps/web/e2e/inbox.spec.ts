@@ -6,7 +6,7 @@ import { visit } from './support/navigation';
 /**
  * The Inbox and the Overview against real rows: the list pages in the server's order and keeps it
  * after "Load more", a transcript shows its sources exactly as the chat shows them, and the
- * question lists keep their columns aligned whatever a row's count or date reads.
+ * Overview's knowledge gaps keep their columns aligned whatever a row's count or date reads.
  *
  * Runs as a throwaway account the spec creates and deletes, so the demo rows are never touched.
  */
@@ -356,11 +356,11 @@ test.describe('the inbox and the overview', () => {
     expect(await chatSources.evaluate((node) => node.outerHTML)).toBe(transcriptHtml);
   });
 
-  test('the question lists keep their count and time columns aligned', async () => {
+  test("the Overview's knowledge gaps keep their count and time columns aligned", async () => {
     /** Where each row's count and time text ends, and whether any of it wrapped or spilled. */
-    const measure = (testId: string) =>
+    const measure = () =>
       page
-        .getByTestId(testId)
+        .getByTestId('knowledge-gaps')
         .locator('li')
         .evaluateAll((items) =>
           items.map((item) => {
@@ -388,26 +388,21 @@ test.describe('the inbox and the overview', () => {
         );
 
     await visit(page, `/a/${seeded.assistantId}`);
-    await expect(page.getByTestId('top-questions').getByText(OLD_QUESTION)).toBeVisible();
+    await expect(page.getByTestId('knowledge-gaps').getByText(OLD_QUESTION)).toBeVisible();
 
-    const top = await measure('top-questions');
-    const unanswered = await measure('unanswered-questions');
+    const rows = await measure();
 
-    // The three repeated questions, the old one and the one asked in the cited conversation.
-    expect(top).toHaveLength(QUESTIONS.length + 2);
-    expect(unanswered).toHaveLength(2);
+    // The newest question and the old one went unanswered.
+    expect(rows).toHaveLength(2);
+    // The old question's row reads a full date, the widest a time gets; the other a relative time.
+    expect(rows.some((row) => /\d{4}$/.test(row.timeText))).toBe(true);
+    expect(rows.some((row) => /ago$/.test(row.timeText))).toBe(true);
 
-    for (const rows of [top, unanswered]) {
-      // The old question's row reads a full date, the widest a time gets; the others a relative time.
-      expect(rows.some((row) => /\d{4}$/.test(row.timeText))).toBe(true);
-      expect(rows.some((row) => /ago$/.test(row.timeText))).toBe(true);
-
-      for (const row of rows) {
-        expect(row.countRight).toBeCloseTo(rows[0]!.countRight, 0);
-        expect(row.timeRight).toBeCloseTo(rows[0]!.timeRight, 0);
-        expect(row.fits).toBe(true);
-        expect(row.lineHeight).toBeLessThan(20);
-      }
+    for (const row of rows) {
+      expect(row.countRight).toBeCloseTo(rows[0]!.countRight, 0);
+      expect(row.timeRight).toBeCloseTo(rows[0]!.timeRight, 0);
+      expect(row.fits).toBe(true);
+      expect(row.lineHeight).toBeLessThan(20);
     }
   });
 });
