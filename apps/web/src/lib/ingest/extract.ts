@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 
 import type { UploadType } from '@/lib/uploads';
 
+import { parseBlocks } from './chunk';
 import { IngestError } from './errors';
 import { htmlToMarkdown } from './html';
 import { type PdfRun, pdfRunsToMarkdown } from './pdf';
@@ -26,11 +27,16 @@ const normalizeText = (text: string) =>
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 
-/** The first ATX heading of a Markdown document, the way GitHub names a file. */
+/**
+ * The first level one or two heading of a Markdown document, the way GitHub names a file. It is
+ * read with the chunker's parser, so a `# comment` inside a fenced code block is never the title.
+ */
 export const markdownTitle = (markdown: string) => {
-  const match = markdown.match(/^ {0,3}#{1,2}[ \t]+(.+?)[ \t]*#*[ \t]*$/m);
+  const heading = parseBlocks(markdown).find(
+    (block) => block.kind === 'heading' && block.level <= 2,
+  );
 
-  return match?.[1]?.trim() || null;
+  return (heading?.kind === 'heading' && heading.text) || null;
 };
 
 const PDF_UNREADABLE =

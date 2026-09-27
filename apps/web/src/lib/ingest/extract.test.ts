@@ -22,6 +22,15 @@ describe('markdownTitle', () => {
     expect(markdownTitle('intro\n\n## Setup\n\n# Later')).toBe('Setup');
     expect(markdownTitle('### Too deep')).toBeNull();
   });
+
+  it('skips a comment inside a fenced code block', () => {
+    expect(markdownTitle('Run this:\n\n```sh\n# Install the CLI\nnpm i -g acme\n```')).toBeNull();
+    expect(markdownTitle('~~~yaml\n# worker settings\n~~~\n\n# Worker configuration')).toBe(
+      'Worker configuration',
+    );
+    // A longer fence is only closed by one at least as long.
+    expect(markdownTitle('````\n```\n# Not a title\n````\n\n## Setup')).toBe('Setup');
+  });
 });
 
 describe('extractUpload', () => {
@@ -245,6 +254,35 @@ describe('extractUpload with the layout of a PDF', () => {
     );
 
     await expect(extractUpload(pdf, 'pdf')).resolves.toMatchObject({ title: 'Handbook' });
+  });
+
+  it('never takes a comment in a code block for the title', async () => {
+    const install = layoutPdf([
+      { paragraph: 'Install the command line tool first.' },
+      { code: ['# Install the CLI', 'npm install -g acme-cli'] },
+      { paragraph: 'Then sign in with your account.' },
+    ]);
+    const withoutHeading = await extractUpload(install, 'pdf');
+
+    expect(withoutHeading.markdown).toContain(
+      '```\n# Install the CLI\nnpm install -g acme-cli\n```',
+    );
+    // With no heading and no metadata title, the file keeps its own name.
+    expect(withoutHeading.title).toBeNull();
+
+    const config = layoutPdf(
+      [
+        { paragraph: 'Start from this file:' },
+        { code: ['# worker settings', 'concurrency: 4'] },
+        { heading: 'Worker configuration', level: 1 },
+        { paragraph: 'Each worker reads its settings on start.' },
+      ],
+      { title: 'Untitled document' },
+    );
+
+    await expect(extractUpload(config, 'pdf')).resolves.toMatchObject({
+      title: 'Worker configuration',
+    });
   });
 });
 
