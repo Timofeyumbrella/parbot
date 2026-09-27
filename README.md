@@ -124,8 +124,16 @@ Creates the demo account on the Starter plan, an assistant called Parbot Docs in
 `apps/web/content/docs`, two weeks of realistic conversations with one lead, and writes the
 assistant's public key into `.env` so the ⌘K palette on the landing page answers from it (restart
 `pnpm dev` to pick it up). Any assistant's widget can be tried at `/demo/<public key>`. Re-running
-re-indexes the docs and leaves the history alone; `--reset` deletes the assistant and starts over,
-which gives it a new public key.
+re-indexes only the docs whose text changed, moves any saved citation of a re-indexed page to its
+new copy, and leaves the history alone; `--reset` deletes the assistant and starts over, which gives
+it a new public key.
+
+The history is dated relative to the day it was seeded, so after a few days it drops out of the
+Overview's default week. `seed:demo --refresh-history` replaces it with two weeks ending yesterday
+and keeps the assistant, its settings and its public key: it deletes the assistant's
+conversations, leads and chat projects, seeds the history again with citations to the pages
+indexed now, sets this month's answer count to match, and prints what it deleted and created.
+Run it on the day of a demo.
 
 ## Tests
 

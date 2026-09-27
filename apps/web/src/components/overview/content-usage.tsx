@@ -2,7 +2,7 @@ import { ExternalLink, FileText } from 'lucide-react';
 import Link from 'next/link';
 
 import { LocalTime } from '@/components/inbox/local-time';
-import { formatCount } from '@/lib/format';
+import { formatCount, plural, pluralWord } from '@/lib/format';
 
 import { NextStep, Section } from './section';
 
@@ -133,7 +133,7 @@ export const ContentUsage = ({
           testId="cited-documents"
           title={
             citedTotal > 0
-              ? `Most cited: ${formatCount(citedTotal)} ${citedTotal === 1 ? 'page' : 'pages'} used in answers`
+              ? `Most cited: ${plural(citedTotal, 'page')} used in answers`
               : 'Most cited'
           }
         >
@@ -153,8 +153,7 @@ export const ContentUsage = ({
                       className="text-muted-foreground shrink-0 whitespace-nowrap text-xs tabular-nums"
                       data-testid="cited-answers"
                     >
-                      {formatCount(document.answers)}{' '}
-                      {document.answers === 1 ? 'answer' : 'answers'}
+                      {plural(document.answers, 'answer')}
                     </span>
                   </div>
                   {/* Length is the count relative to the most cited page, for scanning. */}
@@ -177,7 +176,7 @@ export const ContentUsage = ({
           testId="uncited-documents"
           title={
             indexed > 0
-              ? `Never cited: ${formatCount(uncitedTotal)} of ${formatCount(indexed)} indexed ${indexed === 1 ? 'page' : 'pages'}`
+              ? `Never cited: ${formatCount(uncitedTotal)} of ${formatCount(indexed)} indexed ${pluralWord(indexed, 'page')}`
               : 'Never cited'
           }
         >

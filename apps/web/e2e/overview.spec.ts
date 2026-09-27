@@ -78,7 +78,14 @@ test.describe('the Overview', () => {
   });
 
   test('answer quality: rates, ratings and time against the week before', async () => {
-    await visit(page, `/a/${seeded.assistantId}?days=7`);
+    // The Overview opens on the week, with no ?days= in the address.
+    await visit(page, `/a/${seeded.assistantId}`);
+    const period = page.getByRole('navigation', { name: 'Period' });
+    await expect(period.getByRole('link', { name: '7 days' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    await expect(period.getByRole('link', { name: '30 days' })).not.toHaveAttribute('aria-current');
 
     // 5 answered of 9 finished (the stopped one is left out); the week before 1 of 2.
     const rate = metric(page, 'metric-answer-rate');
@@ -257,9 +264,13 @@ test.describe('the Overview', () => {
   });
 
   test('the 30-day period takes in the week before too', async () => {
-    await visit(page, `/a/${seeded.assistantId}?days=7`);
+    await visit(page, `/a/${seeded.assistantId}`);
     await page.getByRole('link', { name: '30 days' }).click();
     await expect(page).toHaveURL(new RegExp(`/a/${seeded.assistantId}\\?days=30$`));
+    await expect(page.getByRole('link', { name: '30 days' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
 
     // 6 answered of 11 finished, and nothing in the 30 days before that.
     await expect(metric(page, 'metric-answer-rate').value).toHaveText('55%');
@@ -271,6 +282,11 @@ test.describe('the Overview', () => {
       'Never cited: 1 of 5 indexed pages',
     );
     await expect(section(page, 'leads-summary').getByTestId('leads-count')).toHaveText('2');
+
+    // Back to the week: the default drops out of the address again.
+    await page.getByRole('link', { name: '7 days' }).click();
+    await expect(page).toHaveURL(new RegExp(`/a/${seeded.assistantId}$`));
+    await expect(metric(page, 'metric-answer-rate').value).toHaveText('56%');
   });
 
   test('an assistant with no traffic yet shows the first-use state', async ({ browser }) => {

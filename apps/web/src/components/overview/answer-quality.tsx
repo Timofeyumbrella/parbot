@@ -1,5 +1,5 @@
 import { inboxHref, type DailyRow } from '@/lib/analytics';
-import { formatCount, formatDuration } from '@/lib/format';
+import { formatCount, formatDuration, plural, pluralWord } from '@/lib/format';
 import {
   answerRate,
   type Change,
@@ -42,14 +42,7 @@ const Caption = ({ children }: { children: React.ReactNode }) => (
 );
 
 /** Percentage points, the unit a change between two percentages is read in. */
-const points = (change: Change | null) => {
-  const amount = change?.amount ?? 0;
-
-  return `${formatCount(amount)} ${amount === 1 ? 'pt' : 'pts'}`;
-};
-
-const plural = (count: number, one: string, many: string) =>
-  `${formatCount(count)} ${count === 1 ? one : many}`;
+const points = (change: Change | null) => plural(change?.amount ?? 0, 'pt');
 
 export type AnswerQualityProps = {
   assistantId: string;
@@ -89,8 +82,9 @@ export const AnswerQuality = ({
       footer={
         current.unanswered > 0 ? (
           <NextStep href={inboxHref(assistantId, 'conversations', 'unanswered')}>
-            Read the {plural(current.unanswered, 'unanswered question', 'unanswered questions')} in
-            the Inbox
+            {current.unanswered === 1
+              ? 'Read the unanswered question in the Inbox'
+              : `Read the ${formatCount(current.unanswered)} unanswered questions in the Inbox`}
           </NextStep>
         ) : rate.whole > 0 ? (
           'Every finished answer in this period came from the docs.'
@@ -109,7 +103,7 @@ export const AnswerQuality = ({
           <Caption>
             {rate.whole === 0
               ? 'No finished answers in this period.'
-              : `${formatCount(rate.part)} of ${plural(rate.whole, 'answer', 'answers')} came from the docs.`}
+              : `${formatCount(rate.part)} of ${plural(rate.whole, 'answer')} came from the docs.`}
           </Caption>
         </Metric>
 
@@ -122,7 +116,7 @@ export const AnswerQuality = ({
           <Caption>
             {helpful.whole === 0
               ? 'No ratings yet. Readers rate answers with a thumb up or down.'
-              : `${formatCount(helpful.part)} of ${plural(helpful.whole, 'rating', 'ratings')} were a thumb up.${
+              : `${formatCount(helpful.part)} of ${plural(helpful.whole, 'rating')} ${pluralWord(helpful.part, 'was', 'were')} a thumb up.${
                   helpful.whole < SMALL_SAMPLE ? ' Too few ratings to read much into yet.' : ''
                 }`}
           </Caption>

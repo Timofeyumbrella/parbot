@@ -1,8 +1,8 @@
-import { expect, test } from '@playwright/test';
+import { type BrowserContext, expect, test } from '@playwright/test';
 
 import { authErrorMessage } from '../src/components/auth/auth-errors';
 
-import { trackAccounts } from './support/accounts';
+import { adminClient, trackAccounts } from './support/accounts';
 import { visit } from './support/navigation';
 
 const accounts = trackAccounts();
@@ -74,6 +74,52 @@ test.describe('signing up and creating the assistant', () => {
     await page.getByLabel(/^password/i).fill('correct-horse-battery');
     await page.getByRole('button', { name: /sign in/i }).click();
     await expect(page).toHaveURL(new RegExp(`${overview}$`));
+  });
+
+  test('signing out ends this browser only, not the same account signed in elsewhere', async ({
+    browser,
+  }) => {
+    // The demo account is shared: a reviewer signing out must not end the presenter's session.
+    const email = accounts.email('sign-out');
+    const password = 'correct-horse-battery';
+    const admin = adminClient();
+
+    test.skip(!admin, 'Needs SUPABASE_SERVICE_ROLE_KEY to create the account.');
+
+    const { error } = await admin!.auth.admin.createUser({ email, password, email_confirm: true });
+    expect(error).toBeNull();
+
+    const [here, elsewhere] = await Promise.all([browser.newContext(), browser.newContext()]);
+
+    try {
+      const signIn = async (context: BrowserContext) => {
+        const page = await context.newPage();
+
+        await visit(page, `/login?next=${encodeURIComponent('/account')}`);
+        await page.getByLabel(/email/i).fill(email);
+        await page.getByLabel(/^password/i).fill(password);
+        await page.getByRole('button', { name: /sign in/i }).click();
+        await expect(page).toHaveURL(/\/account$/);
+
+        return page;
+      };
+
+      const [page, other] = [await signIn(here), await signIn(elsewhere)];
+
+      await page.getByRole('complementary').getByRole('button', { name: 'Sign out' }).click();
+      await expect(page).toHaveURL(/\/login/);
+
+      // This browser is signed out.
+      await visit(page, '/account');
+      await expect(page).toHaveURL(/\/login\?next=%2Faccount/);
+
+      // The other one still is not: its next server render still knows who it is.
+      await visit(other, '/account');
+      await expect(other).toHaveURL(/\/account$/);
+      await expect(other.getByRole('heading', { level: 1 })).toHaveText('Account');
+    } finally {
+      await Promise.all([here.close(), elsewhere.close()]);
+    }
   });
 
   test('guarded routes bounce to login and keep the destination', async ({ page }) => {

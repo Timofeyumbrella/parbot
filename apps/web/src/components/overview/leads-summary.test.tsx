@@ -34,6 +34,12 @@ describe('LeadsSummary', () => {
     expect(screen.getByTestId('leads-caption')).toHaveTextContent('All of them contacted.');
   });
 
+  it('does not say "all of them" about a single contacted lead', () => {
+    render(<LeadsSummary {...props({ leads: 1, newLeads: 0 })} />);
+
+    expect(screen.getByTestId('leads-caption')).toHaveTextContent('Already contacted.');
+  });
+
   it('points to the widget settings when lead capture is off', () => {
     render(<LeadsSummary {...props({ leads: 0, newLeads: 0, leadCapture: false })} />);
 

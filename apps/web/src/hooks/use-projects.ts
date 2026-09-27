@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
 
 import { createProject, deleteProject, moveConversation, updateProject } from '@/actions/projects';
+import { useHydrated } from '@/hooks/use-hydrated';
 import type { ConversationRow } from '@/lib/chat/conversations';
 import {
   deletedProjects,
@@ -78,14 +79,21 @@ export const useProjects = (assistantId: string, snapshot?: ProjectSnapshot) => 
 
 /**
  * The list as the sidebar holds it, for screens that show one project (its home, a composer's
- * fixed chips). Never fetches on its own: the sidebar owns the query.
+ * fixed chips). Never fetches on its own: the sidebar owns the query. Nothing until the page has
+ * hydrated, for the reason `useConversationListCache` gives: the sidebar's Suspense boundary may
+ * seed the cache before the screen reading it hydrates, and the server rendered that screen
+ * without it.
  */
-export const useProjectList = (assistantId: string) =>
-  useQuery<ProjectRow[]>({
+export const useProjectList = (assistantId: string) => {
+  const hydrated = useHydrated();
+  const { data } = useQuery<ProjectRow[]>({
     queryKey: projectsKey(assistantId),
     queryFn: () => fetchProjects(getSupabaseBrowserClient(), assistantId),
     enabled: false,
-  }).data;
+  });
+
+  return hydrated ? data : undefined;
+};
 
 /** One project from the cache, or null; undefined while the list has not arrived. */
 export const useProjectRow = (assistantId: string, projectId: string | null | undefined) => {

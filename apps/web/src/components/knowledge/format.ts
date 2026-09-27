@@ -1,7 +1,6 @@
 import { FileText, Globe, type LucideIcon, Map, TextAlignStart } from 'lucide-react';
 
 import type { Enums, Source } from '@/lib/db';
-import { formatCount } from '@/lib/format';
 import { formatBytes, UPLOAD_TYPES, uploadTypeFor } from '@/lib/uploads';
 
 export type SourceKind = Enums<'source_kind'>;
@@ -33,5 +32,5 @@ export const describeSource = (
   return source.byte_size ? `${label} · ${formatBytes(source.byte_size)}` : label;
 };
 
-export const plural = (count: number, noun: string) =>
-  `${formatCount(count)} ${count === 1 ? noun : `${noun}s`}`;
+// Counts read the same on every screen; the Knowledge components import it from here.
+export { plural } from '@/lib/format';

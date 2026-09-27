@@ -7,7 +7,7 @@ import {
   pillNavClass,
   SegmentedLink,
 } from '@/components/inbox/pending-nav';
-import { PERIODS, type PeriodDays } from '@/lib/analytics';
+import { overviewHref, PERIODS, type PeriodDays } from '@/lib/analytics';
 
 /** Links, not client state: the period lives in the URL so it survives reloads and sharing. */
 export const PeriodSwitch = ({ assistantId, days }: { assistantId: string; days: PeriodDays }) => (
@@ -15,7 +15,7 @@ export const PeriodSwitch = ({ assistantId, days }: { assistantId: string; days:
     {PERIODS.map((period) => (
       <SegmentedLink
         key={period}
-        href={`/a/${assistantId}?days=${period}`}
+        href={overviewHref(assistantId, period)}
         group="period"
         active={period === days}
         className={pillLinkClass}

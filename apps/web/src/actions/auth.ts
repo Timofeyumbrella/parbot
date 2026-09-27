@@ -82,10 +82,15 @@ export const signUp = async (
   redirect(onboardingPath(parsed.data.plan, parsed.data.interval));
 };
 
+/**
+ * Ends the session in this browser only. The default (global) scope revokes every session of the
+ * account, and the demo account is shared: one reviewer signing out would sign the presenter out
+ * mid-recording, and anyone signed in on a second device.
+ */
 export const signOut = async () => {
   const supabase = await createSupabaseServerClient();
 
-  await supabase.auth.signOut();
+  await supabase.auth.signOut({ scope: 'local' });
 
   redirect('/login');
 };

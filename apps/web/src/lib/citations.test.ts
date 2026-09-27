@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { groupCitationsByPage, groupCitationsByPageAscending } from './citations';
+import { citationSnippet, groupCitationsByPage, groupCitationsByPageAscending } from './citations';
 
 const cite = (index: number, documentId: string | undefined, url: string | null = null) => ({
   index,
@@ -50,5 +50,23 @@ describe('groupCitationsByPageAscending', () => {
       ['install', [1, 2]],
       ['auth', [3]],
     ]);
+  });
+});
+
+describe('citationSnippet', () => {
+  it('collapses whitespace and keeps a short passage whole', () => {
+    expect(citationSnippet('  Refunds\n\n are  issued within 30 days. ')).toBe(
+      'Refunds are issued within 30 days.',
+    );
+  });
+
+  it('cuts a long passage at a word boundary near 240 characters', () => {
+    const words = Array.from({ length: 80 }, (_, index) => `word${index}`).join(' ');
+    const cut = citationSnippet(words);
+
+    expect(cut.endsWith('…')).toBe(true);
+    expect(cut.length).toBeLessThanOrEqual(241);
+    expect(words.startsWith(cut.slice(0, -1))).toBe(true);
+    expect(words.charAt(cut.length - 1)).toBe(' ');
   });
 });

@@ -131,6 +131,44 @@ describe('AnswerQuality', () => {
     ).toHaveAttribute('href', `/a/${ASSISTANT}/chat`);
   });
 
+  it('agrees with a count of one in every caption and link', () => {
+    // Regression: one rating read "1 of 1 rating were a thumb up."
+    render(
+      <AnswerQuality
+        assistantId={ASSISTANT}
+        days={7}
+        current={totals({ answered: 1, unanswered: 1, positive: 1, negative: 0 })}
+        previous={totals({ answered: 1, unanswered: 0, positive: 0, negative: 1 })}
+        daily={daily}
+      />,
+    );
+
+    expect(metric('metric-answer-rate').caption).toBe('1 of 2 answers came from the docs.');
+    expect(metric('metric-helpful').caption).toBe(
+      '1 of 1 rating was a thumb up. Too few ratings to read much into yet.',
+    );
+    expect(
+      screen.getByRole('link', { name: 'Read the unanswered question in the Inbox' }),
+    ).toHaveAttribute('href', `/a/${ASSISTANT}/inbox?filter=unanswered`);
+  });
+
+  it('says "were" for none and for several thumbs up', () => {
+    render(
+      <AnswerQuality
+        assistantId={ASSISTANT}
+        days={7}
+        current={totals({ answered: 1, positive: 0, negative: 1 })}
+        previous={EMPTY_TOTALS}
+        daily={daily}
+      />,
+    );
+
+    expect(metric('metric-answer-rate').caption).toBe('1 of 1 answer came from the docs.');
+    expect(metric('metric-helpful').caption).toBe(
+      '0 of 1 rating were a thumb up. Too few ratings to read much into yet.',
+    );
+  });
+
   it('reads a small move in answer time as no change', () => {
     render(
       <AnswerQuality

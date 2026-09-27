@@ -434,7 +434,7 @@ describe('KnowledgeScreen', () => {
     const confirm = await screen.findByRole('dialog', { name: 'Delete Old notes?' });
 
     expect(confirm).toHaveTextContent(
-      "The 1 page it added, and their passages, are removed from the assistant's knowledge. This cannot be undone.",
+      "The page it added, and its passages, are removed from the assistant's knowledge. This cannot be undone.",
     );
 
     await user.click(within(confirm).getByRole('button', { name: 'Delete' }));

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { signIn, signUp } from './auth';
+import { signIn, signOut, signUp } from './auth';
 
 const { auth, redirect } = vi.hoisted(() => ({
   auth: {
@@ -35,6 +35,16 @@ beforeEach(() => {
   auth.signUp.mockResolvedValue({
     data: { session: { access_token: 'x' }, user: { id: '1' } },
     error: null,
+  });
+  auth.signOut.mockResolvedValue({ error: null });
+});
+
+describe('signOut', () => {
+  it('ends the session in this browser only, then goes to login', async () => {
+    await expect(signOut()).rejects.toThrow('REDIRECT /login');
+
+    // The global default would sign every other browser on the account out as well.
+    expect(auth.signOut).toHaveBeenCalledExactlyOnceWith({ scope: 'local' });
   });
 });
 
