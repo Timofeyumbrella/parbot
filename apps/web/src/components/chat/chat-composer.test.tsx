@@ -241,6 +241,38 @@ describe('ChatComposer', () => {
     expect(chipTexts()).toEqual(['harbor-club.pdfUploading', 'rates.pdfUploading']);
   });
 
+  it('uploads a file again once its earlier copy has left Knowledge', async () => {
+    const user = userEvent.setup();
+    const file = new File(['x'.repeat(120)], 'harbor-club.pdf', { type: 'application/pdf' });
+    const first = renderComposer();
+
+    await waitFor(() =>
+      expect(queryClient.getQueryData(referenceSourcesKey('asst-1'))).toBeTruthy(),
+    );
+    await user.upload(screen.getByLabelText('Choose a file to attach'), file);
+
+    const id = uploads[0]!.body.get('id') as string;
+
+    await act(async () => {
+      uploads[0]!.resolve(
+        Response.json(
+          { source: source({ id, title: 'harbor-club.pdf', kind: 'upload', byte_size: 120 }) },
+          { status: 201 },
+        ),
+      );
+    });
+    first.unmount();
+    resetDrafts();
+
+    // Deleted in Knowledge since: the list no longer has it, so attaching it uploads it again.
+    await act(() => queryClient.invalidateQueries({ queryKey: referenceSourcesKey('asst-1') }));
+    renderComposer();
+    await user.upload(screen.getByLabelText('Choose a file to attach'), file);
+
+    expect(uploads).toHaveLength(2);
+    expect(chipTexts()).toEqual(['harbor-club.pdfUploading']);
+  });
+
   it("starts from the conversation's references and lets one be removed for the next question", async () => {
     const user = userEvent.setup();
     const onSend = vi.fn();

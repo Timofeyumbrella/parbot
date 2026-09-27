@@ -105,13 +105,13 @@ export const composerUploads = {
   },
 
   /**
-   * The upload of this same file (name and size) into this assistant that is still on its way or
-   * saved a moment ago, if any; a refused one does not count.
+   * The upload of this same file (name and size) into this assistant that is still on its way, if
+   * any. Once saved, the source list knows the file (and forgets it if it is deleted later).
    */
   find: (assistantId: string, file: { name: string; size: number }) => {
     for (const [id, entry] of entries) {
       if (
-        entry.state.status !== 'failed' &&
+        entry.state.status === 'uploading' &&
         entry.file.assistantId === assistantId &&
         entry.file.name === file.name &&
         entry.file.size === file.size
