@@ -53,16 +53,19 @@ const loadReferenceOptions = async (assistantId: string) => {
 
 /**
  * The assistant's sources, newest first. Read as soon as a composer mounts so the picker opens
- * with its list, and read again while one of them is being indexed, so a chip moves from Indexing
- * to Ready by itself.
+ * with its list, and read again while a source the composer shows as a chip (`watched`) is being
+ * indexed, so the chip moves from Indexing to Ready by itself. A long crawl nobody pointed at is
+ * left to the Knowledge screen.
  */
-export const useReferenceSources = (assistantId: string) =>
+export const useReferenceSources = (assistantId: string, watched: readonly string[] = []) =>
   useQuery({
     queryKey: referenceSourcesKey(assistantId),
     queryFn: () => loadReferenceOptions(assistantId),
     staleTime: 5_000,
     refetchInterval: (query) =>
-      query.state.data?.some((option) => isIndexingStatus(option.status))
+      query.state.data?.some(
+        (option) => watched.includes(option.id) && isIndexingStatus(option.status),
+      )
         ? REFERENCE_POLL_MS
         : false,
   });

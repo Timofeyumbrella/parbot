@@ -49,12 +49,15 @@ export const ChatComposer = ({
 }: ChatComposerProps) => {
   const assistant = useAssistant();
   const queryClient = useQueryClient();
-  const sources = useReferenceSources(assistant.id);
   const [edited, setEdited] = useState(() => readReferenceDraft(draftKey));
+  const references = edited ?? conversationReferences;
+  const sources = useReferenceSources(
+    assistant.id,
+    references.map((reference) => reference.id),
+  );
   // Chip statuses follow uploads as they finish.
   useSyncExternalStore(composerUploads.subscribe, composerUploads.version, serverSnapshot);
 
-  const references = edited ?? conversationReferences;
   const byId = useMemo(
     () => new Map((sources.data ?? []).map((option) => [option.id, option])),
     [sources.data],

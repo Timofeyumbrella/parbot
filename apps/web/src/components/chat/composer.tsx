@@ -257,6 +257,8 @@ export const Composer = ({
   const attach = (files: File[]) => {
     if (references && files.length > 0) {
       references.onAttach(files);
+      // Straight back to the question, which can go out while the file uploads.
+      textareaRef.current?.focus();
     }
   };
 
