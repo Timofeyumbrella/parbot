@@ -58,6 +58,7 @@ export const DemoFrame = ({ title, sources, composer, children, bodyRef }: DemoF
     */}
     <div
       ref={bodyRef}
+      data-testid="demo-thread"
       className="flex h-[29rem] min-w-0 flex-col gap-5 overflow-hidden p-4 [mask-image:linear-gradient(to_bottom,transparent,black_1rem)] sm:h-[26rem]"
     >
       {children}

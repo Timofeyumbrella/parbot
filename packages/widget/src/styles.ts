@@ -319,6 +319,7 @@ button:focus-visible, textarea:focus-visible, input:focus-visible, a:focus-visib
   max-width: 88%;
   color: var(--pb-danger);
   font-size: 13px;
+  overflow-wrap: anywhere;
   display: flex;
   gap: 8px;
   align-items: center;
@@ -336,6 +337,7 @@ button:focus-visible, textarea:focus-visible, input:focus-visible, a:focus-visib
 
 .pb-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .pb-chip {
+  max-width: 100%;
   border: 1px solid var(--pb-border);
   border-radius: 999px;
   padding: 5px 11px;
@@ -343,6 +345,7 @@ button:focus-visible, textarea:focus-visible, input:focus-visible, a:focus-visib
   color: var(--pb-fg);
   background: var(--pb-bg);
   text-align: left;
+  overflow-wrap: anywhere;
 }
 .pb-chip:hover { border-color: var(--pb-accent); background: var(--pb-muted); }
 
@@ -379,7 +382,8 @@ button:focus-visible, textarea:focus-visible, input:focus-visible, a:focus-visib
 .pb-btn:disabled { opacity: 0.6; cursor: default; }
 .pb-btn.pb-ghost { background: none; color: var(--pb-muted-fg); }
 .pb-btn.pb-ghost:hover { color: var(--pb-fg); }
-.pb-thanks { align-self: flex-start; color: var(--pb-muted-fg); font-size: 13px; }
+/* The thanks line repeats the reader's address, which can be one long unbroken word. */
+.pb-thanks { align-self: flex-start; max-width: 88%; color: var(--pb-muted-fg); font-size: 13px; overflow-wrap: anywhere; }
 
 .pb-composer {
   display: flex;

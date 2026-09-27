@@ -30,6 +30,8 @@ const LONG_CODE =
 
 /** What the reader sends: all three at once. */
 const QUESTION = `${TOKEN} ${LONG_URL} \`${LONG_CODE}\``;
+/** A valid address with the longest local part allowed, which the widget's thank-you repeats. */
+const LONG_EMAIL = `${TOKEN.slice(0, 64)}@example.com`;
 /** The stub answers with the first sentence of the best passage, so this one carries all three. */
 const PASSAGE = `Paste ${TOKEN} into ${LONG_URL} and run \`${LONG_CODE}\` to refund part of a payment.`;
 /** A stored answer with a fenced block, which the stub never writes. */
@@ -85,10 +87,25 @@ const seed = async (service: SupabaseClient): Promise<Seed> => {
 
   const userId = created.user.id;
   const slug = email.split('@')[0]!.replace(/[^a-z0-9-]/g, '-');
+  // Starter, so the widget offers to take an email when the docs fall short.
+  must(
+    await service
+      .from('subscriptions')
+      .update({ plan_id: 'starter', status: 'active', billing_interval: 'monthly' })
+      .eq('account_id', userId)
+      .select('account_id'),
+  );
+
   const assistant = must(
     await service
       .from('assistants')
-      .insert({ owner_id: userId, name: 'Northwind docs', slug, mode: 'bubble' })
+      .insert({
+        owner_id: userId,
+        name: 'Northwind docs',
+        slug,
+        mode: 'bubble',
+        lead_capture: true,
+      })
       .select('id, public_key')
       .single(),
   );
@@ -237,6 +254,19 @@ const expectInsideScreen = async (page: Page, boxes: Locator, label: string) => 
   }
 };
 
+/**
+ * A scrolling pane has nothing to scroll sideways. A word that overflows its box inside a pane
+ * that scrolls, like the widget's message list, never widens the page; it makes the pane scroll.
+ */
+const expectNoSidewaysScroll = async (pane: Locator, label: string) => {
+  const { scrollWidth, clientWidth } = await pane.evaluate((node) => ({
+    scrollWidth: node.scrollWidth,
+    clientWidth: node.clientWidth,
+  }));
+
+  expect(scrollWidth, `${label}: sideways scroll in the pane`).toBeLessThanOrEqual(clientWidth);
+};
+
 /** Measures at every phone width. The layout reflows on resize, so one visit covers all three. */
 const atEveryPhoneWidth = async (page: Page, check: (width: number) => Promise<void>) => {
   for (const width of PHONE_WIDTHS) {
@@ -275,6 +305,8 @@ test.describe('long messages on a phone', () => {
     await visit(page, `/a/${seeded.assistantId}/chat/${seeded.chatConversationId}`);
 
     const thread = page.getByTestId('thread');
+    // The pane that scrolls the messages.
+    const messages = thread.locator(':scope > div').first();
     const stored = thread.locator('[data-role="assistant"][data-status="complete"]');
 
     await expect(stored.getByTestId('code-block')).toBeVisible();
@@ -287,6 +319,7 @@ test.describe('long messages on a phone', () => {
         thread.locator('[data-role] > div, [data-testid="code-block"], [data-testid="sources"]'),
         `stored chat at ${width}`,
       );
+      await expectNoSidewaysScroll(messages, `stored chat at ${width}`);
       // The long line scrolls inside its block instead of pushing it wider.
       expect(await code.evaluate((node) => node.scrollWidth > node.clientWidth)).toBe(true);
     });
@@ -314,6 +347,7 @@ test.describe('long messages on a phone', () => {
         thread.locator('[data-role] > div, [data-testid="sources"]'),
         `streamed chat at ${width}`,
       );
+      await expectNoSidewaysScroll(messages, `streamed chat at ${width}`);
     });
   });
 
@@ -399,13 +433,28 @@ test.describe('long messages on a phone', () => {
       await input.fill(`${TOKEN} again`);
       await input.press('Enter');
       await expect(widget('.pb-body pre')).toBeVisible({ timeout: 15_000 });
+      await visitor.unrouteAll({ behavior: 'wait' });
+
+      // Something the docs do not cover: the email offer, and a thank-you that repeats a long address.
+      await input.fill('What will the weather be like on Mars next week?');
+      await input.press('Enter');
+
+      const form = widget('form.pb-lead');
+
+      await expect(form).toBeVisible({ timeout: 15_000 });
+      await form.locator('input[name=email]').fill(LONG_EMAIL);
+      await form.locator('button[type=submit]').click();
+      await expect(widget('.pb-thanks')).toHaveText(
+        `Thanks. The team will reply to ${LONG_EMAIL}.`,
+      );
 
       await atEveryPhoneWidth(visitor, async (width) => {
         await expectInsideScreen(
           visitor,
-          widget('.pb-msg, .pb-body pre, .pb-sources'),
+          widget('.pb-msg, .pb-body pre, .pb-sources, .pb-thanks'),
           `widget at ${width}`,
         );
+        await expectNoSidewaysScroll(widget('.pb-messages'), `widget at ${width}`);
         expect(
           await widget('.pb-body pre').evaluate((node) => node.scrollWidth > node.clientWidth),
         ).toBe(true);
@@ -468,6 +517,7 @@ test.describe('long messages on a phone', () => {
           `landing demo at ${width}`,
         );
         await expectInsideScreen(visitor, frame, `landing frame at ${width}`);
+        await expectNoSidewaysScroll(frame.getByTestId('demo-thread'), `landing demo at ${width}`);
       });
     } finally {
       await visitor.close();
