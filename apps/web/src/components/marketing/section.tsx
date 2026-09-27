@@ -30,7 +30,7 @@ type SectionHeadingProps = {
   id: string;
   eyebrow: string;
   title: string;
-  lede?: string;
+  lede?: React.ReactNode;
   align?: 'left' | 'center';
   className?: string;
 };

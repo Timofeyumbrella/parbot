@@ -135,6 +135,10 @@ describe('landing page', () => {
     expect(screen.getByText(/Sign up to point Parbot at your own/)).toBeInTheDocument();
     expect(screen.queryByText(/to try it here/)).not.toBeInTheDocument();
     expect(screen.queryByText(/⌘K palette on this page/)).not.toBeInTheDocument();
+    // Nothing points a phone anywhere either.
+    expect(screen.queryByTestId('live-demo-hint')).not.toBeInTheDocument();
+    expect(document.querySelector('a[href^="/demo/"]')).toBeNull();
+    expect(screen.queryByText(/press ⌘K/)).not.toBeInTheDocument();
     expect(document.querySelector('script[data-parbot]')).toBeNull();
   });
 
@@ -157,5 +161,40 @@ describe('landing page', () => {
       'pb_demo_key',
     );
     expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('shows the ⌘K hints on wide screens only and a link to the live demo below them', () => {
+    vi.stubEnv('NEXT_PUBLIC_DEMO_ASSISTANT_KEY', 'pb_demo_key');
+
+    render(<LandingPage />);
+
+    const hero = section('hero-heading');
+
+    // Below lg the pill is hidden and a phone has no ⌘K, so each hint gives way to a link.
+    expect(hero.getByTestId('palette-hint')).toHaveClass('hidden', 'lg:list-item');
+    expect(hero.getByText(/The ⌘K palette on this page answers live/)).toHaveClass(
+      'hidden',
+      'lg:inline',
+    );
+    expect(screen.getByText(/press ⌘K and ask the assistant on this page/)).toHaveClass(
+      'hidden',
+      'lg:inline',
+    );
+
+    const phoneHint = hero.getByTestId('live-demo-hint');
+    expect(phoneHint).toHaveClass('lg:hidden');
+    expect(
+      within(phoneHint).getByRole('link', { name: 'Try it live on the Parbot docs' }),
+    ).toHaveAttribute('href', '/demo/pb_demo_key?mode=bubble');
+
+    const phoneLinks = [
+      hero.getByRole('link', { name: 'the demo page' }),
+      section('faq-heading').getByRole('link', { name: 'the live assistant' }),
+    ];
+
+    for (const link of phoneLinks) {
+      expect(link).toHaveAttribute('href', '/demo/pb_demo_key?mode=bubble');
+      expect(link.closest('.lg\\:hidden')).not.toBeNull();
+    }
   });
 });
