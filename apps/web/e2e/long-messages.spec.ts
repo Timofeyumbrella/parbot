@@ -67,7 +67,8 @@ type Seed = {
   email: string;
   assistantId: string;
   publicKey: string;
-  conversationId: string;
+  chatConversationId: string;
+  widgetConversationId: string;
 };
 
 const seed = async (service: SupabaseClient): Promise<Seed> => {
@@ -136,57 +137,67 @@ const seed = async (service: SupabaseClient): Promise<Seed> => {
       .select('id'),
   );
 
-  // A conversation as the engine would title it: the first 60 characters of the question.
-  const conversation = must(
-    await service
-      .from('conversations')
-      .insert({ assistant_id: assistant.id, owner_id: userId, title: `${TOKEN.slice(0, 60)}…` })
-      .select('id')
-      .single(),
-  );
   const now = Date.now();
+  /** One exchange with a fenced answer, titled as the engine titles it: the question's first 60 characters. */
+  const conversation = async (fields: Record<string, unknown>) => {
+    const row = must(
+      await service
+        .from('conversations')
+        .insert({
+          assistant_id: assistant.id,
+          owner_id: userId,
+          title: `${TOKEN.slice(0, 60)}…`,
+          ...fields,
+        })
+        .select('id')
+        .single(),
+    );
+    const message = (created: number, rest: Record<string, unknown>) => ({
+      conversation_id: row.id,
+      assistant_id: assistant.id,
+      owner_id: userId,
+      created_at: new Date(now - created).toISOString(),
+      ...rest,
+    });
 
-  must(
-    await service
-      .from('messages')
-      .insert([
-        {
-          conversation_id: conversation.id,
-          assistant_id: assistant.id,
-          owner_id: userId,
-          role: 'user',
-          content: QUESTION,
-          citations: [],
-          created_at: new Date(now - 60_000).toISOString(),
-        },
-        {
-          conversation_id: conversation.id,
-          assistant_id: assistant.id,
-          owner_id: userId,
-          role: 'assistant',
-          content: FENCED_ANSWER,
-          answered: true,
-          citations: [
-            {
-              index: 1,
-              documentId: document.id,
-              title: 'Partial refunds with idempotency keys and webhook retries',
-              url: LONG_URL,
-              snippet: PASSAGE.slice(0, 200),
-            },
-          ],
-          created_at: new Date(now - 58_000).toISOString(),
-        },
-      ])
-      .select('id'),
-  );
+    must(
+      await service
+        .from('messages')
+        .insert([
+          message(60_000, { role: 'user', content: QUESTION, citations: [] }),
+          message(58_000, {
+            role: 'assistant',
+            content: FENCED_ANSWER,
+            answered: true,
+            citations: [
+              {
+                index: 1,
+                documentId: document.id,
+                title: 'Partial refunds with idempotency keys and webhook retries',
+                url: LONG_URL,
+                snippet: PASSAGE.slice(0, 200),
+              },
+            ],
+          }),
+        ])
+        .select('id'),
+    );
+
+    return row.id as string;
+  };
 
   return {
     userId,
     email,
     assistantId: assistant.id as string,
     publicKey: assistant.public_key as string,
-    conversationId: conversation.id as string,
+    chatConversationId: await conversation({ channel: 'app' }),
+    // A reader's conversation from a page with a long address, which the Inbox panel shows.
+    widgetConversationId: await conversation({
+      channel: 'widget',
+      visitor_id: 'visitor_0123456789abcdef01234567',
+      page_url: LONG_URL,
+    }),
   };
 };
 
@@ -261,7 +272,7 @@ test.describe('long messages on a phone', () => {
 
   test('the in-app chat wraps a stored answer and a streamed one inside the screen', async () => {
     await page.setViewportSize({ width: PHONE_WIDTHS[0]!, height: 800 });
-    await visit(page, `/a/${seeded.assistantId}/chat/${seeded.conversationId}`);
+    await visit(page, `/a/${seeded.assistantId}/chat/${seeded.chatConversationId}`);
 
     const thread = page.getByTestId('thread');
     const stored = thread.locator('[data-role="assistant"][data-status="complete"]');
@@ -320,7 +331,7 @@ test.describe('long messages on a phone', () => {
     });
 
     await page.setViewportSize({ width: PHONE_WIDTHS[0]!, height: 800 });
-    await visit(page, `/a/${seeded.assistantId}/inbox/${seeded.conversationId}`);
+    await visit(page, `/a/${seeded.assistantId}/inbox/${seeded.widgetConversationId}`);
 
     const transcript = page.getByTestId('transcript-message');
 
@@ -331,7 +342,7 @@ test.describe('long messages on a phone', () => {
       await expectInsideScreen(
         page,
         page.locator(
-          '[data-testid="transcript-message"] > div, [data-testid="transcript-message"] [data-testid="code-block"], h1',
+          '[data-testid="transcript-message"] > div, [data-testid="transcript-message"] [data-testid="code-block"], h1, [data-testid="conversation-panel"]',
         ),
         `inbox transcript at ${width}`,
       );

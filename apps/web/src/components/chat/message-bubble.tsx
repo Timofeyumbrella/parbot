@@ -25,7 +25,8 @@ export type MessageBubbleProps = {
 
 const UserBubble = ({ message }: { message: ThreadMessage }) => (
   <div className="flex flex-col items-end gap-1" data-role="user" data-status={message.status}>
-    <div className="bg-muted text-foreground max-w-[85%] whitespace-pre-wrap break-words rounded-2xl rounded-br-md px-3.5 py-2 text-sm leading-relaxed">
+    {/* `anywhere`, not `break-word`: a pasted token must not set the column's minimum width either. */}
+    <div className="bg-muted text-foreground wrap-anywhere max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-md px-3.5 py-2 text-sm leading-relaxed">
       {message.content}
     </div>
     {message.status === 'failed' ? (
