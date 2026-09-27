@@ -4,6 +4,8 @@
 
 **Live: https://parbot-web.vercel.app** · demo login `demo@parbot.dev` / `parbot-demo`
 
+**Video walkthrough: coming soon**
+
 Parbot is an Ask-AI assistant for developer docs. Point it at your documentation, and readers ask
 in plain language and get a streamed answer drawn from your docs with the pages it used listed
 underneath: inside the app as a ChatGPT-style chat, and on your own site as a one-script-tag widget,
@@ -30,18 +32,18 @@ Knowledge, then ask about it in Chat. Palette mode, colours and lead capture unl
 Starter on Billing.
 
 The demo account is on Starter with Parbot's own docs indexed and two weeks of seeded conversations,
-so it is the quickest way to see the Inbox and the Overview with data in them; on the Overview, pick
-7 days. The account is shared with everyone who reads this, and the ⌘K palette on the landing page
-answers from it, so please try billing changes and deleting sources on your own account.
+so it is the quickest way to see the Inbox and the Overview with data in them. The account is shared
+with everyone who reads this, and the ⌘K palette on the landing page answers from it, so please try
+billing changes and deleting sources on your own account.
 
-| Requirement                            | Where it is                                                                                                                                                                                                                                                                           |
-| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Landing page with features and pricing | `/`: a scripted example conversation in the hero, the bubble and ⌘K modes, features, and pricing with a monthly or yearly toggle. On a desktop, ⌘K opens the live palette, answering from Parbot's docs; on a phone, use the widget links above.                                      |
-| Upload docs to build a chatbot         | Knowledge: PDF, Word (.docx), HTML, Markdown or plain text files, pasted text, a website or a sitemap. Sources index live, and each one opens as its extracted text with a link to the original file or page.                                                                         |
-| ChatGPT-like chat in the app           | Chat: your message appears at once and the answer streams in under it, with citations that open the cited passage. `@` or the paperclip points the chat at a file, Stop keeps what you saw, and Projects are folders with their own files and instructions.                           |
-| Embeddable widget                      | Widget: bubble or palette, colours, position, welcome line, suggested questions, the sites allowed to use it, branding and lead capture, with a preview that reloads on save and a one-line install snippet. Palette, colours, branding and lead capture need a paid plan.            |
-| Pricing and billing                    | Billing: the plan and usage meters. Choose Starter or Growth, then Apply on the card that stands in for Stripe Checkout. A paid plan turns on palette mode, a custom theme, lead capture and removing the branding, and raises the limits.                                            |
-| Beyond the brief                       | Inbox: every conversation from the chat and the widget, and the leads. Overview: answer quality over 7 or 30 days against the period before, knowledge gaps, disliked answers, where readers ask, the docs answers use and the ones they never do, leads, and usage against the plan. |
+| Requirement                            | Where it is                                                                                                                                                                                                                                                                                                                  |
+| -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Landing page with features and pricing | `/`: a scripted example conversation in the hero, the bubble and ⌘K modes, features, and pricing with a monthly or yearly toggle. On a desktop, ⌘K opens the live palette, answering from Parbot's docs; on a phone, a link in the hero opens the same assistant on its demo page.                                           |
+| Upload docs to build a chatbot         | Knowledge: PDF, Word (.docx), HTML, Markdown or plain text files, pasted text, a website or a sitemap. Sources index live, and each one opens as its extracted text, headings and lists kept, with a link to the original file or page.                                                                                      |
+| ChatGPT-like chat in the app           | Chat: your message appears at once and the answer streams in under it, with citations that open the cited passage. `@` or the paperclip points the chat at a file (one already in Knowledge is not uploaded again), Stop keeps what you saw and its sources, and Projects are folders with their own files and instructions. |
+| Embeddable widget                      | Widget: bubble or palette, colours, position, welcome line, suggested questions, the sites allowed to use it, branding and lead capture, with a preview that reloads on save and a one-line install snippet. Palette, colours, branding and lead capture need a paid plan.                                                   |
+| Pricing and billing                    | Billing: the plan and usage meters. Choose Starter or Growth, then Apply on the card that stands in for Stripe Checkout. A paid plan turns on palette mode, a custom theme, lead capture and removing the branding, and raises the limits.                                                                                   |
+| Beyond the brief                       | Inbox: every conversation from the chat and the widget, and the leads. Overview: answer quality over the last 7 days, or 30, against the period before, knowledge gaps, disliked answers, where readers ask, the docs answers use and the ones they never do, leads, and usage against the plan.                             |
 
 ## Stack
 
@@ -97,8 +99,10 @@ card. Everything else in `.env.example` is optional.
    (with `@` or the paperclip), or the conversation is in a project with files, the best passages of
    those files are read first whatever their similarity (`match_chunks_in_sources`).
 2. The closest passages, trimmed to a context budget, go to the model with a system prompt that
-   allows answering only from them and asks for `[n]` citations. A project's instructions are
-   added after the assistant's own, and the prompt tells the model they never override that rule.
+   allows answering only from them and asks for `[n]` citations. When they cover only part of the
+   question, the answer gives that part and says what the docs leave out; a question they do not
+   touch at all gets the unanswered reply. A project's instructions are added after the
+   assistant's own, and the prompt tells the model they never override that rule.
    A model that sends nothing within `GEMINI_FIRST_CHUNK_DEADLINE_MS` (3.5 s) gets the next model
    in the chain started beside it; the first to send a chunk answers and the other is aborted.
 3. The answer streams to the client as server-sent events (`packages/shared` defines them): `meta`,
@@ -133,7 +137,14 @@ Overview's default week. `seed:demo --refresh-history` replaces it with two week
 and keeps the assistant, its settings and its public key: it deletes the assistant's
 conversations, leads and chat projects, seeds the history again with citations to the pages
 indexed now, sets this month's answer count to match, and prints what it deleted and created.
-Run it on the day of a demo.
+Run it on the day of a demo. With the hosted values in a separate env file, run it from `apps/web`:
+
+```bash
+node --env-file=<file> --conditions=react-server --import tsx scripts/seed-demo.ts --refresh-history
+```
+
+Never use `--reset` on a deployment: the ⌘K palette on the landing page and the widget links under
+Try it depend on the public key.
 
 ## Tests
 
