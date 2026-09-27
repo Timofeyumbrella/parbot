@@ -2,7 +2,11 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
 import { ConversationList } from '@/components/inbox/conversation-list';
-import { conversationPage } from '@/components/inbox/conversation-query';
+import {
+  conversationPage,
+  projectNames,
+  type ProjectNames,
+} from '@/components/inbox/conversation-query';
 import { ConversationFilters, InboxTabs } from '@/components/inbox/inbox-nav';
 import { LeadsTable } from '@/components/inbox/leads-table';
 import { PendingNav, PendingRegion } from '@/components/inbox/pending-nav';
@@ -32,7 +36,7 @@ export default async function InboxPage({
   const now = new Date().getTime();
 
   // Only the open tab's rows are fetched; both counts are cheap and label the tabs.
-  const [conversations, leads, conversationCount, leadCount] = await Promise.all([
+  const [conversations, leads, conversationCount, leadCount, projects] = await Promise.all([
     tab === 'conversations' ? conversationPage(supabase, assistantId, filter) : null,
     tab === 'leads'
       ? supabase
@@ -50,6 +54,10 @@ export default async function InboxPage({
       .from('leads')
       .select('id', { count: 'exact', head: true })
       .eq('assistant_id', assistantId),
+    // The labels are a nicety: a failure to read them leaves the rows unlabelled, not the page broken.
+    tab === 'conversations'
+      ? projectNames(supabase, assistantId).catch(() => ({}) as ProjectNames)
+      : undefined,
   ]);
 
   const failure = [conversations, leads, conversationCount, leadCount].find(
@@ -95,6 +103,7 @@ export default async function InboxPage({
               filter={filter}
               initialRows={conversations?.data ?? []}
               now={now}
+              projects={projects}
             />
           </PendingRegion>
         )}

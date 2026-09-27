@@ -13,6 +13,7 @@ import { MessageBubble } from '@/components/chat/message-bubble';
 import { Welcome } from '@/components/chat/welcome';
 import { Button } from '@/components/ui/button';
 import { useAutoscroll } from '@/hooks/use-autoscroll';
+import { useConversationRow } from '@/hooks/use-conversations';
 import { useSendMessage } from '@/hooks/use-send-message';
 import { useFeedback, useThread } from '@/hooks/use-thread';
 import type { MessageReference } from '@/lib/chat/references';
@@ -33,6 +34,8 @@ export const Thread = ({ conversationId }: ThreadProps) => {
   const { data, isError, error, refetch, isFetching } = useThread(conversationId, valid);
   const { send, stop, retry } = useSendMessage(assistant.id);
   const feedback = useFeedback(conversationId);
+  // The project the conversation is in right now; moving it changes the composer's fixed chips.
+  const projectId = useConversationRow(assistant.id, conversationId)?.project_id ?? null;
   const messages = data?.messages ?? [];
   const streaming = isStreaming(data);
   const activeReferences = useMemo(() => conversationReferences(data), [data]);
@@ -156,6 +159,7 @@ export const Thread = ({ conversationId }: ThreadProps) => {
           className="mx-auto w-full max-w-3xl"
           draftKey={conversationId}
           conversationReferences={activeReferences}
+          projectId={projectId}
           onSend={handleSend}
           onStop={handleStop}
           streaming={streaming}

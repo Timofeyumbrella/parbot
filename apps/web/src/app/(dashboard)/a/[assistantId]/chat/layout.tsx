@@ -3,15 +3,24 @@ import { Suspense } from 'react';
 import { ChatShell } from '@/components/chat/chat-shell';
 import { ConversationListSkeleton } from '@/components/chat/chat-skeletons';
 import { ConversationList } from '@/components/chat/conversation-list';
-import { readConversationSnapshot } from '@/lib/chat/queries';
+import { readConversationSnapshot, readProjectSnapshot } from '@/lib/chat/queries';
 import { requireUser } from '@/lib/session';
 
-/** Reads the list with the visitor's own session and seeds the client cache with it. */
+/** Reads the list and the projects with the visitor's own session and seeds the client cache. */
 async function ConversationPane({ assistantId }: { assistantId: string }) {
   const { supabase } = await requireUser();
-  const snapshot = await readConversationSnapshot(supabase, assistantId);
+  const [snapshot, projectSnapshot] = await Promise.all([
+    readConversationSnapshot(supabase, assistantId),
+    readProjectSnapshot(supabase, assistantId),
+  ]);
 
-  return <ConversationList assistantId={assistantId} snapshot={snapshot} />;
+  return (
+    <ConversationList
+      assistantId={assistantId}
+      snapshot={snapshot}
+      projectSnapshot={projectSnapshot}
+    />
+  );
 }
 
 /**

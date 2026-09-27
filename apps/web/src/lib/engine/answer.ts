@@ -18,6 +18,12 @@ import {
   UNANSWERED_TEXT,
 } from './prompt';
 import {
+  loadProjectContext,
+  mergeContextSources,
+  type ProjectContext,
+  resolveProjectContext,
+} from './projects';
+import {
   isIndexing,
   readingMessage,
   REFERENCE_WAIT_MS,
@@ -76,6 +82,11 @@ export type AnswerParams = {
    * replaces the conversation's references, undefined keeps the ones it has.
    */
   references?: string[];
+  /**
+   * The project a new in-app conversation starts in. Read only when this request creates the
+   * conversation; an existing one answers with the project it is in now.
+   */
+  projectId?: string;
   /** How long to wait for a referenced source that is still being indexed. */
   referenceWaitMs?: number;
 };
@@ -86,6 +97,8 @@ const SNIPPET_CHARS = 240;
 const HOLD_CHARS = NO_ANSWER.length + 2;
 /** Postgres unique_violation. */
 const UNIQUE_VIOLATION = '23505';
+/** Postgres foreign_key_violation. */
+const FOREIGN_KEY_VIOLATION = '23503';
 
 const snippet = (content: string) => {
   const text = content.replace(/\s+/g, ' ').trim();
@@ -149,6 +162,7 @@ type StoredConversation = {
   channel: string;
   visitor_id: string | null;
   title: string | null;
+  project_id: string | null;
 };
 
 const findConversation = async (
@@ -157,7 +171,7 @@ const findConversation = async (
 ): Promise<StoredConversation | null> => {
   const { data } = await service
     .from('conversations')
-    .select('id, assistant_id, channel, visitor_id, title')
+    .select('id, assistant_id, channel, visitor_id, title, project_id')
     .eq('id', id)
     .maybeSingle();
 
@@ -229,10 +243,46 @@ export async function* streamAnswer(params: AnswerParams): AsyncGenerator<ChatSt
     return;
   }
 
-  const existing = await findConversation(service, conversation.id);
+  // A project named for a new conversation is read beside the lookup, so starting a chat in a
+  // project costs no extra round trip. The widget never starts one in a project.
+  const wantsProject = conversation.channel === 'app' && Boolean(params.projectId);
+  const [existing, requested] = await Promise.all([
+    findConversation(service, conversation.id),
+    wantsProject
+      ? loadProjectContext(service, assistant.id, params.projectId!).then(
+          (project) => ({ project, failed: false }),
+          (cause: unknown) => {
+            console.error('[engine] the project could not be read', cause);
+
+            return { project: null, failed: true };
+          },
+        )
+      : Promise.resolve(null),
+  ]);
 
   if (existing && isForeign(existing, assistant, conversation)) {
     yield { type: 'error', code: 'not_found', message: 'That conversation does not exist.' };
+
+    return;
+  }
+
+  // A new conversation that asked for a project starts in it or not at all: starting it outside
+  // would answer without the files the reader expects.
+  const newProject: ProjectContext | null = existing ? null : (requested?.project ?? null);
+
+  if (!existing && requested && !requested.project) {
+    yield requested.failed
+      ? {
+          type: 'error',
+          code: 'internal',
+          message: 'The conversation could not be started. Try again in a moment.',
+        }
+      : {
+          type: 'error',
+          code: 'not_found',
+          message:
+            'That project no longer exists. Start the chat outside it, or pick another project.',
+        };
 
     return;
   }
@@ -332,6 +382,9 @@ export async function* streamAnswer(params: AnswerParams): AsyncGenerator<ChatSt
     }
   };
 
+  /** The project the conversation is in as this question is asked; null for none. */
+  let projectId = existing?.project_id ?? null;
+
   try {
     if (!existing) {
       const { error } = await service.from('conversations').insert({
@@ -342,6 +395,7 @@ export async function* streamAnswer(params: AnswerParams): AsyncGenerator<ChatSt
         visitor_id: conversation.visitorId ?? null,
         page_url: conversation.pageUrl ?? null,
         title: conversationTitle(message),
+        project_id: newProject?.id ?? null,
       });
 
       if (error?.code === UNIQUE_VIOLATION) {
@@ -354,6 +408,19 @@ export async function* streamAnswer(params: AnswerParams): AsyncGenerator<ChatSt
 
           return;
         }
+
+        projectId = winner.project_id;
+      } else if (error?.code === FOREIGN_KEY_VIOLATION && newProject) {
+        // The project was deleted between the lookup above and this insert.
+        settled = true;
+        yield {
+          type: 'error',
+          code: 'not_found',
+          message:
+            'That project no longer exists. Start the chat outside it, or pick another project.',
+        };
+
+        return;
       } else if (error) {
         console.error('[engine] a conversation could not be started', error);
         settled = true;
@@ -366,6 +433,7 @@ export async function* streamAnswer(params: AnswerParams): AsyncGenerator<ChatSt
         return;
       } else {
         created = true;
+        projectId = newProject?.id ?? null;
       }
     } else if (!existing.title) {
       await service
@@ -374,16 +442,17 @@ export async function* streamAnswer(params: AnswerParams): AsyncGenerator<ChatSt
         .eq('id', conversation.id);
     }
 
-    // References belong to the in-app chat: the widget never sends any, and its visitors cannot
-    // see an owner's private files.
-    const [{ data: history }, resolvedReferences] = await Promise.all([
+    // References and projects belong to the in-app chat: the widget never sends any, and its
+    // visitors cannot see an owner's private files.
+    const app = conversation.channel === 'app';
+    const [{ data: history }, references, project] = await Promise.all([
       service
         .from('messages')
         .select('role, content')
         .eq('conversation_id', conversation.id)
         .order('created_at', { ascending: false })
         .limit(HISTORY_TURNS),
-      conversation.channel === 'app'
+      app
         ? resolveReferences(service, {
             assistantId: assistant.id,
             ownerId: assistant.owner_id,
@@ -392,8 +461,15 @@ export async function* streamAnswer(params: AnswerParams): AsyncGenerator<ChatSt
             existing: Boolean(existing),
           })
         : Promise.resolve([] as ReferencedSource[]),
+      !app || !projectId
+        ? Promise.resolve(null)
+        : newProject?.id === projectId
+          ? Promise.resolve(newProject)
+          : resolveProjectContext(service, assistant.id, projectId),
     ]);
-    let references = resolvedReferences;
+    // What this question reads: the conversation's own references, then the project's files. Only
+    // the conversation's own are stored on the question; the project's follow the project.
+    let sources = mergeContextSources(references, project?.sources ?? []);
 
     // Newest first, so the first user row is the latest question.
     const newestFirst = history ?? [];
@@ -433,13 +509,13 @@ export async function* streamAnswer(params: AnswerParams): AsyncGenerator<ChatSt
       assistantMessageId,
     };
 
-    const waiting = references.filter((reference) => isIndexing(reference.status));
+    const waiting = sources.filter((source) => isIndexing(source.status));
 
     if (waiting.length > 0) {
       // A file attached a moment ago is usually indexed within a second or two. The reader sees
       // what the wait is for; past the limit the question is answered from what is ready.
       yield { type: 'status', message: readingMessage(waiting) };
-      references = await waitForReferences(service, references, {
+      sources = await waitForReferences(service, sources, {
         timeoutMs: params.referenceWaitMs ?? REFERENCE_WAIT_MS,
         signal: signal ? AbortSignal.any([signal, watch.signal]) : watch.signal,
       });
@@ -455,7 +531,7 @@ export async function* streamAnswer(params: AnswerParams): AsyncGenerator<ChatSt
         provider,
         assistant.id,
         retrievalQuery(message, previousQuestion),
-        { sourceIds: references.map((reference) => reference.id) },
+        { sourceIds: sources.map((source) => source.id) },
       );
     } catch (cause) {
       await rollback();
@@ -477,11 +553,27 @@ export async function* streamAnswer(params: AnswerParams): AsyncGenerator<ChatSt
         { role: 'user', text: renderQuestion(message, chunks) },
       ];
       // Only files that gave passages are named, so the model is never pointed at text it lacks.
+      const gave = (id: string) => chunks.some((chunk) => chunk.sourceId === id);
+      const ownIds = new Set(references.map((reference) => reference.id));
       const referencedTitles = references
-        .filter((reference) => chunks.some((chunk) => chunk.sourceId === reference.id))
+        .filter((reference) => gave(reference.id))
         .map((reference) => reference.title);
+      const promptProject = project
+        ? {
+            name: project.name,
+            instructions: project.instructions,
+            titles: sources
+              .filter(
+                (source) =>
+                  !ownIds.has(source.id) &&
+                  project.sources.some((file) => file.id === source.id) &&
+                  gave(source.id),
+              )
+              .map((source) => source.title),
+          }
+        : null;
       const generator = provider.stream({
-        system: buildSystemPrompt(assistant, referencedTitles),
+        system: buildSystemPrompt(assistant, referencedTitles, promptProject),
         turns,
         signal: signal ? AbortSignal.any([signal, watch.signal]) : watch.signal,
       });

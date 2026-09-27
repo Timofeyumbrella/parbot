@@ -114,6 +114,12 @@ export type AppChatRequest = {
    * has, so a follow-up still reads the file the first question named.
    */
   references?: string[];
+  /**
+   * The project a new conversation starts in: one of the caller's projects on this assistant. Only
+   * read when this request creates the conversation; an existing one keeps the project it is in
+   * (moving it is done from the sidebar), and its project's files and instructions apply.
+   */
+  projectId?: string;
 };
 
 /** The most sources one question can reference. */

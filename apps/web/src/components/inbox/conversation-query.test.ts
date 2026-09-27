@@ -180,7 +180,7 @@ describe('conversationPage', () => {
       ['from', 'conversations'],
       [
         'select',
-        'id, title, channel, page_url, message_count, unanswered_count, last_message_at, created_at',
+        'id, title, channel, page_url, message_count, unanswered_count, last_message_at, created_at, project_id',
       ],
       ['eq', 'assistant_id', 'assistant-1'],
       ['order', 'last_message_at', { ascending: false, nullsFirst: false }],

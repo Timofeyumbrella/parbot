@@ -8,6 +8,13 @@ import {
   type ConversationRow,
   type ConversationSnapshot,
 } from './conversations';
+import {
+  PROJECT_COLUMNS,
+  projectFromRow,
+  type ProjectRow,
+  type ProjectSnapshot,
+  sortProjects,
+} from './projects';
 import { mergeThread, type MessageRow, type Thread, THREAD_MESSAGE_COLUMNS } from './thread';
 
 type Client = SupabaseClient<Database>;
@@ -25,6 +32,32 @@ export const conversationsKey = (assistantId: string) =>
   [...CHAT_NAMESPACE, 'conversations', assistantId] as const;
 export const threadKey = (conversationId: string) =>
   [...CHAT_NAMESPACE, 'thread', conversationId] as const;
+export const projectsKey = (assistantId: string) =>
+  [...CHAT_NAMESPACE, 'projects', assistantId] as const;
+
+/** The assistant's projects with their files, newest first. Works with the server and the browser client. */
+export const fetchProjects = async (client: Client, assistantId: string): Promise<ProjectRow[]> => {
+  const { data, error } = await client
+    .from('chat_projects')
+    .select(PROJECT_COLUMNS)
+    .eq('assistant_id', assistantId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return sortProjects((data ?? []).map(projectFromRow));
+};
+
+/** The projects plus the clock they were read at, like the conversation snapshot. */
+export const readProjectSnapshot = async (
+  client: Client,
+  assistantId: string,
+): Promise<ProjectSnapshot> => ({
+  rows: await fetchProjects(client, assistantId),
+  fetchedAt: Date.now(),
+});
 
 /** The assistant's in-app conversations, newest first. Works with the server and the browser client. */
 export const fetchConversations = async (

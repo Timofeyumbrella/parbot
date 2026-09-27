@@ -1,12 +1,23 @@
 'use client';
 
-import { type QueryClient, useQuery } from '@tanstack/react-query';
+import { type QueryClient, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useCallback, useMemo, useSyncExternalStore } from 'react';
+import { toast } from 'sonner';
 
+import type { ComposerChip } from '@/components/chat/reference-chips';
 import { describeSource } from '@/components/knowledge/format';
 import { CHAT_NAMESPACE } from '@/lib/chat/queries';
-import { isIndexingStatus, type ReferenceOption } from '@/lib/chat/references';
+import {
+  addReference,
+  chipStatus,
+  isIndexingStatus,
+  type MessageReference,
+  type ReferenceOption,
+} from '@/lib/chat/references';
+import { composerUploads } from '@/lib/chat/uploads';
 import type { Source } from '@/lib/db';
 import { getSupabaseBrowserClient } from '@/lib/supabase/client';
+import { uploadProblem } from '@/lib/uploads';
 
 /** The chat's own list of the assistant's sources, for the @ picker and the chips' statuses. */
 export const referenceSourcesKey = (assistantId: string) =>
@@ -80,3 +91,97 @@ export const upsertReferenceOption = (
     toReferenceOption(row),
     ...(options ?? []).filter((option) => option.id !== row.id),
   ]);
+
+const serverSnapshot = () => 0;
+
+/**
+ * Chips for references: where each file is (Uploading, Indexing, Ready, Failed, Removed), from the
+ * upload in flight or the source's row. `fixed` are chips the reader cannot take off here (a
+ * project's files); both lists are watched, so a chip moves to Ready by itself.
+ */
+export const useReferenceChips = (
+  assistantId: string,
+  references: MessageReference[],
+  fixed: MessageReference[] = [],
+) => {
+  const watched = useMemo(
+    () => [...references, ...fixed].map((reference) => reference.id),
+    [references, fixed],
+  );
+  const sources = useReferenceSources(assistantId, watched);
+  // Chip statuses follow uploads as they finish.
+  useSyncExternalStore(composerUploads.subscribe, composerUploads.version, serverSnapshot);
+
+  const byId = useMemo(
+    () => new Map((sources.data ?? []).map((option) => [option.id, option])),
+    [sources.data],
+  );
+  const toChip = (reference: MessageReference): ComposerChip => {
+    const upload = composerUploads.state(reference.id);
+
+    return {
+      ...reference,
+      status: chipStatus({ upload, source: byId.get(reference.id), loaded: sources.isSuccess }),
+      error: upload?.status === 'failed' ? upload.error : undefined,
+    };
+  };
+
+  return { chips: references.map(toChip), fixedChips: fixed.map(toChip), sources };
+};
+
+/** Knowledge lists sources under its own keys; a file attached from the chat should show there too. */
+const KNOWLEDGE_NAMESPACE = ['knowledge'] as const;
+
+/**
+ * Attaching files from the chat: each one is uploaded into Knowledge through the same route the
+ * Add source dialog uses, and becomes a reference at once, with its upload's status on its chip.
+ * Returns the references with the new files added, up to `limit`.
+ */
+export const useAttachFiles = (assistantId: string) => {
+  const queryClient = useQueryClient();
+
+  return useCallback(
+    (
+      files: File[],
+      current: MessageReference[],
+      options: { limit: number; limitMessage: string },
+    ) => {
+      let next = current;
+
+      for (const file of files) {
+        const problem = uploadProblem(file);
+
+        if (problem) {
+          toast.error(`${file.name} was not attached. ${problem}`);
+          continue;
+        }
+
+        if (next.length >= options.limit) {
+          toast.error(options.limitMessage);
+          break;
+        }
+
+        const reference: MessageReference = {
+          id: crypto.randomUUID(),
+          title: file.name.slice(0, 200),
+          kind: 'upload',
+        };
+
+        next = addReference(next, reference, options.limit);
+        void composerUploads.start(
+          { id: reference.id, assistantId, file },
+          {
+            onSaved: (source) => {
+              upsertReferenceOption(queryClient, assistantId, source);
+              void queryClient.invalidateQueries({ queryKey: KNOWLEDGE_NAMESPACE });
+            },
+            onFailed: (error) => toast.error(`${reference.title} could not be uploaded. ${error}`),
+          },
+        );
+      }
+
+      return next;
+    },
+    [queryClient, assistantId],
+  );
+};

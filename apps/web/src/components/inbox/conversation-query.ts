@@ -11,7 +11,7 @@ import type { Conversation, Database } from '@/lib/db';
  */
 
 export const CONVERSATION_COLUMNS =
-  'id, title, channel, page_url, message_count, unanswered_count, last_message_at, created_at' as const;
+  'id, title, channel, page_url, message_count, unanswered_count, last_message_at, created_at, project_id' as const;
 
 export type ConversationRow = Pick<
   Conversation,
@@ -23,7 +23,33 @@ export type ConversationRow = Pick<
   | 'unanswered_count'
   | 'last_message_at'
   | 'created_at'
->;
+> & {
+  /** The chat project an in-app conversation is in; rows read before projects existed have none. */
+  project_id?: string | null;
+};
+
+/** A project's name by id, for the label on its conversations. */
+export type ProjectNames = Record<string, string>;
+
+export const inboxProjectsKey = (assistantId: string) =>
+  ['inbox', assistantId, 'projects'] as const;
+
+/** The assistant's projects by id. Works with the server and the browser client. */
+export const projectNames = async (
+  client: SupabaseClient<Database>,
+  assistantId: string,
+): Promise<ProjectNames> => {
+  const { data, error } = await client
+    .from('chat_projects')
+    .select('id, name')
+    .eq('assistant_id', assistantId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return Object.fromEntries((data ?? []).map((row) => [row.id, row.name]));
+};
 
 export const PAGE_SIZE = 30;
 

@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { z } from 'zod';
 
-import { ChannelBadge } from '@/components/inbox/channel-badge';
+import { ChannelBadge, ProjectBadge } from '@/components/inbox/channel-badge';
 import { ConversationPanel } from '@/components/inbox/conversation-panel';
 import { TranscriptMessage } from '@/components/inbox/transcript-message';
 import { PageContainer, PageHeader } from '@/components/page-header';
@@ -37,7 +37,7 @@ export default async function ConversationPage({
     supabase
       .from('conversations')
       .select(
-        'id, assistant_id, channel, visitor_id, title, page_url, created_at, message_count, unanswered_count',
+        'id, assistant_id, channel, visitor_id, title, page_url, created_at, message_count, unanswered_count, project:chat_projects(name)',
       )
       .eq('id', conversationId)
       .eq('assistant_id', assistantId)
@@ -92,7 +92,14 @@ export default async function ConversationPage({
         <PageHeader
           title={conversation.data.title || 'Untitled conversation'}
           description="A read-only transcript of what was asked and what the assistant answered."
-          actions={<ChannelBadge channel={conversation.data.channel} />}
+          actions={
+            <div className="flex flex-wrap items-center gap-2">
+              {conversation.data.project ? (
+                <ProjectBadge name={conversation.data.project.name} />
+              ) : null}
+              <ChannelBadge channel={conversation.data.channel} />
+            </div>
+          }
         />
       </div>
 

@@ -726,7 +726,9 @@ test.describe('the in-app chat', () => {
   });
 
   test('New chat right after the first send of a page load shows the welcome at once', async () => {
-    await page.goto(`/a/${assistantId}/chat`);
+    // `visit` waits for the streamed copy of the page to be revealed, or the welcome is on the
+    // page twice (the hidden server copy included) and the locator below is ambiguous.
+    await visit(page, `/a/${assistantId}/chat`);
     await expect(page.getByTestId('welcome')).toBeVisible();
 
     // After a page load the router has no payload for the new chat's own URL yet. Holding every

@@ -77,6 +77,51 @@ export type Database = {
           },
         ]
       }
+      chat_projects: {
+        Row: {
+          assistant_id: string
+          created_at: string
+          id: string
+          instructions: string
+          name: string
+          owner_id: string
+          updated_at: string
+        }
+        Insert: {
+          assistant_id: string
+          created_at?: string
+          id?: string
+          instructions?: string
+          name: string
+          owner_id: string
+          updated_at?: string
+        }
+        Update: {
+          assistant_id?: string
+          created_at?: string
+          id?: string
+          instructions?: string
+          name?: string
+          owner_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_projects_assistant_id_fkey"
+            columns: ["assistant_id"]
+            isOneToOne: false
+            referencedRelation: "assistants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chat_projects_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       chunks: {
         Row: {
           assistant_id: string
@@ -204,6 +249,7 @@ export type Database = {
           message_count: number
           owner_id: string
           page_url: string | null
+          project_id: string | null
           title: string | null
           unanswered_count: number
           updated_at: string
@@ -218,6 +264,7 @@ export type Database = {
           message_count?: number
           owner_id: string
           page_url?: string | null
+          project_id?: string | null
           title?: string | null
           unanswered_count?: number
           updated_at?: string
@@ -232,6 +279,7 @@ export type Database = {
           message_count?: number
           owner_id?: string
           page_url?: string | null
+          project_id?: string | null
           title?: string | null
           unanswered_count?: number
           updated_at?: string
@@ -251,6 +299,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversations_project_fkey"
+            columns: ["project_id", "assistant_id"]
+            isOneToOne: false
+            referencedRelation: "chat_projects"
+            referencedColumns: ["id", "assistant_id"]
           },
         ]
       }
@@ -520,6 +575,52 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      project_sources: {
+        Row: {
+          created_at: string
+          owner_id: string
+          position: number
+          project_id: string
+          source_id: string
+        }
+        Insert: {
+          created_at?: string
+          owner_id: string
+          position?: number
+          project_id: string
+          source_id: string
+        }
+        Update: {
+          created_at?: string
+          owner_id?: string
+          position?: number
+          project_id?: string
+          source_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_sources_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_sources_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "chat_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_sources_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "sources"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       rate_limits: {
         Row: {

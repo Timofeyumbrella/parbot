@@ -55,9 +55,13 @@ export const toReference = ({ id, title, kind }: MessageReference): MessageRefer
   kind,
 });
 
-/** Adds a reference once, at the end, and never past the limit. */
-export const addReference = (references: MessageReference[], added: MessageReference) =>
-  references.some((reference) => reference.id === added.id) || references.length >= MAX_REFERENCES
+/** Adds a reference once, at the end, and never past the limit (a question's, unless told). */
+export const addReference = (
+  references: MessageReference[],
+  added: MessageReference,
+  limit = MAX_REFERENCES,
+) =>
+  references.some((reference) => reference.id === added.id) || references.length >= limit
     ? references
     : [...references, toReference(added)];
 

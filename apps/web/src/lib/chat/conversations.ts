@@ -6,6 +6,8 @@ export type ConversationRow = {
   last_message_at: string | null;
   message_count: number;
   unanswered_count: number;
+  /** The project the conversation belongs to; null or absent for none. */
+  project_id?: string | null;
   /** Created in the browser and not yet confirmed by the server. */
   pending?: boolean;
 };
@@ -16,7 +18,8 @@ export type ConversationSnapshot = {
   fetchedAt: number;
 };
 
-export const CONVERSATION_COLUMNS = 'id, title, last_message_at, message_count, unanswered_count';
+export const CONVERSATION_COLUMNS =
+  'id, title, last_message_at, message_count, unanswered_count, project_id';
 export const CONVERSATION_LIST_LIMIT = 100;
 export const TITLE_LIMIT = 60;
 export const MAX_TITLE_LENGTH = 120;

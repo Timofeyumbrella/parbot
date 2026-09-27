@@ -22,6 +22,7 @@ import {
   NETWORK_FAILURE,
   STREAM_CUT_SHORT,
 } from '@/lib/chat/errors';
+import { projectCreations } from '@/lib/chat/project-state';
 import { conversationsKey, INBOX_NAMESPACE, threadKey } from '@/lib/chat/queries';
 import { type MessageReference, uploadingMessage } from '@/lib/chat/references';
 import { recordStop } from '@/lib/chat/stop';
@@ -49,6 +50,11 @@ export type SendInput = {
    * conversation's references; left out, the conversation keeps the ones it has.
    */
   references?: MessageReference[];
+  /**
+   * The project a new conversation starts in. The conversation keeps it from then on; a question
+   * in an existing conversation reads whatever project it is in when it is asked.
+   */
+  projectId?: string;
 };
 
 /** Resolves when the signal aborts: a Stop pressed while attached files are still uploading. */
@@ -118,6 +124,13 @@ export const sendMessage = async (
     }),
   );
 
+  const listed = queryClient
+    .getQueryData<ConversationRow[]>(listKey)
+    ?.find((row) => row.id === conversationId);
+  // A conversation the server has not confirmed yet (a first question, or its retry) still asks
+  // for its project; a confirmed one is already in whatever project it is in.
+  const projectId = listed && !listed.pending ? null : (input.projectId ?? listed?.project_id);
+
   queryClient.setQueryData<ConversationRow[]>(listKey, (rows) => {
     const existing = rows?.find((row) => row.id === conversationId);
 
@@ -127,6 +140,7 @@ export const sendMessage = async (
       last_message_at: now,
       message_count: (existing?.message_count ?? 0) + 1,
       unanswered_count: existing?.unanswered_count ?? 0,
+      project_id: existing ? (existing.project_id ?? null) : (input.projectId ?? null),
       pending: existing ? existing.pending : true,
     });
   });
@@ -193,12 +207,25 @@ export const sendMessage = async (
       );
     }
 
+    // A project created a moment ago may still be on its way to the server.
+    if (projectId && !(await projectCreations.ready(projectId))) {
+      settle(
+        errorEvent({
+          code: 'not_found',
+          message: 'The project could not be created, so this chat was not started. Try again.',
+        }),
+      );
+
+      return;
+    }
+
     const body: AppChatRequest = {
       assistantId,
       conversationId,
       message: content,
       assistantMessageId: answerId,
       ...(references ? { references: references.map((reference) => reference.id) } : {}),
+      ...(projectId ? { projectId } : {}),
     };
     const response = await fetch('/api/chat', {
       method: 'POST',
