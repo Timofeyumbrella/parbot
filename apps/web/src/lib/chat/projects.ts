@@ -75,13 +75,47 @@ export const removeProject = (rows: ProjectRow[], id: string) =>
 
 /**
  * Reconciles a fresh read with the cache. The server wins, including projects deleted elsewhere;
- * only projects created here and not yet confirmed survive a read that predates them.
+ * only projects created here and not yet confirmed survive a read that predates them, and a
+ * project with a change still on its way (`busy`) keeps what the reader sees until it lands.
  */
-export const mergeProjectLists = (previous: ProjectRow[] | undefined, fetched: ProjectRow[]) => {
+export const mergeProjectLists = (
+  previous: ProjectRow[] | undefined,
+  fetched: ProjectRow[],
+  busy: ReadonlySet<string> = new Set(),
+) => {
+  const cached = new Map((previous ?? []).map((row) => [row.id, row]));
   const known = new Set(fetched.map((row) => row.id));
   const pending = (previous ?? []).filter((row) => row.pending && !known.has(row.id));
+  const merged = fetched.map((row) => (busy.has(row.id) ? (cached.get(row.id) ?? row) : row));
 
-  return sortProjects([...pending, ...fetched]);
+  return sortProjects([...pending, ...merged]);
+};
+
+/**
+ * Folds a server snapshot into the cache, like the conversation list does: it adds and updates
+ * (a cached copy that is newer, or still pending, wins) and never drops, and it never brings back
+ * a project the reader deleted here.
+ */
+export const mergeProjectSnapshot = (
+  previous: ProjectRow[] | undefined,
+  snapshot: ProjectRow[],
+  deleted: ReadonlySet<string> = new Set(),
+) => {
+  const incoming = snapshot.filter((row) => !deleted.has(row.id));
+
+  if (!previous) {
+    return sortProjects(incoming);
+  }
+
+  const fresh = new Map(incoming.map((row) => [row.id, row]));
+  const merged = previous.map((row) => {
+    const next = fresh.get(row.id);
+
+    return next && !row.pending && next.updated_at >= row.updated_at ? next : row;
+  });
+  const cached = new Set(previous.map((row) => row.id));
+
+  return sortProjects([...merged, ...incoming.filter((row) => !cached.has(row.id))]);
 };
 
 /** Why a name cannot be used, or null. Names are unique per assistant, whatever the case. */

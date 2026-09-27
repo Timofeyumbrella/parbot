@@ -15,6 +15,7 @@ import {
   removeConversationRow,
   renameConversationRow,
 } from '@/lib/chat/conversations';
+import { projectMoves } from '@/lib/chat/project-state';
 import {
   conversationsKey,
   fetchConversations,
@@ -63,8 +64,9 @@ export const useConversations = (assistantId: string, snapshot?: ConversationSna
     const invalidated = queryClient.getQueryState(listKey)?.isInvalidated ?? false;
 
     appliedSnapshots.set(assistantId, snapshot.fetchedAt);
+    // Server rows never undo a move the reader just made (see `projectMoves`).
     queryClient.setQueryData<ConversationRow[]>(listKey, (rows) =>
-      mergeSnapshot(rows, snapshot.rows),
+      projectMoves.overlay(mergeSnapshot(rows, snapshot.rows)),
     );
 
     if (invalidated) {
@@ -74,12 +76,16 @@ export const useConversations = (assistantId: string, snapshot?: ConversationSna
 
   return useQuery({
     queryKey: key,
-    queryFn: async () =>
-      mergeConversationLists(
-        queryClient.getQueryData<ConversationRow[]>(key),
-        await fetchConversations(getSupabaseBrowserClient(), assistantId),
-      ),
-    initialData: snapshot ? () => mergeSnapshot(undefined, snapshot.rows) : undefined,
+    queryFn: async () => {
+      const fetched = await fetchConversations(getSupabaseBrowserClient(), assistantId);
+
+      return projectMoves.overlay(
+        mergeConversationLists(queryClient.getQueryData<ConversationRow[]>(key), fetched),
+      );
+    },
+    initialData: snapshot
+      ? () => projectMoves.overlay(mergeSnapshot(undefined, snapshot.rows))
+      : undefined,
     initialDataUpdatedAt: snapshot ? Date.now : undefined,
   });
 };
@@ -98,6 +104,14 @@ export const useConversationRow = (assistantId: string, conversationId: string |
 
   return conversationId ? (data?.find((row) => row.id === conversationId) ?? null) : null;
 };
+
+/** The whole list as the cache holds it, for a screen beside the list. Never fetches on its own. */
+export const useConversationListCache = (assistantId: string) =>
+  useQuery<ConversationRow[]>({
+    queryKey: conversationsKey(assistantId),
+    queryFn: () => fetchConversations(getSupabaseBrowserClient(), assistantId),
+    enabled: false,
+  }).data;
 
 /**
  * Keeps the list fresh from the database: titles the engine sets, activity, rows created in
@@ -147,13 +161,16 @@ export const useConversationsRealtime = (assistantId: string) => {
             }
 
             queryClient.setQueryData<ConversationRow[]>(key, (rows) =>
-              applyServerRow(rows ?? [], {
-                id: row.id,
-                title: row.title,
-                last_message_at: row.last_message_at,
-                message_count: row.message_count,
-                unanswered_count: row.unanswered_count,
-              }),
+              projectMoves.overlay(
+                applyServerRow(rows ?? [], {
+                  id: row.id,
+                  title: row.title,
+                  last_message_at: row.last_message_at,
+                  message_count: row.message_count,
+                  unanswered_count: row.unanswered_count,
+                  project_id: row.project_id ?? null,
+                }),
+              ),
             );
           },
         )

@@ -1,12 +1,19 @@
 'use client';
 
 import { cn } from 'cn';
-import { MoreHorizontal, Pencil, Plus, Search, Trash2, X } from 'lucide-react';
+import { Plus, Search, X } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 
-import { useChatPane, useChatSelection } from '@/components/chat/chat-shell';
+import { useChatPane, useChatSelection } from '@/components/chat/chat-context';
+import { ConversationRowItem } from '@/components/chat/conversation-row';
+import { ProjectDialog, useProjectDialog } from '@/components/chat/project-dialog';
+import {
+  ProjectsSection,
+  setFolderOpen,
+  useConversationDrop,
+} from '@/components/chat/project-list';
 import { isPlainLeftClick } from '@/components/nav-pending';
 import { Button } from '@/components/ui/button';
 import {
@@ -17,199 +24,84 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { useConversationActions, useConversations } from '@/hooks/use-conversations';
+import { useProjectActions, useProjects } from '@/hooks/use-projects';
 import { usePrefetchThread } from '@/hooks/use-thread';
 import {
   conversationLabel,
   type ConversationRow,
   type ConversationSnapshot,
   filterConversations,
-  MAX_TITLE_LENGTH,
 } from '@/lib/chat/conversations';
-import { relativeTime } from '@/lib/format';
+import { groupConversations, type ProjectRow, type ProjectSnapshot } from '@/lib/chat/projects';
 
 export type ConversationListProps = {
   assistantId: string;
   /** The first page, read by the server; seeds the cache. */
   snapshot?: ConversationSnapshot;
+  /** The projects, read by the server alongside; seeds their cache. */
+  projectSnapshot?: ProjectSnapshot;
 };
 
-type RenameInputProps = {
-  initial: string;
-  onSubmit: (title: string) => void;
-  onCancel: () => void;
-};
-
-const RenameInput = ({ initial, onSubmit, onCancel }: RenameInputProps) => {
-  const [value, setValue] = useState(initial);
-  const settled = useRef(false);
-
-  const finish = (save: boolean) => {
-    if (settled.current) {
-      return;
-    }
-
-    settled.current = true;
-
-    const next = value.trim();
-
-    if (save && next && next !== initial) {
-      onSubmit(next);
-    } else {
-      onCancel();
-    }
-  };
-
-  return (
-    <input
-      autoFocus
-      aria-label="Conversation title"
-      value={value}
-      maxLength={MAX_TITLE_LENGTH}
-      onChange={(event) => setValue(event.target.value)}
-      onFocus={(event) => event.currentTarget.select()}
-      onBlur={() => finish(true)}
-      onKeyDown={(event) => {
-        if (event.key === 'Enter') {
-          event.preventDefault();
-          finish(true);
-        } else if (event.key === 'Escape') {
-          event.preventDefault();
-          finish(false);
-        }
-      }}
-      className="bg-background focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-3 h-10 w-full rounded-md border px-2.5 text-sm outline-none"
-    />
-  );
-};
-
-/** Relative times depend on the clock, so the server's text is replaced after hydration. */
-const RowTime = ({ at }: { at: string | null }) => (
-  <span
-    className="text-muted-foreground ml-auto shrink-0 text-[11px] tabular-nums"
-    suppressHydrationWarning
-  >
-    {at ? relativeTime(at) : ''}
-  </span>
-);
-
-type RowProps = {
-  row: ConversationRow;
-  href: string;
-  active: boolean;
-  renaming: boolean;
-  onNavigate: (event: React.MouseEvent<HTMLAnchorElement>) => void;
-  onIntent: () => void;
-  onRename: () => void;
-  onRenameSubmit: (title: string) => void;
-  onRenameCancel: () => void;
-  onDelete: () => void;
-};
-
-const Row = ({
-  row,
-  href,
-  active,
-  renaming,
-  onNavigate,
-  onIntent,
-  onRename,
-  onRenameSubmit,
-  onRenameCancel,
-  onDelete,
-}: RowProps) => {
-  const [menuOpen, setMenuOpen] = useState(false);
-  const label = conversationLabel(row);
-
-  if (renaming) {
-    return <RenameInput initial={label} onSubmit={onRenameSubmit} onCancel={onRenameCancel} />;
-  }
-
-  return (
-    <div
-      className={cn(
-        'group flex h-10 items-center rounded-md transition-colors',
-        active ? 'bg-sidebar-accent text-sidebar-accent-foreground' : 'hover:bg-sidebar-accent/60',
-        menuOpen && !active && 'bg-sidebar-accent/60',
-      )}
-      data-active={active || undefined}
-    >
-      <Link
-        href={href}
-        // The pane selects on the client, so the route prefetch would buy nothing here; left on, a
-        // long list queues ahead of the sidebar's own prefetches after a page load.
-        prefetch={false}
-        onClick={onNavigate}
-        onPointerEnter={onIntent}
-        onFocus={onIntent}
-        aria-current={active ? 'page' : undefined}
-        className="flex min-w-0 flex-1 items-center gap-2 self-stretch pl-2.5 pr-1 text-sm outline-none focus-visible:underline"
-      >
-        {row.unanswered_count > 0 ? (
-          <span
-            className="bg-warning size-1.5 shrink-0 rounded-full"
-            title={`${row.unanswered_count} unanswered`}
-            aria-label={`${row.unanswered_count} unanswered`}
-          />
-        ) : null}
-        <span className={cn('truncate', active ? 'font-medium' : 'text-foreground/90')}>
-          {label}
-        </span>
-        <RowTime at={row.last_message_at} />
-      </Link>
-      <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon-xs"
-            aria-label={`Actions for ${label}`}
-            className="pointer-coarse:opacity-100 mr-1 shrink-0 opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 data-[state=open]:opacity-100"
-          >
-            <MoreHorizontal />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-40">
-          <DropdownMenuItem onSelect={onRename}>
-            <Pencil />
-            Rename
-          </DropdownMenuItem>
-          <DropdownMenuItem variant="destructive" onSelect={onDelete}>
-            <Trash2 />
-            Delete
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </div>
-  );
-};
+const NO_PROJECTS: ProjectRow[] = [];
 
 /**
- * The left pane: filter, New chat, and one row per conversation. Rows come from the cache the
- * layout seeded, so the list never loads; rename and delete update it before the server answers.
+ * The left pane: filter, New chat, the projects with their conversations, then the conversations
+ * in no project. Rows come from the caches the layout seeded, so the list never loads; renaming,
+ * moving and deleting update it before the server answers.
  */
-export const ConversationList = ({ assistantId, snapshot }: ConversationListProps) => {
-  const params = useParams<{ conversationId?: string }>();
+export const ConversationList = ({
+  assistantId,
+  snapshot,
+  projectSnapshot,
+}: ConversationListProps) => {
+  const params = useParams<{ conversationId?: string; projectId?: string }>();
   const router = useRouter();
   const { onNavigate } = useChatPane();
   const selection = useChatSelection();
   const prefetchThread = usePrefetchThread();
   // The row lights up on click, before the router has the route; outside a shell, the route alone.
   const activeId = selection ? selection.selectedId : (params.conversationId ?? null);
+  const activeProjectId = selection
+    ? selection.selectedProjectId
+    : params.conversationId
+      ? null
+      : (params.projectId ?? null);
   const { data, isError, error, refetch } = useConversations(assistantId, snapshot);
+  const { data: projectData } = useProjects(assistantId, projectSnapshot);
+  const projects = projectData ?? NO_PROJECTS;
   const { rename, remove } = useConversationActions(assistantId);
+  const projectActions = useProjectActions(assistantId);
+  const dialog = useProjectDialog();
   const [query, setQuery] = useState('');
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<ConversationRow | null>(null);
+  const [projectToDelete, setProjectToDelete] = useState<ProjectRow | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
-  const rows = useMemo(() => filterConversations(data ?? [], query), [data, query]);
+  const chatsHeadingId = useId();
   const base = `/a/${assistantId}/chat`;
+
+  const filtering = query.trim().length > 0;
+  const { byProject, loose, shownProjects } = useMemo(() => {
+    const rows = filterConversations(data ?? [], query);
+    const grouped = groupConversations(rows, projects);
+    const needle = query.trim().toLowerCase();
+
+    return {
+      ...grouped,
+      shownProjects: needle
+        ? projects.filter(
+            (project) =>
+              project.name.toLowerCase().includes(needle) || grouped.byProject.has(project.id),
+          )
+        : projects,
+    };
+  }, [data, query, projects]);
+  const matches = loose.length + shownProjects.length;
+  const outOfProject = useConversationDrop((conversationId) =>
+    void projectActions.move(conversationId, null),
+  );
 
   const follow =
     (conversationId: string | null) => (event: React.MouseEvent<HTMLAnchorElement>) => {
@@ -219,6 +111,29 @@ export const ConversationList = ({ assistantId, snapshot }: ConversationListProp
 
       onNavigate?.();
     };
+
+  const openProject = (projectId: string) => (event: React.MouseEvent<HTMLAnchorElement>) => {
+    if (isPlainLeftClick(event)) {
+      selection?.selectProject(projectId);
+    }
+
+    onNavigate?.();
+  };
+
+  /** A project's home is where its new chats start; the menu and a new project both go there. */
+  const goToProject = (projectId: string) => {
+    selection?.selectProject(projectId);
+    router.push(`${base}/projects/${projectId}`);
+    onNavigate?.();
+  };
+
+  const move = (conversationId: string, projectId: string | null) => {
+    if (projectId) {
+      setFolderOpen(projectId, true);
+    }
+
+    void projectActions.move(conversationId, projectId);
+  };
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -256,6 +171,48 @@ export const ConversationList = ({ assistantId, snapshot }: ConversationListProp
       router.push(base);
     }
   };
+
+  const confirmProjectDelete = () => {
+    const target = projectToDelete;
+
+    if (!target) {
+      return;
+    }
+
+    setProjectToDelete(null);
+    void projectActions.remove(target.id);
+
+    // Its home is gone; its chats stay where they are, so an open one stays open.
+    if (target.id === activeProjectId && !activeId) {
+      selection?.select(null);
+      router.push(base);
+    }
+  };
+
+  const renderConversation = (row: ConversationRow, nested: boolean) => (
+    <ConversationRowItem
+      row={row}
+      href={`${base}/${row.id}`}
+      active={row.id === activeId}
+      renaming={row.id === renamingId}
+      projects={projects}
+      nested={nested}
+      onNavigate={follow(row.id)}
+      onIntent={() => prefetchThread(row.id)}
+      onRename={() => setRenamingId(row.id)}
+      onRenameSubmit={(title) => {
+        setRenamingId(null);
+        void rename(row.id, title);
+      }}
+      onRenameCancel={() => setRenamingId(null)}
+      onDelete={() => setPendingDelete(row)}
+      onMove={(projectId) => move(row.id, projectId)}
+    />
+  );
+
+  const releasedCount = projectToDelete
+    ? (data ?? []).filter((row) => row.project_id === projectToDelete.id).length
+    : 0;
 
   return (
     <div className="flex h-full min-h-0 flex-col" data-testid="conversation-list">
@@ -305,51 +262,81 @@ export const ConversationList = ({ assistantId, snapshot }: ConversationListProp
       </div>
 
       <nav className="min-h-0 flex-1 overflow-y-auto px-2 pb-2" aria-label="Conversations">
-        {isError && !data ? (
-          <div className="text-muted-foreground flex flex-col gap-2 px-2 py-6 text-sm" role="alert">
-            <p>
-              The conversations could not be loaded. {error instanceof Error ? error.message : ''}
-            </p>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="w-fit"
-              onClick={() => void refetch()}
-            >
-              Try again
-            </Button>
-          </div>
-        ) : !data || data.length === 0 ? (
-          <p className="text-muted-foreground px-2 py-6 text-sm">
-            No conversations yet. Ask the assistant something and it will appear here.
-          </p>
-        ) : rows.length === 0 ? (
+        {filtering && matches === 0 && data ? (
           <p className="text-muted-foreground px-2 py-6 text-sm">
             Nothing matches “{query.trim()}”.
           </p>
         ) : (
-          <ul className="flex flex-col gap-0.5">
-            {rows.map((row) => (
-              <li key={row.id}>
-                <Row
-                  row={row}
-                  href={`${base}/${row.id}`}
-                  active={row.id === activeId}
-                  renaming={row.id === renamingId}
-                  onNavigate={follow(row.id)}
-                  onIntent={() => prefetchThread(row.id)}
-                  onRename={() => setRenamingId(row.id)}
-                  onRenameSubmit={(title) => {
-                    setRenamingId(null);
-                    void rename(row.id, title);
-                  }}
-                  onRenameCancel={() => setRenamingId(null)}
-                  onDelete={() => setPendingDelete(row)}
-                />
-              </li>
-            ))}
-          </ul>
+          <>
+            {!filtering || shownProjects.length > 0 ? (
+              <ProjectsSection
+                base={base}
+                projects={shownProjects}
+                allProjects={projects}
+                byProject={byProject}
+                filtering={filtering}
+                activeConversationId={activeId}
+                activeProjectId={activeProjectId}
+                renderConversation={(row) => renderConversation(row, true)}
+                onCreate={(name) => goToProject(projectActions.create(name))}
+                onOpenProject={openProject}
+                onNewChat={goToProject}
+                onEdit={dialog.edit}
+                onRename={(projectId, name) => void projectActions.rename(projectId, name)}
+                onDelete={setProjectToDelete}
+                onMoveConversation={move}
+              />
+            ) : null}
+
+            <section aria-labelledby={chatsHeadingId} className="mt-2 flex flex-col">
+              <h2
+                id={chatsHeadingId}
+                className={cn(
+                  'text-muted-foreground rounded-md px-2.5 pb-1 pt-2 text-[11px] font-medium uppercase tracking-wide',
+                  outOfProject.over && 'ring-primary bg-primary/10 ring-2 ring-inset',
+                )}
+                {...outOfProject.handlers}
+              >
+                Chats
+              </h2>
+              {isError && !data ? (
+                <div
+                  className="text-muted-foreground flex flex-col gap-2 px-2 py-6 text-sm"
+                  role="alert"
+                >
+                  <p>
+                    The conversations could not be loaded.{' '}
+                    {error instanceof Error ? error.message : ''}
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="w-fit"
+                    onClick={() => void refetch()}
+                  >
+                    Try again
+                  </Button>
+                </div>
+              ) : !data || data.length === 0 ? (
+                <p className="text-muted-foreground px-2 py-6 text-sm">
+                  No conversations yet. Ask the assistant something and it will appear here.
+                </p>
+              ) : loose.length === 0 ? (
+                filtering ? null : (
+                  <p className="text-muted-foreground px-2 py-3 text-sm">
+                    Every chat is in a project. New chats outside a project appear here.
+                  </p>
+                )
+              ) : (
+                <ul className="flex flex-col gap-0.5" {...outOfProject.handlers}>
+                  {loose.map((row) => (
+                    <li key={row.id}>{renderConversation(row, false)}</li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          </>
         )}
       </nav>
 
@@ -375,6 +362,41 @@ export const ConversationList = ({ assistantId, snapshot }: ConversationListProp
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog
+        open={Boolean(projectToDelete)}
+        onOpenChange={(open) => (open ? null : setProjectToDelete(null))}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete project</DialogTitle>
+            <DialogDescription>
+              “{projectToDelete?.name}” and its instructions are removed.{' '}
+              {releasedCount === 0
+                ? 'It has no chats.'
+                : releasedCount === 1
+                  ? 'Its chat is kept and moves to Chats.'
+                  : `Its ${releasedCount} chats are kept and move to Chats.`}{' '}
+              Its files stay in Knowledge.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setProjectToDelete(null)}>
+              Cancel
+            </Button>
+            <Button type="button" variant="destructive" onClick={confirmProjectDelete}>
+              Delete project
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <ProjectDialog
+        assistantId={assistantId}
+        project={projects.find((project) => project.id === dialog.projectId) ?? null}
+        open={dialog.open}
+        onClose={dialog.close}
+      />
     </div>
   );
 };

@@ -3,34 +3,24 @@
 import { PanelLeft, SquarePen } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
+import {
+  type ChatPane,
+  ChatPaneContext,
+  ChatSelectionContext,
+} from '@/components/chat/chat-context';
 import { NewChat } from '@/components/chat/new-chat';
+import { ProjectHome } from '@/components/chat/project-home';
 import { Thread } from '@/components/chat/thread';
 import { isPlainLeftClick } from '@/components/nav-pending';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { useConversationRow, useConversationsRealtime } from '@/hooks/use-conversations';
+import { useProjectRow, useProjectsRealtime } from '@/hooks/use-projects';
 import { conversationLabel } from '@/lib/chat/conversations';
 
-type ChatPane = { onNavigate?: () => void };
-
-const ChatPaneContext = createContext<ChatPane>({});
-
-/** What the pane a conversation list sits in wants to know: on a phone, that a link was followed. */
-export const useChatPane = () => useContext(ChatPaneContext);
-
-type ChatSelection = {
-  /** The conversation on screen: the one just clicked, else the route's. Null is a new chat. */
-  selectedId: string | null;
-  /** Shows a conversation (or a new chat, with null) at once; the link's navigation follows. */
-  select: (conversationId: string | null) => void;
-};
-
-const ChatSelectionContext = createContext<ChatSelection | null>(null);
-
-/** The shell's selection, or null outside a shell (the list then follows the route alone). */
-export const useChatSelection = () => useContext(ChatSelectionContext);
+export { useChatPane, useChatSelection } from '@/components/chat/chat-context';
 
 export type ChatShellProps = {
   assistantId: string;
@@ -51,41 +41,63 @@ export type ChatShellProps = {
  * the route takes over as soon as it moves.
  */
 export const ChatShell = ({ assistantId, list, children }: ChatShellProps) => {
-  const params = useParams<{ conversationId?: string }>();
+  const params = useParams<{ conversationId?: string; projectId?: string }>();
   const routed = params.conversationId ?? null;
+  const routedProject = params.conversationId ? null : (params.projectId ?? null);
   // `fresh` tells one New chat from the next, so each click starts a blank screen.
-  const [picked, setPicked] = useState<{ id: string | null; fresh: number } | null>(null);
-  const [route, setRoute] = useState(routed);
+  const [picked, setPicked] = useState<{
+    id: string | null;
+    projectId: string | null;
+    fresh: number;
+  } | null>(null);
+  const routeKey = routedProject ? `project:${routedProject}` : routed;
+  const [route, setRoute] = useState(routeKey);
 
   // The route moved (the pick landed, or the reader went elsewhere): the route is the truth again.
-  if (route !== routed) {
-    setRoute(routed);
+  if (route !== routeKey) {
+    setRoute(routeKey);
     setPicked(null);
   }
 
   const conversationId = picked ? picked.id : routed;
+  const projectId = picked ? picked.projectId : routedProject;
   // New chat never defers to the route, even on the new chat URL: a chat just started there shows
   // its thread until the router has moved to the chat's own URL, a round trip after a page load.
   const select = useCallback(
     (id: string | null) =>
       setPicked((current) =>
-        id !== null && id === routed ? null : { id, fresh: (current?.fresh ?? 0) + 1 },
+        id !== null && id === routed
+          ? null
+          : { id, projectId: null, fresh: (current?.fresh ?? 0) + 1 },
       ),
     [routed],
   );
+  // A project's home is its new chat screen, so it never defers to the route either.
+  const selectProject = useCallback(
+    (id: string) =>
+      setPicked((current) => ({ id: null, projectId: id, fresh: (current?.fresh ?? 0) + 1 })),
+    [],
+  );
   const selection = useMemo(
-    () => ({ selectedId: conversationId, select }),
-    [conversationId, select],
+    () => ({ selectedId: conversationId, selectedProjectId: projectId, select, selectProject }),
+    [conversationId, projectId, select, selectProject],
   );
 
   // The sheet remembers which route it was opened on, so a route change closes it without an effect.
+  const view = conversationId ?? (projectId ? `project:${projectId}` : null);
   const [openedOn, setOpenedOn] = useState<string | null | false>(false);
-  const open = openedOn !== false && openedOn === conversationId;
-  const setOpen = (next: boolean) => setOpenedOn(next ? conversationId : false);
+  const open = openedOn !== false && openedOn === view;
+  const setOpen = (next: boolean) => setOpenedOn(next ? view : false);
   const active = useConversationRow(assistantId, conversationId);
-  const title = conversationId ? conversationLabel(active ?? { title: null }) : 'New chat';
+  const project = useProjectRow(assistantId, conversationId ? null : projectId);
+  const title = conversationId
+    ? conversationLabel(active ?? { title: null })
+    : projectId
+      ? (project?.name ?? 'Project')
+      : 'New chat';
 
   useConversationsRealtime(assistantId);
+  useProjectsRealtime(assistantId);
 
   const sheetPane = useMemo<ChatPane>(() => ({ onNavigate: () => setOpenedOn(false) }), []);
 
@@ -130,6 +142,8 @@ export const ChatShell = ({ assistantId, list, children }: ChatShellProps) => {
             {picked ? (
               picked.id ? (
                 <Thread key={picked.id} conversationId={picked.id} />
+              ) : picked.projectId ? (
+                <ProjectHome key={picked.fresh} projectId={picked.projectId} />
               ) : (
                 <NewChat key={picked.fresh} />
               )

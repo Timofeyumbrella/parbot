@@ -3,18 +3,24 @@
 import { useParams } from 'next/navigation';
 
 import { ComposerSkeleton, WelcomeSkeleton } from '@/components/chat/chat-skeletons';
+import { ProjectHome } from '@/components/chat/project-home';
 import { Thread } from '@/components/chat/thread';
 
 /**
  * What the chat routes show while the router fetches a page. A conversation route renders the
  * real thread straight from the cache (the page that follows renders the same thing), so a
- * click on a conversation never shows a route-level skeleton. The new chat route shows its shape.
+ * click on a conversation never shows a route-level skeleton; a project's home does the same.
+ * The new chat route shows its shape.
  */
 export const ChatLoading = () => {
-  const params = useParams<{ conversationId?: string }>();
+  const params = useParams<{ conversationId?: string; projectId?: string }>();
 
   if (params.conversationId) {
     return <Thread conversationId={params.conversationId} />;
+  }
+
+  if (params.projectId) {
+    return <ProjectHome projectId={params.projectId} />;
   }
 
   return (

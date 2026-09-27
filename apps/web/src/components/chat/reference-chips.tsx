@@ -79,6 +79,31 @@ export const ComposerReferenceChip = ({
   );
 };
 
+/**
+ * A project's file in the composer: read by every question in the project, so it has no remove
+ * button here; the project is where it changes.
+ */
+export const ProjectFileChip = ({ chip, project }: { chip: ComposerChip; project: string }) => {
+  const Icon = SOURCE_KINDS[chip.kind].icon;
+
+  return (
+    <span
+      className={cn(
+        'border-primary/25 bg-primary/5 inline-flex h-7 max-w-full items-center gap-1.5 rounded-md border px-2 text-xs',
+        (chip.status === 'failed' || chip.status === 'missing') && 'border-destructive/40',
+      )}
+      data-testid="project-chip"
+      data-status={chip.status}
+      title={chip.error ?? `${chip.title}, from the project ${project}. Change it in the project.`}
+    >
+      <Icon className="text-muted-foreground size-3.5 shrink-0" aria-hidden="true" />
+      <span className="min-w-0 max-w-40 truncate font-medium sm:max-w-56">{chip.title}</span>
+      <span className="sr-only">, from the project {project}</span>
+      <StatusMark status={chip.status} />
+    </span>
+  );
+};
+
 /** The files a question was asked with, on its bubble; each opens its text in the viewer. */
 export const MessageReferences = ({
   references,
