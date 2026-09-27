@@ -10,6 +10,11 @@ export type Citation = {
   title: string;
   url: string | null;
   snippet: string;
+  /**
+   * The passage itself, so the app can open the document at it. Answers saved before it existed
+   * have none, and the widget never receives it.
+   */
+  chunkId?: string;
 };
 
 export type ChatErrorCode =
@@ -27,6 +32,12 @@ export type ChatStreamEvent =
   | { type: 'meta'; conversationId: string; userMessageId: string; assistantMessageId: string }
   | { type: 'token'; text: string }
   | { type: 'citations'; citations: Citation[] }
+  /**
+   * What the engine is doing before the first token, for the thinking state: "Reading guide.pdf…"
+   * while a referenced file finishes indexing. Only the in-app chat sends it; clients that do not
+   * know it ignore it.
+   */
+  | { type: 'status'; message: string }
   | { type: 'done'; answered: boolean; latencyMs: number }
   | { type: 'error'; code: ChatErrorCode; message: string };
 
@@ -97,7 +108,16 @@ export type AppChatRequest = {
   message: string;
   /** The id the answer will be saved under, chosen by the client so it can stop the answer at any moment. */
   assistantMessageId?: string;
+  /**
+   * Ids of the assistant's sources the reader pointed at (@ or an attached file). A list, even an
+   * empty one, becomes the conversation's references; left out, the conversation keeps the ones it
+   * has, so a follow-up still reads the file the first question named.
+   */
+  references?: string[];
 };
+
+/** The most sources one question can reference. */
+export const MAX_REFERENCES = 10;
 
 /** POST /api/messages/[messageId]/stop: the reader pressed Stop; `text` is what they had been shown. */
 export type AppStopRequest = {

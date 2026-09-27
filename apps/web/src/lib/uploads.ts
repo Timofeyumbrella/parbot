@@ -32,6 +32,29 @@ export const UPLOAD_ACCEPT = Object.values(UPLOAD_TYPES)
 
 export const UPLOAD_TYPES_LABEL = 'PDF, Word, HTML, Markdown or plain text';
 
+export const UPLOAD_FAILED_OFFLINE =
+  'The upload did not go through. Check your connection and try again.';
+
+/**
+ * Why a picked file cannot be uploaded, in the words the Add source dialog and the chat composer
+ * both use, or null when it can. The sources route checks the same again.
+ */
+export const uploadProblem = (file: Pick<File, 'name' | 'type' | 'size'>) => {
+  if (!uploadTypeFor(file.name, file.type)) {
+    return `That file type is not supported. Upload ${UPLOAD_TYPES_LABEL}.`;
+  }
+
+  if (file.size > MAX_UPLOAD_BYTES) {
+    return 'That file is larger than 25 MB. Split it or pick a smaller one.';
+  }
+
+  if (file.size === 0) {
+    return 'That file is empty. Pick one with some text in it.';
+  }
+
+  return null;
+};
+
 const MIME_ALIASES: Record<string, UploadType> = {
   'text/x-markdown': 'md',
   'application/xhtml+xml': 'html',
@@ -96,3 +119,26 @@ export const storagePathFor = (ownerId: string, assistantId: string, extension: 
 
 export const fileNameFromPath = (storagePath: string) =>
   storagePath.split('/').pop() ?? storagePath;
+
+/**
+ * The name a stored file opens or downloads under: the source's title, with the extension its
+ * type calls for when the title lacks one (pasted text is stored as Markdown).
+ */
+export const fileNameFor = (title: string, type: UploadType | null) => {
+  // Path separators, quotes and control characters have no place in a header's file name.
+  const base = title.replace(/[\\/"\u0000-\u001f\u007f]+/g, ' ').trim() || 'file';
+  const extensions = type ? UPLOAD_TYPES[type].extensions : [];
+
+  if (extensions.length === 0 || extensions.includes(extensionOf(base))) {
+    return base;
+  }
+
+  return `${base}.${extensions[0]}`;
+};
+
+/** A Content-Disposition value any browser reads, with the real name for those that take UTF-8. */
+export const contentDisposition = (disposition: 'inline' | 'attachment', fileName: string) => {
+  const ascii = fileName.replace(/[^\x20-\x7e]+/g, '_').replace(/["\\]/g, '_');
+
+  return `${disposition}; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(fileName)}`;
+};

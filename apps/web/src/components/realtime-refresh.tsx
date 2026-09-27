@@ -7,7 +7,7 @@ import { useEffect } from 'react';
 import { getSupabaseBrowserClient, realtimeReadyClient } from '@/lib/supabase/client';
 
 export type RealtimeWatch = {
-  table: 'conversations' | 'messages' | 'leads';
+  table: 'conversations' | 'messages' | 'leads' | 'sources';
   /** A postgres_changes filter such as `conversation_id=eq.<id>`. */
   filter: string;
 };

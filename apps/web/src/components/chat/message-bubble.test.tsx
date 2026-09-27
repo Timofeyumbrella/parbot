@@ -56,6 +56,47 @@ describe('MessageBubble for the reader', () => {
   });
 });
 
+describe('MessageBubble references', () => {
+  it('shows the files a question was asked with, each opening its text', () => {
+    renderBubble({
+      message: message({
+        id: 'u1',
+        role: 'user',
+        content: 'What does this say about limits?',
+        status: 'pending',
+        references: [
+          { id: 's1', title: 'limits.md', kind: 'upload' },
+          { id: 's2', title: 'Refund policy', kind: 'text' },
+        ],
+      }),
+    });
+
+    const list = screen.getByRole('list', { name: 'Referenced files' });
+    const links = within(list).getAllByRole('link');
+
+    expect(links.map((link) => [link.textContent, link.getAttribute('href')])).toEqual([
+      ['limits.md', '/a/asst/knowledge/sources/s1'],
+      ['Refund policy', '/a/asst/knowledge/sources/s2'],
+    ]);
+  });
+
+  it('shows no list for a question without references', () => {
+    renderBubble({ message: message({ id: 'u1', role: 'user', content: 'Hi', references: [] }) });
+
+    expect(screen.queryByRole('list', { name: 'Referenced files' })).toBeNull();
+  });
+
+  it('says what the answer is waiting on before the first word', () => {
+    renderBubble({
+      message: message({ content: '', status: 'streaming', progress: 'Reading limits.md…' }),
+    });
+
+    expect(screen.getByRole('status', { name: 'Reading limits.md…' })).toHaveTextContent(
+      'Reading limits.md…',
+    );
+  });
+});
+
 describe('MessageBubble for the assistant', () => {
   it('shows the name, renders markdown and turns [n] markers into chips', () => {
     const { container } = renderBubble();
@@ -68,8 +109,8 @@ describe('MessageBubble for the assistant', () => {
     expect(chips).toHaveLength(2);
     expect(chips[0]).toHaveAttribute('href', 'https://docs.acme.test/auth');
     expect(chips[0]).toHaveAttribute('target', '_blank');
-    // A source without a url points at the sources row instead.
-    expect(chips[1]).toHaveAttribute('href', '#sources-a1');
+    // A source without a url opens in the document viewer, in the same tab.
+    expect(chips[1]).toHaveAttribute('href', '/a/asst/knowledge/documents/d2');
     expect(chips[1]).not.toHaveAttribute('target');
   });
 
@@ -84,8 +125,10 @@ describe('MessageBubble for the assistant', () => {
       'https://docs.acme.test/auth',
     );
     expect(within(sources).getByText('docs.acme.test')).toBeInTheDocument();
-    expect(within(sources).getByText('Pasted notes')).toBeInTheDocument();
-    expect(within(sources).queryByRole('link', { name: /Pasted notes/ })).not.toBeInTheDocument();
+    expect(within(sources).getByRole('link', { name: /Pasted notes/ })).toHaveAttribute(
+      'href',
+      '/a/asst/knowledge/documents/d2',
+    );
   });
 
   it('renders fenced code with a language label and a copy button', async () => {

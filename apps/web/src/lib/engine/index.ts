@@ -8,6 +8,7 @@ export {
 export {
   buildSystemPrompt,
   conversationTitle,
+  referencesInstruction,
   isRefusal,
   NO_ANSWER,
   renderQuestion,
@@ -27,10 +28,25 @@ export {
   takeInOrder,
 } from './rate-limit';
 export {
+  isIndexing,
+  loadConversationReferences,
+  loadRequestedReferences,
+  readingMessage,
+  REFERENCE_WAIT_MS,
+  type ReferencedSource,
+  resolveReferences,
+  saveConversationReferences,
+  type SourceReference,
+  waitForReferences,
+} from './references';
+export {
   MAX_CONTEXT_CHARS,
+  mergeReferenced,
+  REFERENCE_PASSAGES_PER_SOURCE,
   RETRIEVAL_MATCH_COUNT,
   RETRIEVAL_THRESHOLD,
   type RetrievedChunk,
+  type RetrieveOptions,
   retrievalQuery,
   retrieveChunks,
   type ServiceClient,

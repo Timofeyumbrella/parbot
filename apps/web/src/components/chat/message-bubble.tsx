@@ -7,6 +7,7 @@ import { memo } from 'react';
 
 import { AnswerMarkdown } from '@/components/chat/answer-markdown';
 import { CopyButton } from '@/components/chat/code-block';
+import { MessageReferences } from '@/components/chat/reference-chips';
 import { Sources } from '@/components/chat/sources';
 import { Button } from '@/components/ui/button';
 import { canRetry, errorAction } from '@/lib/chat/errors';
@@ -23,8 +24,11 @@ export type MessageBubbleProps = {
   questionId?: string;
 };
 
-const UserBubble = ({ message }: { message: ThreadMessage }) => (
+const UserBubble = ({ message, assistantId }: { message: ThreadMessage; assistantId: string }) => (
   <div className="flex flex-col items-end gap-1" data-role="user" data-status={message.status}>
+    {message.references?.length ? (
+      <MessageReferences references={message.references} assistantId={assistantId} />
+    ) : null}
     <div className="bg-muted text-foreground max-w-[85%] whitespace-pre-wrap break-words rounded-2xl rounded-br-md px-3.5 py-2 text-sm leading-relaxed">
       {message.content}
     </div>
@@ -72,15 +76,17 @@ const ErrorNotice = ({ error, onRetry }: ErrorNoticeProps) => {
   );
 };
 
-const Thinking = () => (
+/** The wait before the first word; `progress` says what it is for, such as a file being read. */
+const Thinking = ({ progress }: { progress?: string }) => (
   <div
-    className="text-muted-foreground flex h-6 items-center gap-1"
-    aria-label="Thinking"
+    className="text-muted-foreground flex min-h-6 items-center gap-1"
+    aria-label={progress ?? 'Thinking'}
     role="status"
   >
-    <span className="bg-muted-foreground/70 size-1.5 animate-pulse rounded-full [animation-delay:-0.4s]" />
-    <span className="bg-muted-foreground/70 size-1.5 animate-pulse rounded-full [animation-delay:-0.2s]" />
-    <span className="bg-muted-foreground/70 size-1.5 animate-pulse rounded-full" />
+    <span className="bg-muted-foreground/70 size-1.5 shrink-0 animate-pulse rounded-full [animation-delay:-0.4s]" />
+    <span className="bg-muted-foreground/70 size-1.5 shrink-0 animate-pulse rounded-full [animation-delay:-0.2s]" />
+    <span className="bg-muted-foreground/70 size-1.5 shrink-0 animate-pulse rounded-full" />
+    {progress ? <span className="ml-1.5 min-w-0 break-words text-xs">{progress}</span> : null}
   </div>
 );
 
@@ -112,12 +118,13 @@ const AssistantBubble = ({
             onRetry={onRetry && questionId ? () => onRetry(questionId) : undefined}
           />
         ) : streaming && !message.content ? (
-          <Thinking />
+          <Thinking progress={message.progress} />
         ) : (
           <AnswerMarkdown
             content={message.content}
             citations={message.citations}
             sourcesId={sourcesId}
+            assistantId={assistantId}
             streaming={streaming}
             stripCitations={message.status === 'stopped' && message.citations.length === 0}
             className={cn(unanswered && 'text-muted-foreground')}
@@ -135,7 +142,7 @@ const AssistantBubble = ({
         ) : null}
 
         {message.citations.length > 0 ? (
-          <Sources citations={message.citations} id={sourcesId} />
+          <Sources citations={message.citations} id={sourcesId} assistantId={assistantId} />
         ) : null}
 
         {settled ? (
@@ -189,7 +196,7 @@ const AssistantBubble = ({
 
 export const MessageBubble = memo(function MessageBubble(props: MessageBubbleProps) {
   return props.message.role === 'user' ? (
-    <UserBubble message={props.message} />
+    <UserBubble message={props.message} assistantId={props.assistantId} />
   ) : (
     <AssistantBubble {...props} />
   );

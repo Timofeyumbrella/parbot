@@ -1,7 +1,8 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { ExternalLink } from 'lucide-react';
+import { BookOpenText, ExternalLink } from 'lucide-react';
+import Link from 'next/link';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -13,6 +14,7 @@ import {
 } from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { Source } from '@/lib/db';
+import { documentHref, hasStoredFile, originalLabel, sourceFileHref } from '@/lib/knowledge/links';
 import { getSupabaseBrowserClient } from '@/lib/supabase/client';
 
 import { plural } from './format';
@@ -41,12 +43,15 @@ export const loadSourcePages = async (sourceId: string): Promise<SourcePage[]> =
 };
 
 type SourcePagesSheetProps = {
-  source: Pick<Source, 'id' | 'title' | 'document_count'>;
+  source: Pick<Source, 'id' | 'assistant_id' | 'kind' | 'title' | 'document_count'>;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 };
 
-/** Every page a source contributed, with a link out and how many passages it became. */
+/**
+ * Every page a source contributed: its text in the viewer, the page itself or the stored file, and
+ * how many passages it became.
+ */
 export const SourcePagesSheet = ({ source, open, onOpenChange }: SourcePagesSheetProps) => {
   const pages = useQuery({
     queryKey: sourcePagesQueryKey(source.id),
@@ -64,6 +69,16 @@ export const SourcePagesSheet = ({ source, open, onOpenChange }: SourcePagesShee
           <SheetDescription>
             {plural(pages.data?.length ?? source.document_count, 'page')} indexed
           </SheetDescription>
+          {hasStoredFile(source.kind) ? (
+            <div className="pt-1">
+              <Button asChild variant="outline" size="sm">
+                <a href={sourceFileHref(source.id)} target="_blank" rel="noreferrer">
+                  <ExternalLink data-icon="inline-start" aria-hidden="true" />
+                  {originalLabel(source.kind)}
+                </a>
+              </Button>
+            </div>
+          ) : null}
         </SheetHeader>
         <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
           {pages.isPending ? (
@@ -91,6 +106,14 @@ export const SourcePagesSheet = ({ source, open, onOpenChange }: SourcePagesShee
               {pages.data.map((page) => (
                 <li key={page.id} className="flex flex-col gap-0.5 py-2.5">
                   <span className="truncate text-sm font-medium">{page.title}</span>
+                  <Link
+                    href={documentHref(source.assistant_id, page.id)}
+                    onClick={() => onOpenChange(false)}
+                    className="text-muted-foreground hover:text-foreground inline-flex w-fit items-center gap-1 text-xs"
+                  >
+                    <BookOpenText className="size-3 shrink-0" aria-hidden="true" />
+                    View text
+                  </Link>
                   {page.url ? (
                     <a
                       href={page.url}

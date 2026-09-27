@@ -44,7 +44,7 @@ export default async function ConversationPage({
       .maybeSingle(),
     supabase
       .from('messages')
-      .select('id, role, content, citations, answered, feedback, created_at')
+      .select('id, role, content, citations, answered, feedback, created_at, source_references')
       .eq('conversation_id', conversationId)
       .eq('assistant_id', assistantId)
       .order('created_at', { ascending: true }),
@@ -120,7 +120,12 @@ export default async function ConversationPage({
             </div>
           ) : (
             (messages.data ?? []).map((message) => (
-              <TranscriptMessage key={message.id} message={message} now={now} />
+              <TranscriptMessage
+                key={message.id}
+                assistantId={assistantId}
+                message={message}
+                now={now}
+              />
             ))
           )}
         </section>

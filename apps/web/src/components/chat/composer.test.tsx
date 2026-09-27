@@ -22,7 +22,7 @@ describe('Composer', () => {
     await user.type(box(), '  How are webhooks signed?  {Enter}');
 
     expect(onSend).toHaveBeenCalledTimes(1);
-    expect(onSend).toHaveBeenCalledWith('How are webhooks signed?');
+    expect(onSend).toHaveBeenCalledWith('How are webhooks signed?', []);
     expect(box()).toHaveValue('');
   });
 
@@ -101,7 +101,7 @@ describe('Composer', () => {
 
     expect(box()).toHaveValue('half a thought');
     await user.type(box(), '{Enter}');
-    expect(onSend).toHaveBeenCalledWith('half a thought');
+    expect(onSend).toHaveBeenCalledWith('half a thought', []);
     second.unmount();
 
     render(<Composer draftKey="c1" onSend={onSend} />);
@@ -156,7 +156,7 @@ describe('Composer', () => {
 
       await user.keyboard('does {Enter}');
 
-      expect(onSend).toHaveBeenCalledWith('Which scopes does a key carry?');
+      expect(onSend).toHaveBeenCalledWith('Which scopes does a key carry?', []);
     });
 
     it('leaves focus alone when the box was not focused, or when it left for good', async () => {

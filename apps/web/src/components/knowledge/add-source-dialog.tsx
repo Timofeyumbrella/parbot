@@ -25,6 +25,7 @@ import {
   formatBytes,
   MAX_UPLOAD_BYTES,
   UPLOAD_ACCEPT,
+  UPLOAD_FAILED_OFFLINE,
   UPLOAD_TYPES,
   UPLOAD_TYPES_LABEL,
   uploadTypeFor,
@@ -94,9 +95,6 @@ const EMPTY_DRAFTS: Drafts = {
   uploadTitle: '',
   file: null,
 };
-
-export const UPLOAD_FAILED_OFFLINE =
-  'The upload did not go through. Check your connection and try again.';
 
 const submitLabel: Record<RemoteOrTextKind, string> = {
   url: 'Add website',

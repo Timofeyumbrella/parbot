@@ -36,7 +36,7 @@ const base = {
 
 describe('TranscriptMessage', () => {
   it('renders markdown, citation chips, the sources row and the time', () => {
-    const { container } = render(<TranscriptMessage message={base} now={NOW} />);
+    const { container } = render(<TranscriptMessage assistantId="asst" message={base} now={NOW} />);
 
     expect(screen.getByText('Settings').tagName).toBe('STRONG');
     expect(screen.getByText('parbot keys create').closest('pre')).not.toBeNull();
@@ -46,24 +46,28 @@ describe('TranscriptMessage', () => {
 
     expect(chips.map((chip) => chip.textContent)).toEqual(['1', '2', '4']);
     expect(chips[0]).toHaveAttribute('href', 'https://docs.example.com/auth');
-    expect(chips[1]).toHaveAttribute('href', '#sources-m1');
+    // A file has no page of its own: its marker opens it in the document viewer.
+    expect(chips[1]).toHaveAttribute('href', '/a/asst/knowledge/documents/d2');
 
-    // One chip per page, and the markers without a url land on the row.
+    // One chip per page; a web page opens itself, a file opens in the viewer.
     const sources = screen.getByTestId('sources');
 
     expect(sources).toHaveAttribute('id', 'sources-m1');
-    expect(within(sources).getByRole('link')).toHaveAttribute(
+    expect(within(sources).getByRole('link', { name: /Authentication/ })).toHaveAttribute(
       'href',
       'https://docs.example.com/auth',
     );
     expect(within(sources).getAllByText('Authentication')).toHaveLength(1);
-    expect(within(sources).getByText('Offline doc').parentElement!.tagName).toBe('SPAN');
+    expect(within(sources).getByRole('link', { name: /Offline doc/ })).toHaveAttribute(
+      'href',
+      '/a/asst/knowledge/documents/d2',
+    );
     expect(screen.getByText('5 min ago')).toBeInTheDocument();
     expect(screen.queryByText('Unanswered')).toBeNull();
   });
 
   it('shows an answer exactly as the chat does', () => {
-    const transcript = render(<TranscriptMessage message={base} now={NOW} />);
+    const transcript = render(<TranscriptMessage assistantId="asst" message={base} now={NOW} />);
     const transcriptSources = transcript.getByTestId('sources').outerHTML;
     const transcriptAnswer = transcript.container.querySelector('.answer-prose')!.outerHTML;
 
@@ -89,6 +93,7 @@ describe('TranscriptMessage', () => {
   it('marks unanswered answers and shows feedback as an indicator', () => {
     render(
       <TranscriptMessage
+        assistantId="asst"
         message={{
           ...base,
           content: 'I could not find that.',
@@ -108,6 +113,7 @@ describe('TranscriptMessage', () => {
   it('shows helpful feedback and keeps user messages as plain text', () => {
     render(
       <TranscriptMessage
+        assistantId="asst"
         message={{
           ...base,
           role: 'user',
@@ -135,5 +141,28 @@ describe('parseCitations', () => {
     expect(parseCitations([{ index: 1, documentId: 'd', title: 'T' }])).toEqual([
       { index: 1, documentId: 'd', title: 'T', url: null, snippet: '' },
     ]);
+  });
+
+  it('shows the files an in-app question pointed at, each opening its text', () => {
+    render(
+      <TranscriptMessage
+        assistantId="asst"
+        message={{
+          ...base,
+          id: 'u1',
+          role: 'user',
+          content: 'What does this say about limits?',
+          citations: [],
+          source_references: [{ id: 's1', title: 'limits.md', kind: 'upload' }],
+        }}
+        now={NOW}
+      />,
+    );
+
+    expect(
+      within(screen.getByRole('list', { name: 'Referenced files' })).getByRole('link', {
+        name: 'limits.md',
+      }),
+    ).toHaveAttribute('href', '/a/asst/knowledge/sources/s1');
   });
 });

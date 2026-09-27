@@ -5,6 +5,8 @@
  * should not go with it. Held in memory only: a reload starts clean.
  */
 
+import type { MessageReference } from './references';
+
 const drafts = new Map<string, string>();
 
 export const NEW_CHAT_DRAFT = 'new';
@@ -54,8 +56,25 @@ export const takeFocus = (key: string): FocusHandoff | null => {
   return taken;
 };
 
+/**
+ * The reference chips the reader set up in a composer but has not sent yet, by the same key as the
+ * text. None stored means the composer shows the conversation's own references.
+ */
+const referenceDrafts = new Map<string, MessageReference[]>();
+
+export const readReferenceDraft = (key: string) => referenceDrafts.get(key) ?? null;
+
+export const writeReferenceDraft = (key: string, references: MessageReference[] | null) => {
+  if (references) {
+    referenceDrafts.set(key, references);
+  } else {
+    referenceDrafts.delete(key);
+  }
+};
+
 /** Test hook. */
 export const resetDrafts = () => {
   drafts.clear();
+  referenceDrafts.clear();
   handoff = null;
 };

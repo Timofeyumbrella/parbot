@@ -92,7 +92,7 @@ describe('useThread', () => {
       expect(result.current.data?.messages.map((message) => message.id)).toEqual(['u1', 'a1']);
     });
     expect(db.select).toHaveBeenCalledWith(
-      'id, role, content, citations, answered, feedback, created_at, latency_ms',
+      'id, role, content, citations, answered, feedback, created_at, latency_ms, source_references',
     );
     expect(result.current.data?.messages.every((message) => message.status === 'complete')).toBe(
       true,

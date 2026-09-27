@@ -23,6 +23,7 @@ import {
   STREAM_CUT_SHORT,
 } from '@/lib/chat/errors';
 import { conversationsKey, INBOX_NAMESPACE, threadKey } from '@/lib/chat/queries';
+import { type MessageReference, uploadingMessage } from '@/lib/chat/references';
 import { recordStop } from '@/lib/chat/stop';
 import { streamRegistry } from '@/lib/chat/streams';
 import {
@@ -32,12 +33,33 @@ import {
   emptyThread,
   failedMessage,
   removeExchange,
+  setActiveReferences,
+  setProgress,
   stopExchange,
   tempId,
   type Thread,
 } from '@/lib/chat/thread';
+import { composerUploads } from '@/lib/chat/uploads';
 
-export type SendInput = { conversationId: string; content: string };
+export type SendInput = {
+  conversationId: string;
+  content: string;
+  /**
+   * The files and sources the question points at. A list, even an empty one, becomes the
+   * conversation's references; left out, the conversation keeps the ones it has.
+   */
+  references?: MessageReference[];
+};
+
+/** Resolves when the signal aborts: a Stop pressed while attached files are still uploading. */
+const whenAborted = (signal: AbortSignal) =>
+  new Promise<null>((resolve) => {
+    if (signal.aborted) {
+      resolve(null);
+    } else {
+      signal.addEventListener('abort', () => resolve(null), { once: true });
+    }
+  });
 
 const nextFrame =
   typeof requestAnimationFrame === 'function'
@@ -77,6 +99,13 @@ export const sendMessage = async (
   // moment, even before the stream has said anything.
   const answerId = randomUuid();
   const now = new Date().toISOString();
+  let references = input.references;
+  // Files attached a moment ago may still be on their way; the question shows at once, with its
+  // chips, and goes out once they have landed in Knowledge.
+  const uploading = composerUploads.pending((references ?? []).map((reference) => reference.id));
+  const uploadingTitles = (references ?? [])
+    .filter((reference) => uploading.includes(reference.id))
+    .map((reference) => reference.title);
 
   queryClient.setQueryData<Thread>(key, (thread) =>
     beginExchange(thread ?? emptyThread(), {
@@ -84,6 +113,8 @@ export const sendMessage = async (
       assistantId: assistantMessageId,
       content,
       now,
+      references: references ?? [],
+      progress: uploading.length > 0 ? uploadingMessage(uploadingTitles) : undefined,
     }),
   );
 
@@ -139,11 +170,35 @@ export const sendMessage = async (
   };
 
   try {
+    if (uploading.length > 0) {
+      const saved = await Promise.race([
+        composerUploads.settle(uploading),
+        whenAborted(controller.signal),
+      ]);
+
+      if (!saved) {
+        queryClient.setQueryData<Thread>(key, (thread) => (thread ? stopExchange(thread) : thread));
+
+        return;
+      }
+
+      // A file the server refused is not part of the question; its chip in the composer says why.
+      const kept = (references ?? []).filter(
+        (reference) => !uploading.includes(reference.id) || saved.has(reference.id),
+      );
+
+      references = kept;
+      queryClient.setQueryData<Thread>(key, (thread) =>
+        thread ? setProgress(setActiveReferences(thread, kept), undefined) : thread,
+      );
+    }
+
     const body: AppChatRequest = {
       assistantId,
       conversationId,
       message: content,
       assistantMessageId: answerId,
+      ...(references ? { references: references.map((reference) => reference.id) } : {}),
     };
     const response = await fetch('/api/chat', {
       method: 'POST',
@@ -259,7 +314,11 @@ export const retryMessage = (
 
   queryClient.setQueryData<Thread>(key, removeExchange(thread, userId));
 
-  return sendMessage(queryClient, assistantId, { conversationId, content: failed.content });
+  return sendMessage(queryClient, assistantId, {
+    conversationId,
+    content: failed.content,
+    references: failed.references,
+  });
 };
 
 export const useSendMessage = (assistantId: string) => {

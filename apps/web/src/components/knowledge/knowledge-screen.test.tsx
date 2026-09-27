@@ -445,4 +445,68 @@ describe('KnowledgeScreen', () => {
     act(() => finishDelete());
     await waitFor(() => expect(meter()).toHaveTextContent(/^10 of 100 pages/));
   });
+
+  it('opens an uploaded file or its text from the row', async () => {
+    const user = userEvent.setup();
+    const file = source({
+      kind: 'upload',
+      title: 'limits.pdf',
+      uri: null,
+      storage_path: `u/${ASSISTANT}/f.pdf`,
+      mime_type: 'application/pdf',
+      document_count: 1,
+    });
+
+    renderScreen([file]);
+
+    // The title reads the file's text in the viewer.
+    expect(screen.getByRole('link', { name: 'limits.pdf' })).toHaveAttribute(
+      'href',
+      `/a/${ASSISTANT}/knowledge/sources/${file.id}`,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Actions for limits.pdf' }));
+
+    expect(await screen.findByRole('menuitem', { name: 'View text' })).toHaveAttribute(
+      'href',
+      `/a/${ASSISTANT}/knowledge/sources/${file.id}`,
+    );
+    expect(screen.getByRole('menuitem', { name: 'Open file' })).toHaveAttribute(
+      'href',
+      `/api/sources/${file.id}/file`,
+    );
+    expect(screen.getByRole('menuitem', { name: 'Open file' })).toHaveAttribute('target', '_blank');
+  });
+
+  it('offers no file for a website, and no text before anything is indexed', async () => {
+    const user = userEvent.setup();
+
+    renderScreen([
+      source({ title: 'Docs site', document_count: 0, status: 'crawling' }),
+      source({
+        kind: 'text',
+        title: 'Draft note',
+        uri: null,
+        storage_path: `u/${ASSISTANT}/n.md`,
+        document_count: 0,
+        status: 'queued',
+      }),
+    ]);
+
+    // Nothing to read yet, so the titles are plain text.
+    expect(screen.queryByRole('link', { name: 'Docs site' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Draft note' })).toBeNull();
+
+    await user.click(screen.getByRole('button', { name: 'Actions for Docs site' }));
+    expect(await screen.findByRole('menuitem', { name: 'View pages' })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Open file' })).toBeNull();
+    await user.keyboard('{Escape}');
+
+    await user.click(screen.getByRole('button', { name: 'Actions for Draft note' }));
+    expect(await screen.findByRole('menuitem', { name: 'View text' })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
+    expect(screen.getByRole('menuitem', { name: 'Open original' })).toBeInTheDocument();
+  });
 });

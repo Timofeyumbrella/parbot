@@ -330,17 +330,21 @@ test.describe('the inbox and the overview', () => {
       'href',
       'https://docs.acme.test/auth',
     );
-    await expect(answer.locator('sup[data-citation="3"] a')).toHaveAttribute(
-      'href',
-      `#sources-${seeded.citedMessageId}`,
-    );
+    // A note has no page of its own: its marker and its chip open it in the document viewer.
+    const notesViewer = `/a/${seeded.assistantId}/knowledge/documents/${NOTES_DOC}`;
+
+    await expect(answer.locator('sup[data-citation="3"] a')).toHaveAttribute('href', notesViewer);
 
     const sources = answer.getByTestId('sources');
+    const auth = sources.getByRole('link', { name: /Authentication/ });
 
-    await expect(sources.getByRole('link')).toHaveCount(1);
-    await expect(sources.getByRole('link')).toHaveAttribute('href', 'https://docs.acme.test/auth');
-    await expect(sources.getByRole('link')).toContainText('Authentication');
-    await expect(sources.getByText('Pasted notes')).toBeVisible();
+    await expect(sources.getByRole('link')).toHaveCount(2);
+    await expect(auth).toHaveAttribute('href', 'https://docs.acme.test/auth');
+    await expect(auth).toContainText('Authentication');
+    await expect(sources.getByRole('link', { name: /Pasted notes/ })).toHaveAttribute(
+      'href',
+      notesViewer,
+    );
     await expect(sources.getByText('Authentication')).toHaveCount(1);
 
     const transcriptHtml = await sources.evaluate((node) => node.outerHTML);

@@ -4,9 +4,11 @@ import { Bot, ThumbsDown, ThumbsUp, UserRound } from 'lucide-react';
 import { z } from 'zod';
 
 import { AnswerMarkdown } from '@/components/chat/answer-markdown';
+import { MessageReferences } from '@/components/chat/reference-chips';
 import { Sources } from '@/components/chat/sources';
 import { UnansweredBadge } from '@/components/inbox/channel-badge';
 import { LocalTime } from '@/components/inbox/local-time';
+import { parseReferences } from '@/lib/chat/references';
 import type { Message } from '@/lib/db';
 
 const citationSchema = z.object({
@@ -15,6 +17,7 @@ const citationSchema = z.object({
   title: z.string(),
   url: z.string().nullable().optional(),
   snippet: z.string().optional(),
+  chunkId: z.string().optional(),
 });
 
 /** Citations are stored as JSON; anything malformed is dropped rather than shown broken. */
@@ -31,10 +34,13 @@ export const parseCitations = (value: unknown): Citation[] => {
 };
 
 export type TranscriptMessageProps = {
+  /** Whose document viewer a file's citation opens in. */
+  assistantId: string;
   message: Pick<
     Message,
     'id' | 'role' | 'content' | 'citations' | 'answered' | 'feedback' | 'created_at'
-  >;
+  > &
+    Partial<Pick<Message, 'source_references'>>;
   now: number;
 };
 
@@ -43,9 +49,11 @@ export type TranscriptMessageProps = {
  * components, so an answer reads the same in the Inbox as it did in the chat, plus feedback and the
  * answered flag.
  */
-export const TranscriptMessage = ({ message, now }: TranscriptMessageProps) => {
+export const TranscriptMessage = ({ assistantId, message, now }: TranscriptMessageProps) => {
   const isUser = message.role === 'user';
   const citations = isUser ? [] : parseCitations(message.citations);
+  // The files an in-app question pointed at; widget questions never carry any.
+  const references = isUser ? parseReferences(message.source_references) : [];
   const unanswered = !isUser && message.answered === false;
   // The chat's id for the same row, where an inline marker without a url points.
   const sourcesId = `sources-${message.id}`;
@@ -68,6 +76,13 @@ export const TranscriptMessage = ({ message, now }: TranscriptMessageProps) => {
       </span>
 
       <div className={cn('flex min-w-0 max-w-[85%] flex-col gap-1.5', isUser && 'items-end')}>
+        {references.length > 0 ? (
+          <MessageReferences
+            references={references}
+            assistantId={assistantId}
+            className="max-w-full"
+          />
+        ) : null}
         <div
           className={cn(
             'rounded-lg px-3 py-2 text-sm leading-relaxed',
@@ -78,12 +93,17 @@ export const TranscriptMessage = ({ message, now }: TranscriptMessageProps) => {
           {isUser ? (
             <p className="whitespace-pre-wrap">{message.content}</p>
           ) : (
-            <AnswerMarkdown content={message.content} citations={citations} sourcesId={sourcesId} />
+            <AnswerMarkdown
+              content={message.content}
+              citations={citations}
+              sourcesId={sourcesId}
+              assistantId={assistantId}
+            />
           )}
 
           {citations.length > 0 ? (
             <div className="mt-2">
-              <Sources citations={citations} id={sourcesId} />
+              <Sources citations={citations} id={sourcesId} assistantId={assistantId} />
             </div>
           ) : null}
         </div>

@@ -2,21 +2,49 @@
 
 import { MAX_MESSAGE_LENGTH } from '@parbot/shared';
 import { cn } from 'cn';
-import { ArrowUp, Square } from 'lucide-react';
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { ArrowUp, Paperclip, Square } from 'lucide-react';
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
+import { type ComposerChip, ComposerReferenceChip } from '@/components/chat/reference-chips';
+import { ReferencePicker } from '@/components/chat/reference-picker';
 import { Button } from '@/components/ui/button';
 import { clearDraft, handOffFocus, readDraft, takeFocus, writeDraft } from '@/lib/chat/drafts';
+import {
+  addReference,
+  filterReferenceOptions,
+  findMention,
+  MAX_REFERENCES,
+  type MessageReference,
+  type ReferenceOption,
+  removeMention,
+  removeReference,
+  toReference,
+} from '@/lib/chat/references';
+import { UPLOAD_ACCEPT } from '@/lib/uploads';
+
+/** What the composer needs to offer @ references and attachments; left out, it is a plain box. */
+export type ComposerReferences = {
+  /** The chips the next question carries. */
+  chips: ComposerChip[];
+  onChange: (references: MessageReference[]) => void;
+  /** The picker's list; undefined while it loads. */
+  options: ReferenceOption[] | undefined;
+  failed?: boolean;
+  /** Files picked with the paperclip or dropped on the box. */
+  onAttach: (files: File[]) => void;
+};
 
 export type ComposerProps = {
   /** Where the unsent text is kept between mounts; one per conversation. */
   draftKey: string;
-  onSend: (content: string) => void;
+  /** Called with the text and the references the question carries. */
+  onSend: (content: string, references: MessageReference[]) => void;
   onStop?: () => void;
   streaming?: boolean;
   placeholder?: string;
   autoFocus?: boolean;
   className?: string;
+  references?: ComposerReferences;
 };
 
 const MAX_HEIGHT = 200;
@@ -27,6 +55,10 @@ const isComposing = (event: React.KeyboardEvent<HTMLTextAreaElement>) =>
 /**
  * The message box. Enter sends, Shift+Enter breaks the line, and a composition in progress (IME)
  * is never sent by accident. The Stop button takes the Send button's place while an answer streams.
+ *
+ * With `references`, an @ opens a picker of the assistant's files and sources (arrows move, Enter
+ * or Tab picks, Esc closes) and a picked one becomes a chip above the text; the paperclip uploads
+ * a file into Knowledge and adds it as a chip at once, with its status on it.
  */
 export const Composer = ({
   draftKey,
@@ -36,11 +68,35 @@ export const Composer = ({
   placeholder = 'Ask about the docs',
   autoFocus = true,
   className,
+  references,
 }: ComposerProps) => {
   const [value, setValue] = useState(() => readDraft(draftKey));
+  const [caret, setCaret] = useState<number | null>(null);
+  /** The @ the reader closed with Esc; the picker stays shut for it until they type another. */
+  const [dismissed, setDismissed] = useState<number | null>(null);
+  const [active, setActive] = useState({ query: '', index: 0 });
+  const [dragging, setDragging] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const fileRef = useRef<HTMLInputElement | null>(null);
   const handedFocus = useRef(false);
+  const nextCaret = useRef<number | null>(null);
+  const pickerId = useId();
   const canSend = value.trim().length > 0 && !streaming;
+
+  const mention = references && caret !== null ? findMention(value, caret) : null;
+  const open = Boolean(mention && mention.start !== dismissed);
+  const query = mention?.query ?? '';
+  const options = references?.options;
+  const filtered = useMemo(
+    () => (options ? filterReferenceOptions(options, query) : undefined),
+    [options, query],
+  );
+  // The highlighted row goes back to the top whenever the filter changes.
+  const activeIndex = active.query === query ? active.index : 0;
+  const optionId = useCallback((index: number) => `${pickerId}-option-${index}`, [pickerId]);
+  const referenceChips = references?.chips;
+  const chips = useMemo(() => referenceChips ?? [], [referenceChips]);
+  const selectedIds = useMemo(() => new Set(chips.map((chip) => chip.id)), [chips]);
 
   const resize = useCallback(() => {
     const textarea = textareaRef.current;
@@ -56,6 +112,14 @@ export const Composer = ({
 
   useLayoutEffect(() => {
     resize();
+
+    // A pick rewrote the text; the caret goes where the @ was.
+    const textarea = textareaRef.current;
+
+    if (textarea && nextCaret.current !== null) {
+      textarea.setSelectionRange(nextCaret.current, nextCaret.current);
+      nextCaret.current = null;
+    }
   }, [resize, value]);
 
   // A remount for the same conversation (the route taking over from the pane a click rendered,
@@ -96,6 +160,21 @@ export const Composer = ({
     }
   }, [autoFocus]);
 
+  // Arrow keys can move the highlight past the visible rows.
+  useEffect(() => {
+    if (open) {
+      document.getElementById(optionId(activeIndex))?.scrollIntoView({ block: 'nearest' });
+    }
+  }, [open, activeIndex, optionId]);
+
+  const sendableReferences = useCallback(
+    () =>
+      chips
+        .filter((chip) => chip.status !== 'failed' && chip.status !== 'missing')
+        .map(toReference),
+    [chips],
+  );
+
   const submit = useCallback(() => {
     const content = value.trim();
 
@@ -104,19 +183,69 @@ export const Composer = ({
     }
 
     setValue('');
+    setCaret(0);
     clearDraft(draftKey);
-    onSend(content);
+    onSend(content, sendableReferences());
     textareaRef.current?.focus();
-  }, [value, streaming, draftKey, onSend]);
+  }, [value, streaming, draftKey, onSend, sendableReferences]);
+
+  const pick = (option: ReferenceOption) => {
+    if (!references || !mention) {
+      return;
+    }
+
+    const next = removeMention(value, mention, caret ?? value.length);
+
+    nextCaret.current = next.caret;
+    setValue(next.text);
+    setCaret(next.caret);
+    writeDraft(draftKey, next.text);
+    references.onChange(addReference(chips.map(toReference), option));
+    textareaRef.current?.focus();
+  };
 
   const handleChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
     const next = event.target.value;
 
     setValue(next);
+    setCaret(event.target.selectionStart);
     writeDraft(draftKey, next);
+
+    if (dismissed !== null && !next.includes('@')) {
+      setDismissed(null);
+    }
   };
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (open && !isComposing(event)) {
+      const count = filtered?.length ?? 0;
+
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        event.stopPropagation();
+        setDismissed(mention!.start);
+
+        return;
+      }
+
+      if (count > 0 && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
+        event.preventDefault();
+
+        const step = event.key === 'ArrowDown' ? 1 : -1;
+
+        setActive({ query, index: (activeIndex + step + count) % count });
+
+        return;
+      }
+
+      if (count > 0 && (event.key === 'Tab' || (event.key === 'Enter' && !event.shiftKey))) {
+        event.preventDefault();
+        pick(filtered![activeIndex]!);
+
+        return;
+      }
+    }
+
     if (event.key !== 'Enter' || event.shiftKey || isComposing(event)) {
       return;
     }
@@ -125,7 +254,16 @@ export const Composer = ({
     submit();
   };
 
+  const attach = (files: File[]) => {
+    if (references && files.length > 0) {
+      references.onAttach(files);
+      // Straight back to the question, which can go out while the file uploads.
+      textareaRef.current?.focus();
+    }
+  };
+
   const remaining = MAX_MESSAGE_LENGTH - value.length;
+  const full = chips.length >= MAX_REFERENCES;
 
   return (
     <form
@@ -134,38 +272,139 @@ export const Composer = ({
         event.preventDefault();
         submit();
       }}
+      onDragOver={
+        references
+          ? (event) => {
+              if (event.dataTransfer.types.includes('Files')) {
+                event.preventDefault();
+                setDragging(true);
+              }
+            }
+          : undefined
+      }
+      onDragLeave={references ? () => setDragging(false) : undefined}
+      onDrop={
+        references
+          ? (event) => {
+              if (event.dataTransfer.files.length > 0) {
+                event.preventDefault();
+                setDragging(false);
+                attach([...event.dataTransfer.files]);
+              }
+            }
+          : undefined
+      }
     >
-      <div className="bg-card focus-within:border-ring focus-within:ring-ring/50 focus-within:ring-3 flex items-end gap-2 rounded-xl border p-2 transition-[border-color,box-shadow]">
-        <textarea
-          ref={textareaRef}
-          name="message"
-          aria-label="Message"
-          rows={1}
-          value={value}
-          placeholder={placeholder}
-          maxLength={MAX_MESSAGE_LENGTH}
-          onChange={handleChange}
-          onKeyDown={handleKeyDown}
-          className="placeholder:text-muted-foreground max-h-50 min-h-8 flex-1 resize-none bg-transparent px-1.5 py-1.5 text-sm leading-6 outline-none"
-        />
-        {streaming ? (
-          <Button
-            type="button"
-            size="icon-sm"
-            variant="secondary"
-            aria-label="Stop"
-            onClick={onStop}
-          >
-            <Square className="size-3 fill-current" />
-          </Button>
-        ) : (
-          <Button type="submit" size="icon-sm" aria-label="Send" disabled={!canSend}>
-            <ArrowUp />
-          </Button>
-        )}
+      <div className="relative">
+        {open && references ? (
+          <ReferencePicker
+            id={pickerId}
+            options={filtered}
+            failed={references.failed}
+            hasSources={(references.options?.length ?? 0) > 0}
+            query={query}
+            activeIndex={activeIndex}
+            selectedIds={selectedIds}
+            optionId={optionId}
+            onPick={pick}
+            onActivate={(index) => setActive({ query, index })}
+          />
+        ) : null}
+        <div
+          className={cn(
+            'bg-card focus-within:border-ring focus-within:ring-ring/50 focus-within:ring-3 flex flex-col gap-1.5 rounded-xl border p-2 transition-[border-color,box-shadow]',
+            dragging && 'border-primary bg-primary/5',
+          )}
+        >
+          {chips.length > 0 ? (
+            <div className="flex flex-wrap gap-1.5" aria-label="References for the next question">
+              {chips.map((chip) => (
+                <ComposerReferenceChip
+                  key={chip.id}
+                  chip={chip}
+                  onRemove={(id) =>
+                    references?.onChange(removeReference(chips, id).map(toReference))
+                  }
+                />
+              ))}
+            </div>
+          ) : null}
+          <div className="flex items-end gap-2">
+            {references ? (
+              <>
+                <Button
+                  type="button"
+                  size="icon-sm"
+                  variant="ghost"
+                  aria-label="Attach a file"
+                  title={
+                    full
+                      ? `A question can reference up to ${MAX_REFERENCES} files or sources.`
+                      : 'Attach a file'
+                  }
+                  disabled={full}
+                  className="text-muted-foreground"
+                  onClick={() => fileRef.current?.click()}
+                >
+                  <Paperclip />
+                </Button>
+                <input
+                  ref={fileRef}
+                  type="file"
+                  multiple
+                  accept={UPLOAD_ACCEPT}
+                  className="sr-only"
+                  tabIndex={-1}
+                  aria-label="Choose a file to attach"
+                  onChange={(event) => {
+                    attach([...(event.target.files ?? [])]);
+                    event.target.value = '';
+                  }}
+                />
+              </>
+            ) : null}
+            <textarea
+              ref={textareaRef}
+              name="message"
+              aria-label="Message"
+              rows={1}
+              value={value}
+              placeholder={placeholder}
+              maxLength={MAX_MESSAGE_LENGTH}
+              onChange={handleChange}
+              onKeyDown={handleKeyDown}
+              onSelect={(event) => setCaret(event.currentTarget.selectionStart)}
+              onBlur={() => setDismissed(mention?.start ?? null)}
+              onFocus={() => setDismissed(null)}
+              aria-autocomplete={references ? 'list' : undefined}
+              aria-controls={open && filtered?.length ? pickerId : undefined}
+              aria-activedescendant={open && filtered?.length ? optionId(activeIndex) : undefined}
+              className="placeholder:text-muted-foreground max-h-50 min-h-8 flex-1 resize-none bg-transparent px-1.5 py-1.5 text-sm leading-6 outline-none"
+            />
+            {streaming ? (
+              <Button
+                type="button"
+                size="icon-sm"
+                variant="secondary"
+                aria-label="Stop"
+                onClick={onStop}
+              >
+                <Square className="size-3 fill-current" />
+              </Button>
+            ) : (
+              <Button type="submit" size="icon-sm" aria-label="Send" disabled={!canSend}>
+                <ArrowUp />
+              </Button>
+            )}
+          </div>
+        </div>
       </div>
       <div className="text-muted-foreground flex justify-between px-1 text-[11px]">
-        <span className="hidden sm:inline">Enter to send, Shift+Enter for a new line</span>
+        <span className="hidden sm:inline">
+          {references
+            ? 'Enter to send, Shift+Enter for a new line, @ to point at a file'
+            : 'Enter to send, Shift+Enter for a new line'}
+        </span>
         <span className={cn('ml-auto', remaining < 200 ? 'inline' : 'hidden')} aria-live="polite">
           {remaining} left
         </span>

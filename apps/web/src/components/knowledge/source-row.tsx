@@ -1,6 +1,15 @@
 'use client';
 
-import { Ellipsis, FileText, RefreshCw, Trash, TriangleAlert } from 'lucide-react';
+import {
+  BookOpenText,
+  Ellipsis,
+  ExternalLink,
+  FileText,
+  RefreshCw,
+  Trash,
+  TriangleAlert,
+} from 'lucide-react';
+import Link from 'next/link';
 import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -22,6 +31,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import type { Source } from '@/lib/db';
 import { relativeTime } from '@/lib/format';
+import { hasStoredFile, originalLabel, sourceFileHref, sourceHref } from '@/lib/knowledge/links';
 
 import { describeSource, isActiveStatus, plural, SOURCE_KINDS } from './format';
 import { SourcePagesSheet } from './source-pages-sheet';
@@ -51,6 +61,10 @@ export const SourceRow = ({ source, onReindex, onDelete }: SourceRowProps) => {
   const kind = SOURCE_KINDS[source.kind];
   const active = isActiveStatus(source.status);
   const indexed = source.last_indexed_at ? relativeTime(source.last_indexed_at) : null;
+  // A file or a note opens as its text; a website as the list of its pages. Nothing to read yet
+  // while a first run is still going.
+  const readable = source.document_count > 0;
+  const stored = hasStoredFile(source.kind);
 
   return (
     <li className="flex items-start gap-3 px-4 py-3" data-testid="source-row">
@@ -64,7 +78,16 @@ export const SourceRow = ({ source, onReindex, onDelete }: SourceRowProps) => {
 
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          <span className="truncate text-sm font-medium">{source.title}</span>
+          {readable ? (
+            <Link
+              href={sourceHref(source.assistant_id, source.id)}
+              className="hover:text-primary truncate text-sm font-medium underline-offset-4 hover:underline"
+            >
+              {source.title}
+            </Link>
+          ) : (
+            <span className="truncate text-sm font-medium">{source.title}</span>
+          )}
           <StatusBadge source={source} />
         </div>
         <p className="text-muted-foreground truncate text-xs" title={describeSource(source)}>
@@ -110,6 +133,22 @@ export const SourceRow = ({ source, onReindex, onDelete }: SourceRowProps) => {
             <RefreshCw />
             Re-index
           </DropdownMenuItem>
+          {stored ? (
+            <>
+              <DropdownMenuItem asChild disabled={!readable}>
+                <Link href={sourceHref(source.assistant_id, source.id)}>
+                  <BookOpenText />
+                  View text
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <a href={sourceFileHref(source.id)} target="_blank" rel="noreferrer">
+                  <ExternalLink />
+                  {originalLabel(source.kind)}
+                </a>
+              </DropdownMenuItem>
+            </>
+          ) : null}
           <DropdownMenuItem onSelect={() => setPagesOpen(true)}>
             <FileText />
             View pages
