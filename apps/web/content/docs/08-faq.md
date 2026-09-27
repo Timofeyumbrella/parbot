@@ -10,7 +10,7 @@ It is instructed to answer only from the passages it was given and to say "I cou
 
 ## Can I see what people ask?
 
-Yes. Every conversation is in the Inbox, and the Overview lists the top questions and the ones the docs could not answer.
+Yes. Every conversation is in the Inbox. The Overview groups the questions the docs could not answer, lists the answers readers rated thumbs down, and shows which pages answers use and which they never do.
 
 ## What languages are supported?
 

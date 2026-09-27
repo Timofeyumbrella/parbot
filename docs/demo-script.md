@@ -122,9 +122,11 @@ while we were on the other page."
 
 [Switch to the Parbot Docs assistant with the sidebar switcher. Click Overview.]
 
-"With two weeks of traffic it looks like this: how many questions, how many the docs answered,
-the questions people ask most, and the ones the docs couldn't answer. That last list is your
-writing backlog."
+"With two weeks of traffic it looks like this: how often the docs answered and whether readers
+found it helpful, against the week before. Then the knowledge gaps, the questions the docs couldn't
+answer with different wordings grouped, and Add docs right there. That list is your writing
+backlog. Below it, the answers readers disliked, the pages answers use and the ones they never do,
+and where on the site people ask."
 
 ## 7. Billing (5:20 to 5:50)
 
