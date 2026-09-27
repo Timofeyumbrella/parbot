@@ -325,7 +325,7 @@ test.describe('Stop when the server never hears the reader leave', () => {
     await expect(assistantBubble(page, 'complete')).toHaveCount(0);
   });
 
-  test('Stop after the text but before its sources: bare markers go, and a reload brings the sources', async () => {
+  test('Stop after the text but before its sources: the sources follow once the stop settles, as a reload shows them', async () => {
     proxy.setPace({ tokenDelayMs: 20, holdFinalMs: 8000 });
 
     const before = await usage();
@@ -340,11 +340,15 @@ test.describe('Stop when the server never hears the reader leave', () => {
     const stopped = assistantBubble(page, 'stopped');
 
     await expect(stopped).toContainText('Stopped');
-    // No citations arrived, so the marker is not left behind as a bare [1].
-    await expect(stopped.locator('.answer-prose')).toHaveText(
+    // The stream never sent its citations; the ones the server saved with the shown text are read
+    // back once the stop has settled, so the live answer matches what a reload shows.
+    await expect(stopped.locator('.answer-prose')).toContainText(
       'API keys are created in Settings under Developer.',
     );
-    await expect(stopped.getByTestId('sources')).toHaveCount(0);
+    await expect(stopped.locator('sup[data-citation="1"] a')).toHaveAttribute('href', DOC_URL, {
+      timeout: 10_000,
+    });
+    await expect(stopped.getByTestId('sources')).toContainText('Authentication');
     await expect(page).toHaveURL(CONVERSATION_URL);
 
     const conversationId = page.url().match(CONVERSATION_URL)![1]!;

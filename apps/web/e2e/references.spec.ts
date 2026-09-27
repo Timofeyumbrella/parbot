@@ -269,6 +269,21 @@ test.describe('references in the chat', () => {
     await expect(page.getByTestId('source-row').filter({ hasText: 'limits.md' })).toContainText(
       'Ready',
     );
+
+    // Attached again in a new chat, the same file is the one already in Knowledge, not a copy.
+    await visit(page, `/a/${assistantId}/chat`);
+    // The composer knows Knowledge's files once its @ list has loaded.
+    await composer(page).fill('@limits');
+    await expect(page.getByTestId('reference-picker').getByRole('option')).not.toHaveCount(0);
+    await composer(page).fill('');
+    await page.getByLabel('Choose a file to attach').setInputFiles({
+      name: 'limits.md',
+      mimeType: 'text/markdown',
+      buffer: Buffer.from(LIMITS_FILE),
+    });
+    await expect(chips(page)).toHaveText([/limits\.md.*Already in Knowledge/]);
+    await visit(page, `/a/${assistantId}/knowledge`);
+    await expect(page.getByTestId('source-row').filter({ hasText: 'limits.md' })).toHaveCount(1);
   });
 
   test('a pasted text picked with @ keeps answering a follow-up that does not name it', async ({

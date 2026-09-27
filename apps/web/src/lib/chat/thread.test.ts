@@ -16,6 +16,7 @@ import {
   setActiveReferences,
   setFeedback,
   setProgress,
+  setStoppedCitations,
   stopExchange,
   tempId,
   type Thread,
@@ -230,6 +231,20 @@ describe('stopExchange', () => {
     const thread = emptyThread();
 
     expect(stopExchange(thread)).toBe(thread);
+  });
+
+  it('gives a stopped answer the citations saved with it, and nothing else', () => {
+    const stopped = stopExchange(run(started(), [meta, { type: 'token', text: 'Rotate it [1]' }]));
+    const cited = setStoppedCitations(stopped, 'a1', citations);
+
+    expect(cited.messages[1]).toMatchObject({ status: 'stopped', citations });
+    expect(cited.messages[0]!.citations).toEqual([]);
+
+    // A streaming answer gets its citations from the stream; an unknown id changes nothing.
+    const streaming = run(started(), [meta, { type: 'token', text: 'Rotate it [1]' }]);
+
+    expect(setStoppedCitations(streaming, 'a1', citations)).toBe(streaming);
+    expect(setStoppedCitations(stopped, 'a2', citations)).toBe(stopped);
   });
 });
 

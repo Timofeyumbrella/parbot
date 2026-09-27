@@ -20,6 +20,31 @@ export type ReferenceOption = MessageReference & {
   /** The second line: the address of a website, the type and size of a file. */
   detail: string;
   createdAt: string;
+  /** The stored file's size in bytes, which tells a file attached again from a new one. */
+  byteSize?: number | null;
+};
+
+/** The title an uploaded file gets in Knowledge: its name, as the upload route stores it. */
+export const uploadTitle = (name: string) => name.slice(0, 200);
+
+/**
+ * The upload already in Knowledge that a file attached from the chat is a copy of: same name and
+ * same size, and not failed (a failed one is worth uploading again). Attaching it again would add
+ * a second source, and answers would cite both.
+ */
+export const findKnownUpload = (
+  options: readonly ReferenceOption[],
+  file: { name: string; size: number },
+) => {
+  const title = uploadTitle(file.name);
+
+  return options.find(
+    (option) =>
+      option.kind === 'upload' &&
+      option.status !== 'failed' &&
+      option.title === title &&
+      option.byteSize === file.size,
+  );
 };
 
 /** What a chip says about its source right now. */
@@ -205,6 +230,17 @@ export const CHIP_STATUS_LABEL: Record<ChipStatus, string | null> = {
   missing: 'Removed',
   unknown: null,
 };
+
+/**
+ * A chip's label: its status, or for a file the reader attached that Knowledge already had (see
+ * `findKnownUpload`), that it is that file, while it can be read or is still being indexed.
+ */
+export const chipLabel = (status: ChipStatus, known = false) =>
+  known && status === 'ready'
+    ? 'Already in Knowledge'
+    : known && status === 'indexing'
+      ? 'Already in Knowledge, indexing'
+      : CHIP_STATUS_LABEL[status];
 
 /** The line the thinking state shows while files attached to a question finish uploading. */
 export const uploadingMessage = (titles: string[]) => {

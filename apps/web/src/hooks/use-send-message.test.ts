@@ -6,6 +6,7 @@ import type { ConversationRow } from '@/lib/chat/conversations';
 import { projectCreations, resetProjectState } from '@/lib/chat/project-state';
 import { conversationsKey, threadKey } from '@/lib/chat/queries';
 import type { MessageReference } from '@/lib/chat/references';
+import type { SavedAnswerReader } from '@/lib/chat/stop';
 import { streamRegistry } from '@/lib/chat/streams';
 import { isTempId, type Thread } from '@/lib/chat/thread';
 import { composerUploads } from '@/lib/chat/uploads';
@@ -368,6 +369,78 @@ describe('sendMessage', () => {
       body: { assistantId: ASSISTANT, conversationId: CONVERSATION, text: 'Shown ' },
       keepalive: true,
     });
+  });
+
+  it('stop shows the citations the shown text carries once the server saved them', async () => {
+    const chat = fakeChat();
+    const saved = [
+      { index: 1, documentId: 'd1', title: 'Keys', url: null, snippet: 'Rotate…', chunkId: 'k1' },
+      { index: 2, documentId: 'd2', title: 'Limits', url: null, snippet: '60 a minute…' },
+    ];
+    // The engine saves the stopped text a moment after the stop is recorded.
+    const readAnswer = vi
+      .fn<SavedAnswerReader>()
+      .mockResolvedValueOnce(null)
+      .mockResolvedValue({ citations: saved });
+
+    vi.stubGlobal('fetch', chat.fetch);
+
+    const pending = sendMessage(queryClient, ASSISTANT, {
+      conversationId: CONVERSATION,
+      content: 'How do keys work?',
+    });
+
+    chat.push(meta);
+    chat.push({ type: 'token', text: 'Rotate a key in Settings [1]. The' });
+
+    await vi.waitFor(() => {
+      expect(thread()?.messages[1]!.content).toBe('Rotate a key in Settings [1]. The');
+    });
+
+    stopMessage(queryClient, CONVERSATION, readAnswer);
+    await pending;
+
+    // At once: stopped, with the text as shown and no citations yet.
+    expect(thread()?.messages[1]).toMatchObject({ status: 'stopped', citations: [] });
+
+    await vi.waitFor(
+      () => {
+        expect(thread()?.messages[1]!.citations).toEqual([saved[0]]);
+      },
+      { timeout: 2_000 },
+    );
+    expect(readAnswer).toHaveBeenCalledWith(proposedId(chat));
+    expect(thread()?.messages[1]).toMatchObject({
+      status: 'stopped',
+      content: 'Rotate a key in Settings [1]. The',
+    });
+  });
+
+  it('stop reads nothing back when the shown text cites nothing', async () => {
+    const chat = fakeChat();
+    const readAnswer = vi.fn(async () => ({ citations: [] }));
+
+    vi.stubGlobal('fetch', chat.fetch);
+
+    const pending = sendMessage(queryClient, ASSISTANT, {
+      conversationId: CONVERSATION,
+      content: 'How do keys work?',
+    });
+
+    chat.push(meta);
+    chat.push({ type: 'token', text: 'Rotate a key' });
+    await vi.waitFor(() => {
+      expect(thread()?.messages[1]!.content).toBe('Rotate a key');
+    });
+
+    stopMessage(queryClient, CONVERSATION, readAnswer);
+    await pending;
+    await vi.waitFor(() => {
+      expect(chat.stops).toHaveLength(1);
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(readAnswer).not.toHaveBeenCalled();
   });
 
   it('stop before the stream says anything still names the answer, with nothing shown', async () => {

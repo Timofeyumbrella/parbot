@@ -5,11 +5,11 @@ import { Check, LoaderCircle, TriangleAlert, X } from 'lucide-react';
 import Link from 'next/link';
 
 import { SOURCE_KINDS } from '@/components/knowledge/format';
-import { CHIP_STATUS_LABEL, type ChipStatus, type MessageReference } from '@/lib/chat/references';
+import { type ChipStatus, chipLabel, type MessageReference } from '@/lib/chat/references';
 import { sourceHref } from '@/lib/knowledge/links';
 
-const StatusMark = ({ status }: { status: ChipStatus }) => {
-  const label = CHIP_STATUS_LABEL[status];
+const StatusMark = ({ status, known = false }: { status: ChipStatus; known?: boolean }) => {
+  const label = chipLabel(status, known);
 
   if (!label) {
     return null;
@@ -38,12 +38,24 @@ const StatusMark = ({ status }: { status: ChipStatus }) => {
   );
 };
 
-export type ComposerChip = MessageReference & { status: ChipStatus; error?: string };
+export type ComposerChip = MessageReference & {
+  status: ChipStatus;
+  error?: string;
+  /** A file the reader attached that Knowledge already had, referenced instead of uploaded again. */
+  known?: boolean;
+};
+
+/** What hovering a chip explains: why it failed, or that it is the copy already in Knowledge. */
+const chipTitle = (chip: ComposerChip) =>
+  chip.error ??
+  (chip.known && chip.status !== 'failed' && chip.status !== 'missing'
+    ? `${chip.title} is already in Knowledge, so the question reads that file. It was not uploaded again.`
+    : null);
 
 /**
  * A reference waiting in the composer: what it is, whether it can be read yet, and a way to take it
  * off the next question. The status says Uploading, Indexing, Ready or Failed as the file moves
- * through Knowledge.
+ * through Knowledge, or that an attached file is the one already in Knowledge.
  */
 export const ComposerReferenceChip = ({
   chip,
@@ -62,11 +74,12 @@ export const ComposerReferenceChip = ({
       )}
       data-testid="reference-chip"
       data-status={chip.status}
-      title={chip.error ?? chip.title}
+      data-known={chip.known || undefined}
+      title={chipTitle(chip) ?? chip.title}
     >
       <Icon className="text-muted-foreground size-3.5 shrink-0" aria-hidden="true" />
       <span className="min-w-0 max-w-40 truncate font-medium sm:max-w-56">{chip.title}</span>
-      <StatusMark status={chip.status} />
+      <StatusMark status={chip.status} known={chip.known} />
       <button
         type="button"
         onClick={() => onRemove(chip.id)}

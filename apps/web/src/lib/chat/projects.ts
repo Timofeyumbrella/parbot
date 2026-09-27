@@ -77,18 +77,22 @@ export const removeProject = (rows: ProjectRow[], id: string) =>
 
 /**
  * Reconciles a fresh read with the cache. The server wins, including projects deleted elsewhere;
- * only projects created here and not yet confirmed survive a read that predates them, and a
- * project with a change still on its way (`busy`) keeps what the reader sees until it lands.
+ * only projects created here and not yet confirmed survive a read that predates them, a project
+ * with a change still on its way (`busy`) keeps what the reader sees until it lands, and a project
+ * deleted here (`deleted`) stays gone even if the read left before the delete landed.
  */
 export const mergeProjectLists = (
   previous: ProjectRow[] | undefined,
   fetched: ProjectRow[],
   busy: ReadonlySet<string> = new Set(),
+  deleted: ReadonlySet<string> = new Set(),
 ) => {
   const cached = new Map((previous ?? []).map((row) => [row.id, row]));
   const known = new Set(fetched.map((row) => row.id));
   const pending = (previous ?? []).filter((row) => row.pending && !known.has(row.id));
-  const merged = fetched.map((row) => (busy.has(row.id) ? (cached.get(row.id) ?? row) : row));
+  const merged = fetched
+    .filter((row) => !deleted.has(row.id))
+    .map((row) => (busy.has(row.id) ? (cached.get(row.id) ?? row) : row));
 
   return sortProjects([...pending, ...merged]);
 };

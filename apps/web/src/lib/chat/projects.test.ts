@@ -1,7 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { ConversationRow } from './conversations';
-import { MOVE_GRACE_MS, projectCreations, projectMoves, resetProjectState } from './project-state';
+import {
+  deletedProjects,
+  MOVE_GRACE_MS,
+  overlayProjectState,
+  projectCreations,
+  projectMoves,
+  resetProjectState,
+} from './project-state';
 import {
   groupConversations,
   instructionsSummary,
@@ -83,6 +90,16 @@ describe('merging projects', () => {
     expect(
       mergeProjectLists(previous, fetched, new Set(['p1'])).find((item) => item.id === 'p1')?.name,
     ).toBe('Renamed here');
+  });
+
+  it('keeps a project deleted here gone from a read that left before the delete landed', () => {
+    const fetched = [project('p1'), project('p2')];
+
+    expect(
+      mergeProjectLists([project('p2')], fetched, new Set(), new Set(['p1'])).map(
+        (item) => item.id,
+      ),
+    ).toEqual(['p2']);
   });
 
   it('folds a snapshot in without dropping rows or reviving deleted ones', () => {
@@ -191,5 +208,33 @@ describe('moves in flight', () => {
     await expect(projectCreations.ready('p-failed')).resolves.toBe(false);
     // Nothing in flight: an existing project is ready.
     await expect(projectCreations.ready('p-old')).resolves.toBe(true);
+  });
+});
+
+describe('deleted projects', () => {
+  beforeEach(() => {
+    resetProjectState();
+  });
+
+  it('keeps the chats of a project deleted here out of it, whatever a server row says', () => {
+    const rows = [row('c1', 'p1'), row('c2'), row('c3', 'p2')];
+
+    expect(deletedProjects.release(rows)).toBe(rows);
+
+    deletedProjects.add('p1');
+    expect(overlayProjectState(rows).map((item) => item.project_id)).toEqual([null, null, 'p2']);
+
+    // A delete the server refused puts them back.
+    deletedProjects.restore('p1');
+    expect(overlayProjectState(rows)).toBe(rows);
+  });
+
+  it('applies moves in flight too', () => {
+    deletedProjects.add('p1');
+    projectMoves.begin('c2', 'p2');
+
+    expect(
+      overlayProjectState([row('c1', 'p1'), row('c2')]).map((item) => item.project_id),
+    ).toEqual([null, 'p2']);
   });
 });

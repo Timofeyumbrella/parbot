@@ -92,6 +92,11 @@ export const Composer = ({
   const fileRef = useRef<HTMLInputElement | null>(null);
   const handedFocus = useRef(false);
   const nextCaret = useRef<number | null>(null);
+  /**
+   * Enter (or Tab) pressed while the picker's list was still loading, for the @ that starts at
+   * this index: the first match is picked the moment the list arrives.
+   */
+  const queuedPick = useRef<number | null>(null);
   const pickerId = useId();
   const canSend = value.trim().length > 0 && !streaming;
 
@@ -207,30 +212,55 @@ export const Composer = ({
     textareaRef.current?.focus();
   }, [value, streaming, draftKey, onSend, sendableReferences]);
 
-  const pick = (option: ReferenceOption) => {
-    if (!references || !mention) {
+  const pick = useCallback(
+    (option: ReferenceOption) => {
+      if (!references || !mention) {
+        return;
+      }
+
+      const next = removeMention(value, mention, caret ?? value.length);
+
+      nextCaret.current = next.caret;
+      setValue(next.text);
+      setCaret(next.caret);
+      writeDraft(draftKey, next.text);
+
+      if (!fixedIds.has(option.id)) {
+        references.onChange(addReference(chips.map(toReference), option));
+      }
+
+      textareaRef.current?.focus();
+    },
+    [references, mention, value, caret, draftKey, fixedIds, chips],
+  );
+
+  // A pick asked for while the list loaded lands once it has arrived; a list that failed, or that
+  // has nothing for the query, leaves the text as it is. Closing the picker or typing on drops it.
+  const loading = open && !filtered && !references?.failed;
+  const openMention = open ? (mention?.start ?? null) : null;
+
+  useEffect(() => {
+    const queued = queuedPick.current;
+
+    if (queued === null || (queued === openMention && loading)) {
       return;
     }
 
-    const next = removeMention(value, mention, caret ?? value.length);
+    queuedPick.current = null;
 
-    nextCaret.current = next.caret;
-    setValue(next.text);
-    setCaret(next.caret);
-    writeDraft(draftKey, next.text);
+    const option = queued === openMention ? filtered?.[0] : undefined;
 
-    if (!fixedIds.has(option.id)) {
-      references.onChange(addReference(chips.map(toReference), option));
+    if (option) {
+      pick(option);
     }
-
-    textareaRef.current?.focus();
-  };
+  }, [openMention, loading, filtered, pick]);
 
   const handleChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
     const next = event.target.value;
 
     setValue(next);
     setCaret(event.target.selectionStart);
+    queuedPick.current = null;
     writeDraft(draftKey, next);
 
     if (dismissed !== null && !next.includes('@')) {
@@ -241,10 +271,12 @@ export const Composer = ({
   const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (open && !isComposing(event)) {
       const count = filtered?.length ?? 0;
+      const picks = event.key === 'Tab' || (event.key === 'Enter' && !event.shiftKey);
 
       if (event.key === 'Escape') {
         event.preventDefault();
         event.stopPropagation();
+        queuedPick.current = null;
         setDismissed(mention!.start);
 
         return;
@@ -260,9 +292,24 @@ export const Composer = ({
         return;
       }
 
-      if (count > 0 && (event.key === 'Tab' || (event.key === 'Enter' && !event.shiftKey))) {
+      if (count > 0 && picks) {
         event.preventDefault();
         pick(filtered![activeIndex]!);
+
+        return;
+      }
+
+      if (loading && picks) {
+        event.preventDefault();
+        queuedPick.current = mention!.start;
+
+        return;
+      }
+
+      // The reader is picking a file, not sending: with nothing to pick, Enter keeps the text
+      // (Esc closes the list, and the Send button still sends it as written).
+      if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
 
         return;
       }

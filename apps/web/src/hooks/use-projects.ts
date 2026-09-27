@@ -1,7 +1,7 @@
 'use client';
 
 import type { RealtimeChannel } from '@supabase/supabase-js';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { notifyManager, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
 
@@ -67,6 +67,7 @@ export const useProjects = (assistantId: string, snapshot?: ProjectSnapshot) => 
         queryClient.getQueryData<ProjectRow[]>(key),
         await fetchProjects(getSupabaseBrowserClient(), assistantId),
         projectWrites.busy(),
+        deletedProjects.ids(),
       ),
     initialData: snapshot
       ? () => mergeProjectSnapshot(undefined, snapshot.rows, deletedProjects.ids())
@@ -308,7 +309,12 @@ export const useProjectActions = (assistantId: string) => {
 
   const rename = useCallback((id: string, name: string) => update(id, { name }), [update]);
 
-  /** The project leaves the list and its conversations move out of it, before the server answers. */
+  /**
+   * The project leaves the list and its conversations move to Chats in one render, before the
+   * server answers; reads that left before the delete landed cannot undo either (see
+   * `deletedProjects`). Once the server agrees, both lists are read again in the background; if
+   * it refuses, the folder and its chats come back.
+   */
   const remove = useCallback(
     async (id: string) => {
       const project = queryClient.getQueryData<ProjectRow[]>(key)?.find((row) => row.id === id);
@@ -319,10 +325,14 @@ export const useProjectActions = (assistantId: string) => {
       );
 
       deletedProjects.add(id);
-      queryClient.setQueryData<ProjectRow[]>(key, (rows) => removeProject(rows ?? [], id));
-      queryClient.setQueryData<ConversationRow[]>(listKey, (rows) =>
-        rows ? releaseProjectRows(rows, id) : rows,
-      );
+      // One step: a render between the two writes would show the folder gone with its chats not
+      // yet under Chats, or the reverse.
+      notifyManager.batch(() => {
+        queryClient.setQueryData<ProjectRow[]>(key, (rows) => removeProject(rows ?? [], id));
+        queryClient.setQueryData<ConversationRow[]>(listKey, (rows) =>
+          rows ? releaseProjectRows(rows, id) : rows,
+        );
+      });
 
       await projectCreations.ready(id);
 
@@ -333,21 +343,26 @@ export const useProjectActions = (assistantId: string) => {
 
       if (!result.ok) {
         deletedProjects.restore(id);
+        notifyManager.batch(() => {
+          if (project) {
+            queryClient.setQueryData<ProjectRow[]>(key, (rows) =>
+              upsertProject(rows ?? [], project),
+            );
+          }
 
-        if (project) {
-          queryClient.setQueryData<ProjectRow[]>(key, (rows) => upsertProject(rows ?? [], project));
-        }
-
-        queryClient.setQueryData<ConversationRow[]>(listKey, (rows) =>
-          rows?.map((row) =>
-            released.has(row.id) && !row.project_id ? { ...row, project_id: id } : row,
-          ),
-        );
+          queryClient.setQueryData<ConversationRow[]>(listKey, (rows) =>
+            rows?.map((row) =>
+              released.has(row.id) && !row.project_id ? { ...row, project_id: id } : row,
+            ),
+          );
+        });
         toast.error(result.error);
 
         return false;
       }
 
+      void queryClient.invalidateQueries({ queryKey: key, exact: true });
+      void queryClient.invalidateQueries({ queryKey: listKey, exact: true });
       refreshInbox();
 
       return true;
