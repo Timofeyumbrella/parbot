@@ -11,14 +11,17 @@ const creations = new Map<string, Promise<boolean>>();
 export const projectCreations = {
   /** Records a project being created; `done` resolves true once it exists on the server. */
   track: (id: string, done: Promise<boolean>) => {
-    const forget = () => {
-      if (creations.get(id) === done) {
-        creations.delete(id);
-      }
-    };
-
+    // A project that was created is simply there from then on; one that failed stays known as
+    // failed, so a send that starts after the failure does not go out in its name.
     creations.set(id, done);
-    done.then(forget, forget);
+    done.then(
+      (created) => {
+        if (created && creations.get(id) === done) {
+          creations.delete(id);
+        }
+      },
+      () => undefined,
+    );
   },
   /** Resolves true once the project exists (at once if nothing is in flight), false if it failed. */
   ready: (id: string) => creations.get(id) ?? Promise.resolve(true),

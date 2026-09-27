@@ -3,6 +3,7 @@ import { QueryClient } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { ConversationRow } from '@/lib/chat/conversations';
+import { projectCreations, resetProjectState } from '@/lib/chat/project-state';
 import { conversationsKey, threadKey } from '@/lib/chat/queries';
 import type { MessageReference } from '@/lib/chat/references';
 import { streamRegistry } from '@/lib/chat/streams';
@@ -761,6 +762,131 @@ describe('sendMessage with references', () => {
 
     expect(chatBodies(second.fetch)[0]).toMatchObject({ references: [notes.id] });
     expect(thread()?.messages[0]!.references).toEqual([notes]);
+    second.push(meta);
+    second.push({ type: 'done', answered: true, latencyMs: 3 });
+    second.close();
+    await retried;
+  });
+});
+
+describe('sendMessage in a project', () => {
+  const PROJECT = '55555555-5555-4555-8555-555555555555';
+
+  const bodies = (fetch: ReturnType<typeof vi.fn>) =>
+    fetch.mock.calls
+      .filter(([url]) => url === '/api/chat')
+      .map(
+        ([, init]) => JSON.parse((init as RequestInit).body as string) as Record<string, unknown>,
+      );
+
+  beforeEach(() => {
+    resetProjectState();
+  });
+
+  it('starts a new conversation in the project, and names it only while the server has not confirmed it', async () => {
+    const first = fakeChat();
+
+    vi.stubGlobal('fetch', first.fetch);
+
+    const started = sendMessage(queryClient, ASSISTANT, {
+      conversationId: CONVERSATION,
+      content: 'What does the pricing sheet say?',
+      projectId: PROJECT,
+    });
+
+    // The row is in the project's folder before the request has gone out.
+    expect(list()).toEqual([
+      expect.objectContaining({ id: CONVERSATION, project_id: PROJECT, pending: true }),
+    ]);
+    await vi.waitFor(() => {
+      expect(bodies(first.fetch)[0]).toMatchObject({ projectId: PROJECT });
+    });
+    first.push(meta);
+    first.push({ type: 'done', answered: true, latencyMs: 3 });
+    first.close();
+    await started;
+
+    // A follow-up reads whatever project the conversation is in now; the request names none.
+    const second = fakeChat();
+
+    vi.stubGlobal('fetch', second.fetch);
+
+    const followUp = sendMessage(queryClient, ASSISTANT, {
+      conversationId: CONVERSATION,
+      content: 'And for the team plan?',
+    });
+
+    expect(bodies(second.fetch)[0]).not.toHaveProperty('projectId');
+    expect(list()![0]!.project_id).toBe(PROJECT);
+    second.push({ ...meta, userMessageId: 'u2', assistantMessageId: 'a2' });
+    second.push({ type: 'done', answered: true, latencyMs: 3 });
+    second.close();
+    await followUp;
+  });
+
+  it('waits for a project created a moment ago, and does not send when it failed', async () => {
+    const chat = fakeChat();
+    let created!: (ok: boolean) => void;
+
+    vi.stubGlobal('fetch', chat.fetch);
+    projectCreations.track(
+      PROJECT,
+      new Promise<boolean>((resolve) => {
+        created = resolve;
+      }),
+    );
+
+    const pending = sendMessage(queryClient, ASSISTANT, {
+      conversationId: CONVERSATION,
+      content: 'What does it say?',
+      projectId: PROJECT,
+    });
+
+    // The question shows at once and waits for the project.
+    expect(thread()?.messages.map((message) => message.status)).toEqual(['pending', 'streaming']);
+    await Promise.resolve();
+    expect(chat.fetch).not.toHaveBeenCalled();
+
+    created(false);
+    await pending;
+
+    expect(chat.fetch).not.toHaveBeenCalled();
+    expect(thread()?.messages[1]).toMatchObject({
+      status: 'error',
+      error: {
+        code: 'not_found',
+        message: 'The project could not be created, so this chat was not started. Try again.',
+      },
+    });
+  });
+
+  it('retries a failed first question in the project it was started in', async () => {
+    const first = fakeChat();
+
+    vi.stubGlobal('fetch', first.fetch);
+
+    const failed = sendMessage(queryClient, ASSISTANT, {
+      conversationId: CONVERSATION,
+      content: 'What does it say?',
+      projectId: PROJECT,
+    });
+
+    await vi.waitFor(() => {
+      expect(first.fetch).toHaveBeenCalled();
+    });
+    first.push({ type: 'error', code: 'internal', message: 'The answer could not be produced.' });
+    first.close();
+    await failed;
+
+    const second = fakeChat();
+
+    vi.stubGlobal('fetch', second.fetch);
+
+    const retried = retryMessage(queryClient, ASSISTANT, CONVERSATION, thread()!.messages[0]!.id);
+
+    await vi.waitFor(() => {
+      expect(bodies(second.fetch)[0]).toMatchObject({ projectId: PROJECT });
+    });
     second.push(meta);
     second.push({ type: 'done', answered: true, latencyMs: 3 });
     second.close();

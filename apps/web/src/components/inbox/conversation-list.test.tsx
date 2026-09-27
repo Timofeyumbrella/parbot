@@ -119,6 +119,41 @@ const shownIds = () =>
   screen.getAllByRole('listitem').map((item) => item.getAttribute('data-conversation-id'));
 
 describe('ConversationList', () => {
+  it('labels an in-app conversation with its chat project, and follows a move over Realtime', async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false, staleTime: Infinity } },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <ConversationList
+          assistantId="asst"
+          filter="all"
+          initialRows={[
+            row({ id: 'in-project', project_id: 'p1', last_message_at: '2026-09-23T11:00:00Z' }),
+            row({ id: 'loose', project_id: null }),
+          ]}
+          now={NOW}
+          projects={{ p1: 'Billing' }}
+        />
+      </QueryClientProvider>,
+    );
+
+    const [inProject, loose] = screen.getAllByRole('listitem');
+
+    expect(inProject).toHaveTextContent('Project: Billing');
+    expect(loose!.querySelector('[data-testid="project-badge"]')).toBeNull();
+
+    // Moved into the project from the chat in another tab.
+    queryClient.setQueryData<ListData>(conversationListKey('asst', 'all'), (data) =>
+      data ? applyChange(data, update(row({ id: 'loose', project_id: 'p1' })), 'all').data : data,
+    );
+
+    await waitFor(() => {
+      expect(screen.getAllByTestId('project-badge')).toHaveLength(2);
+    });
+  });
+
   it('shows rows in the order the server pages them, a row without a message last', async () => {
     // Started most recently but never had a message: sorting by start time would lift it to the top.
     const queryClient = renderList([
