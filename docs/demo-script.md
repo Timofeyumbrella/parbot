@@ -5,17 +5,22 @@ OBS records the whole built-in screen at the left of a 1080p frame, with the bro
 screen in the dark scheme at 125% zoom and the camera in the column on the right (see "Recording
 setup"). Record one file per section and join them afterwards.
 
-Voiceover lines are in quotes. Actions are in brackets. Keep the mouse still while talking. Every
-input below was typed on the live site in a full rehearsal on 28 Sep 2026. The timings in italics
-are what that rehearsal measured.
+Voiceover lines are in quotes. Actions are in brackets. Keep the mouse still while talking. The
+timings in italics were measured on the live site.
 
-The story: a new user, Alex, sets up an assistant called Northwind Docs. Its public docs part is
-Hono's API reference, a real site Alex doesn't control, which shows crawling works on any public
-site. Its private part is a Word file and a pasted policy. The demo account's seeded history then
-shows what the Overview looks like after two weeks of real traffic.
+The story: a new user, Alex, signs up and sets up an assistant called Northwind Docs for a payments
+API. Its public part is Hono's API reference, a real site Alex doesn't control, which shows
+crawling works on any public site. Its private part is Northwind's own files, a Word document and a
+PDF, and a pasted refund policy. While those index, a second browser profile shows the demo
+account, whose seeded history makes the Overview look like two weeks of real traffic. The chat
+section answers a reviewer's complaint about a sibling product: there, switching chats took seconds
+and a sent message appeared only after the answer. Here both happen in the same frame.
 
-**Fixed since the rehearsal.** These fixes are merged and covered by tests, but were not rehearsed
-on the live site. The dry run the day before covers the ones the video depends on.
+**What was tested.** The landing, sign-up, chat, billing and widget steps were rehearsed in full
+on the live site on 28 Sep 2026. Every source in section 3 was added live the same night, between
+01:55 and 02:12 (UTC+3), in a new Hobby account, with the questions in `~/Wo/par/utils/README.md`.
+These fixes went live after that and have not been through a full take. The dry run covers the
+ones the video depends on:
 
 - The Overview opens on the last 7 days.
 - The widget settings switches keep their saved values after Save, and the demo page always loads
@@ -25,39 +30,59 @@ on the live site. The dry run the day before covers the ones the video depends o
   leave out. A question no source touches still gets "I couldn't find that…".
 - When a Gemini model sends nothing for 3.5 s, the next model starts beside it and the first to
   answer wins.
-- The pages meter keeps up with the sources as they index, a stopped answer keeps its sources, and
-  the paperclip attaches a file already in Knowledge instead of uploading it again.
+- The pages meter keeps up with the sources as they index, and a stopped answer keeps its sources.
 - PDF uploads keep their headings, paragraphs and lists.
 - Signing out ends only that browser's session.
 - Below 1024 px wide, the landing shows a link to the demo page in place of the ⌘K hint.
-- `seed-demo.ts --refresh-history` gives the demo history new dates and keeps the public key.
+
+New in this running order, so the dry run covers them too: the @ question comes as a follow-up in
+the Hono chat (it was rehearsed in a chat of its own, and tested with all five files uploaded), the
+widget moves to Bottom left, and the demo page question is asked in the palette (it was rehearsed
+in the bubble).
+
+## Running order
+
+| #   | Section                                               | Target | Runs         | Optional beats                     |
+| --- | ----------------------------------------------------- | ------ | ------------ | ---------------------------------- |
+| 1   | Landing: hero, live ⌘K question, embed modes, pricing | 1:00   | 0:00 to 1:00 |                                    |
+| 2   | Sign up and create the assistant                      | 0:20   | 1:00 to 1:20 |                                    |
+| 3   | Knowledge, with the demo account's Overview and Inbox | 2:00   | 1:20 to 3:20 | The sitemap +0:10                  |
+| 4   | Chat                                                  | 1:30   | 3:20 to 4:50 | Stop +0:15, a Project +0:35        |
+| 5   | Billing: upgrade to Starter                           | 0:25   | 4:50 to 5:15 |                                    |
+| 6   | Widget, install snippet and the demo page             | 1:05   | 5:15 to 6:20 | The lead form in the preview +0:20 |
+| 7   | Close                                                 | 0:10   | 6:20 to 6:30 |                                    |
+
+Without the optional beats the video runs about 6:30. Add at most 30 seconds of them to stay under
+7 minutes.
 
 ## Test inputs
 
 Keep this table where you can read it and the capture can't: an external display, a printout or a
-phone. Type or paste exactly these inputs.
+phone. Type or paste exactly these inputs. The files are in `~/Wo/par/utils`, outside the repo.
 
-| Where                | Input                                                                                            | What comes back                                                                                                          |
-| -------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
-| Landing ⌘K           | `What happens when the docs don't cover a question?`                                             | It says so instead of guessing, records the question, and with lead capture offers an email form. Sources listed by page |
-| Sign up              | Full name `Alex Rivera`, a fresh email you control, any 8+ character password                    | Onboarding                                                                                                               |
-| Onboarding           | Name `Northwind Docs`                                                                            | Slug `northwind-docs` fills in, lands on Knowledge                                                                       |
-| Website source       | `https://hono.dev/docs/api/context`                                                              | Crawls everything under `/docs/api/`: 6 pages, 79 passages, Ready in _8 to 13 s_                                         |
-| Upload               | `docs/demo-assets/northwind-api-limits.docx`                                                     | Word file, 6 passages, Ready in _2 to 4 s_                                                                               |
-| Paste text           | Title `Refund policy`, text below                                                                | 1 passage, Ready in _1 to 3 s_                                                                                           |
-| Chat 1               | `How do I read a query parameter?`                                                               | `c.req.query()` with two code blocks, cites HonoRequest                                                                  |
-| Chat 1               | `And a path parameter?`                                                                          | `c.req.param()` with code, same source                                                                                   |
-| Chat 1               | `Does Hono ship a Postgres driver?`                                                              | "I couldn't find that in the documentation…", chat marked unanswered                                                     |
-| Chat 2               | `@north`, Enter to pick the file, then `what happens if we go over?`                             | 429, not queued, safe to resend, Retry-After. Cites the Word file                                                        |
-| Chat 2               | `How long should we wait before retrying?`                                                       | Retry-After, then backoff 1, 2, 4, 8 s, five attempts. Cites the file again                                              |
-| Chat 3               | `Walk me through routing in Hono, with a code example for every kind of route.`                  | A long answer. Press Stop after two or three lines                                                                       |
-| Project              | Name `Support replies`, instructions below, file `Refund policy`                                 |                                                                                                                          |
-| Project chat         | `A customer on the annual plan paid two months ago and wants their money back. What do I reply?` | A two-sentence reply about a pro rata refund, then `Policy: Refund policy`                                               |
-| Demo page bubble     | `How do I set the status code of a response?`                                                    | `c.status()` with `c.status(201)` code, sources listed by page, "Powered by Parbot" under it                             |
-| Live preview palette | `Is there a Go SDK?`                                                                             | "I couldn't find that…", then the lead form                                                                              |
-| Lead form            | `sam@example.com`, note `We ship a Go backend and would like an official SDK.`                   | "Thanks. The team will reply to sam@example.com."                                                                        |
+| Section | Where                  | Input                                                                                                            | What comes back                                                                                                                         |
+| ------- | ---------------------- | ---------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| 1       | Landing ⌘K             | `What happens when the docs don't cover a question?`                                                             | It says so instead of guessing, records the question, and with lead capture offers an email form. Sources listed by page                |
+| 2       | Sign up                | Full name `Alex Rivera`, a fresh email you control, any 8+ character password                                    | Onboarding                                                                                                                              |
+| 2       | Onboarding             | Name `Northwind Docs`                                                                                            | Slug `northwind-docs` fills in. Create assistant lands on Knowledge                                                                     |
+| 3       | Website                | `https://hono.dev/docs/api/context`                                                                              | Everything under `/docs/api/`: 6 pages, 79 passages, Ready in _8 to 16 s_. The row becomes "Context - Hono"                             |
+| 3       | Upload                 | `uploads/northwind-api-limits.docx`                                                                              | Word file, 6 passages, Ready in _2 to 4 s_. Document title "Northwind Payments API: limits and retries"                                 |
+| 3       | Upload                 | `uploads/northwind-webhooks-guide.pdf`                                                                           | PDF, 6 passages, Ready in _2.4 s_. Document title "Northwind Payments API: webhooks guide"                                              |
+| 3       | Upload, optional       | `uploads/northwind-authentication.html`, `uploads/northwind-error-codes.md`, `uploads/northwind-support-sla.txt` | 7, 8 and 5 passages, Ready in _2.3 to 3.3 s_ each                                                                                       |
+| 3       | Paste text             | Title `Refund policy`, the text below                                                                            | 1 passage, Ready in _1 to 3 s_                                                                                                          |
+| 3       | Sitemap, optional      | `https://webhooks.fyi/sitemap.xml`                                                                               | A sitemap index with one child: 29 pages, 88 passages, Ready in _17 to 24 s_. The row reads "webhooks.fyi"                              |
+| 4       | Chat 1                 | `How do I read a query parameter?`                                                                               | `c.req.query()` with two code blocks, cites HonoRequest - Hono                                                                          |
+| 4       | Chat 1                 | `@northwind-api`, Enter to pick the file, then `what happens if we go over?`                                     | 429, not queued, safe to resend, Retry-After. Cites only the Word file                                                                  |
+| 4       | Chat 2                 | `Our webhook endpoint was down all weekend. How do we get the events we missed?`                                 | Replay within 30 days: Resend in the dashboard, `POST /v1/events/{event_id}/replay`, or a bulk replay of up to 1,000. Cites the PDF     |
+| 4       | Chat 3, optional Stop  | `Walk me through routing in Hono, with a code example for every kind of route.`                                  | A long answer. Press Stop after two or three lines                                                                                      |
+| 4       | Project, optional      | Name `Support replies`, the instructions below, file `Refund policy`                                             |                                                                                                                                         |
+| 4       | Project chat, optional | `A customer on the annual plan paid two months ago and wants their money back. What do I reply?`                 | A two-sentence reply about a pro rata refund, then `Policy: Refund policy`                                                              |
+| 6       | Demo page palette      | `How do I set the status code of a response?`                                                                    | `c.status()` with `c.status(201)`, also `c.body()`, `c.redirect()` and `HTTPException`. Cites Context and HTTPException, listed by page |
+| 6       | Live preview, optional | `Is there a Go SDK?`                                                                                             | "I couldn't find that…", then the lead form                                                                                             |
+| 6       | Lead form, optional    | `sam@example.com`, note `We ship a Go backend and would like an official SDK.`                                   | "Thanks. The team will reply to sam@example.com."                                                                                       |
 
-Refund policy text, pasted as-is:
+Refund policy text, pasted as-is (the same as `paste-text/refund-policy.txt` below its first two
+lines):
 
 ```
 Monthly plans are refunded in full when the customer asks within 14 days of the charge.
@@ -73,13 +98,18 @@ Project instructions, pasted as-is:
 Write the reply a support agent can send to the customer: two or three short, friendly sentences, no lists. Then add one line starting with "Policy:" that names the document you used.
 ```
 
+**The @ picker.** Type `@northwind-api`, not `@north`. The picker lists the newest upload first, so
+`@north` picks whichever Northwind file went in last: the PDF when only the Word file and the PDF
+are uploaded, the support SLA text file when all five are. `@northwind-api` matches only the Word
+file. The tested alternative for the PDF is `@northwind-web` with
+`what happens if our endpoint is down?`. If you use it, ask chat 2 about the refund policy instead:
+`A customer on a monthly plan was charged three weeks ago and wants their money back. Can they get it?`
+(No: monthly plans are refunded only within 14 days. Cites Refund policy.)
+
 Do not improvise the questions. `How do I return JSON with a 201 status code?` came back as
-unanswered in rehearsal, even though the Context page covers `c.json()` and `c.status(201)` in
-separate places. The partial-coverage fix was written for that case, but the question has not been
-asked on the live site since, so the demo page keeps the rehearsed status code question. The two
-questions meant to come back unanswered, the Postgres driver and the Go SDK, touch nothing in the
-sources, so the new rules should still turn them into "I couldn't find that…". That reply is what
-flags the chat and brings up the lead form, so the dry run checks both.
+unanswered in rehearsal, and has not been asked since the partial-coverage fix. The one question
+meant to come back unanswered, the Go SDK, touches nothing in the sources, so it should still get
+"I couldn't find that…". That reply is what brings up the lead form, so the dry run checks it.
 
 ---
 
@@ -101,8 +131,9 @@ sharp. This leaves a column about 250 px wide on the right.
 it square from the middle (for a 1920×1080 camera image, Crop Left and Right `420` each), set Size
 to `250x250` and Position to `1670, 0`, so it sits at the top of the right column. Nothing on the
 screen may be covered, because Parbot uses every corner: Billing and Account at the bottom of the
-sidebar on the left, the widget bubble and the landing's Ask AI pill at the bottom right, and the
-composer's send and Stop buttons at the bottom of the chat.
+sidebar on the left, the landing's Ask AI pill and the widget launcher at the bottom right (bottom
+left on the demo page after section 6), and the composer's send and Stop buttons at the bottom of
+the chat.
 
 **Output.** Settings > Output, Output Mode Simple. Recording Quality: High Quality, Medium File
 Size. Recording Format: Hybrid MP4, or MKV and then File > Remux Recordings to MP4 after the
@@ -126,16 +157,19 @@ which fills the screen without going full screen. Hide the bookmarks bar, and se
 parbot-web.vercel.app to 125% (⌘+ twice) in both profiles. The page is then about 1380×800 CSS px,
 close to the rehearsal's 1440×900 window, and text set at 14 px comes out at about 17 px in the
 1080p video. Don't zoom past 150%: once the page is narrower than 1024 px, the landing replaces its
-⌘K hint and the Ask AI pill with a link for phones.
+⌘K hint and the Ask AI pill with a link for phones. Both profiles are windows of the same Chrome, so
+`` ⌘` `` switches between them. If your keyboard layout takes that shortcut, pick the other window
+from Chrome's Window menu.
 
-**Test.** Record 20 seconds: talk, scroll the landing, open ⌘K and type. Play it back full screen
-in QuickTime Player and check that the text reads, the camera covers nothing, the voice is steady
-with no hiss or echo, the cursor shows, and scrolling is smooth.
+**Test.** Record 20 seconds: talk, scroll the landing, open ⌘K and type, switch to the other
+profile and back. Play it back full screen in QuickTime Player and check that the text reads, the
+camera covers nothing, the voice is steady with no hiss or echo, the cursor shows, and scrolling
+is smooth.
 
 **Takes.** One file per section: start with the hotkey, do the section, stop. To redo a section,
-record it again and keep the better file. Each section pastes at most one text, so copy it before
-you start: the refund policy for section 3, the chat 3 question for section 4, the project
-instructions for section 5. Type everything else.
+record it again and keep the better file. Only two texts are pasted, so copy each before its
+section starts: the refund policy for section 3, and the project instructions for section 4 if you
+do the Project beat. Type everything else.
 
 **Joining.** Trim each file's ends in QuickTime Player (Edit > Trim). Open section 1, choose Edit >
 Add Clip to End for each next section in order, then File > Export As > 1080p. iMovie does the same
@@ -146,10 +180,30 @@ walkthrough: coming soon" line under Live with the link.
 
 ## Before recording
 
+**The Gemini quota**
+
+- The free tier gives the whole project 1,000 embeddings a day (gemini-embedding-2). Each indexed
+  passage is one, and so is each question asked anywhere: the landing's palette, the chat, the demo
+  page and the live preview. Testing on the night of 28 Sep used it up by 02:10 (UTC+3).
+- Record after the daily quota resets: midnight Pacific, which is 10:00 your time (UTC+3). Keep
+  everyone and every agent off the key that day: no local `pnpm dev` or seed runs with the hosted
+  key, no `GEMINI_LIVE` tests, and no indexing on the live site outside the takes. Visitors to the
+  live site share the key too, and that you can't control.
+- One Knowledge take (section 3) costs about 120: website 79, uploads about 33 (Word 6, PDF 6, HTML
+  7, Markdown 8, text 5; 12 with only the Word file and the PDF), paste 1. The sitemap adds 88.
+  The questions of a full run add 5, up to 9 with the optional beats and the warm-up question.
+- So plan for at most three or four full takes. Prefer re-recording only the section that went
+  wrong: sections 1, 4 and 6 cost only their questions (1, 3 and 1, plus the optional ones), and
+  sections 2 and 5 cost nothing. A section 3 retake needs an empty Knowledge: delete the rows from
+  their ⋯ menus, or retake section 2 with a new address.
+- The free tier also limits embeddings per minute, which is why the sitemap waits until the other
+  rows have been Ready for a minute. If a row fails anyway, wait a minute and choose Re-index from
+  its ⋯ menu. Pages already indexed are kept.
+
 **Accounts**
 
 - Demo account: `demo@parbot.dev` / `parbot-demo`, Starter, one assistant, "Parbot Docs". The
-  landing's ⌘K palette answers from it. Section 9 shows its Overview.
+  landing's ⌘K palette answers from it, and section 3 shows its Overview and Inbox.
 - New account: created on camera in section 2. Use an address you control that has never signed
   up before. Plus-addressing works, and email confirmation is off on the hosted project. Don't use
   `maya@northwind.dev`: it is the seeded lead. After recording, delete the account from Account >
@@ -157,35 +211,42 @@ walkthrough: coming soon" line under Live with the link.
 
 **Windows**
 
-- Window A, for recording: a clean Chrome profile, signed out, on `https://parbot-web.vercel.app`.
-  Turn off "Offer to save passwords" and address autofill so no popup covers the sign-up form.
-  Clear the site data for parbot-web.vercel.app. The ⌘K palette keeps its last conversation in
-  local storage, and it should open empty with its four suggested questions. Then set the zoom to
-  125%.
-- Window B: a second profile, signed in as the demo account, on its Overview, which opens on the
-  last 7 days. Zoom 125% here too. Used in section 9 only. Other people signing out of the shared
-  demo account no longer sign this window out.
-- Both windows fill the screen. Close every other tab. Put `northwind-api-limits.docx` on the
-  Desktop so the file picker finds it in one click. Keep the three pasted texts (the refund
-  policy, the chat 3 question and the project instructions) in a note.
+- Window A, for recording everything but the detour in section 3: a clean Chrome profile, signed
+  out, on `https://parbot-web.vercel.app`. Turn off "Offer to save passwords" and address autofill
+  so no popup covers the sign-up form. Clear the site data for parbot-web.vercel.app. The ⌘K palette
+  keeps its last conversation in local storage, and it should open empty with its four suggested
+  questions. Then set the zoom to 125%.
+- Window B: a second Chrome profile, signed in as the demo account, on its Overview, which opens on
+  the last 7 days. It has to be a second profile, not another tab: tabs of one profile share the
+  sign-in, so signing up in one would switch the others to the new account. Zoom 125% here too.
+  Other people signing out of the shared demo account no longer sign this window out.
+- Both windows fill the screen. Close every other tab. Drag `~/Wo/par/utils/uploads` into the
+  Favorites in Finder's sidebar, so the file picker reaches it in one click. Keep the refund policy
+  and the project instructions in a note.
 
 **The day before: a dry run**
 
-Run sections 2 to 7 once on a throwaway account, without recording. Check what changed since the
-rehearsal:
+Run sections 2 to 6 once on a throwaway account, without recording, on the day before's quota: a
+dry run costs as much as a take. Check what changed since the rehearsal:
 
-- `Does Hono ship a Postgres driver?` and `Is there a Go SDK?` still come back as "I couldn't find
-  that…", and the Go SDK question still brings up the email form. If either now gets an answer,
-  find a question that nothing in Hono's API pages or the two Northwind documents mentions, check
-  it the same way, and use it in the table and the section.
-- After Save changes on the Widget page, the switches stay on, and the demo page shows the palette.
-- The bubble's answer on the demo page lists its sources by page.
+- `@northwind-api` picks the Word file, and asked after the Hono question in the same chat, the
+  answer still comes from the Word file. The chat 2 question cites the webhooks guide.
+- The Word file opens in the viewer with its headings. If you want to open the PDF on camera, check
+  that it shows headings and paragraphs too.
+- After Save changes on the Widget page, the switches stay on, and the demo page shows the green
+  palette with its launcher at the bottom left.
+- The palette's answer on the demo page lists its sources by page.
+- For the lead-form beat: `Is there a Go SDK?` still comes back as "I couldn't find that…" and
+  brings up the email form, with the sitemap indexed too if you'll add it on camera. If it gets an
+  answer, find a question nothing in the sources mentions, check it the same way, and use it in
+  the table and the section. `What's the maximum size of a webhook payload?` was refused with
+  webhooks.fyi indexed.
 
 Delete the throwaway account afterwards from Account > Delete account.
 
 **On recording day: refresh the demo data**
 
-The live site must run main with these fixes. After the push, check that Vercel's production
+The live site must run main with the fixes above. After a push, check that Vercel's production
 deployment is the pushed commit. In window B, the Overview opening on 7 days, with no `?days=` in
 the address, shows the new build is live.
 
@@ -198,10 +259,10 @@ node --env-file=../../.env.hosted --conditions=react-server --import tsx scripts
 `.env.hosted` is the gitignored file at the repo root with the hosted values. It must have
 `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `GEMINI_API_KEY` and
 `NEXT_PUBLIC_APP_URL=https://parbot-web.vercel.app`. The first lines should say the docs are
-indexed "on the Gemini provider". The run first re-indexes any doc whose text changed, and passages
-indexed on the stub don't match Gemini's questions. "Inbox and analytics" changed when the Overview
-moved to 7 days, so the first run re-indexes that one ("docs: 1 re-indexed, 8 unchanged"). Later
-runs leave all 9 unchanged.
+indexed "on the Gemini provider": passages indexed on the stub don't match Gemini's questions. The
+run re-indexes only a doc whose text changed, and the last refresh (28 Sep, after the fixes went
+live) already did that, so it should report "docs: 0 re-indexed, 9 unchanged" and spend no
+embeddings. A re-indexed doc costs one embedding per passage.
 
 The refresh writes the history again with dates ending yesterday, then deletes everything else the
 assistant has collected: conversations, leads and chat projects, including anything left from
@@ -239,12 +300,11 @@ Then check in window B:
   doesn't count it. If the first words take more than about 6 s, the first two models are both slow
   right now. Wait 10 minutes and try again. In rehearsal, before the hedge, most answers began in
   _1.3 to 2.4 s_, but two took _12.8 s_ and _21.4 s_ while other people were using the same key.
-- Keep everything else off the Gemini key until you're done: no local `pnpm dev`, live tests or
-  seed runs with the same key. Visitors to the live site share it too, and that you can't control.
+- Go back to the Overview in window B, so section 3 opens on it.
 
 ---
 
-## 1. Landing (0:00 to 0:50)
+## 1. Landing (0:00 to 1:00)
 
 [Window A on `/`. Let the hero's example play for three seconds.]
 
@@ -256,256 +316,271 @@ your docs, with the pages it used listed under every answer."
 "This panel is a scripted example on made-up docs, so it always shows a good exchange: a streamed
 answer, a code block, numbered sources, and an email form when the docs can't help."
 
-[Scroll to "One script tag. A bubble or a palette."]
+[Press ⌘K. The question box already has focus. Type the landing question and press Enter. Point at
+the answer, then at Sources: one row per page, with the numbers that cite it.]
 
-"On your site it's one script tag, either a floating bubble or a ⌘K palette, the way developer
-docs already work."
+"This palette isn't scripted. It's the real widget, answering live from Parbot's own docs. It
+streams, and it cites where each part came from."
 
-[Scroll through "From a URL to answers in three steps" and the features to Pricing. Click Yearly.
-The prices change to $290 and $990.]
+_Palette opens in about 10 ms. First words in 3.8 s in one rehearsal run and 12.8 s in another.
+Since then, a model that sends nothing for 3.5 s gets the next one started beside it._
 
-"Three plans. Hobby is free with no card. Starter adds the palette, your own colours, lead capture
-and no Parbot branding. Yearly is twelve months for the price of ten."
+[Esc. Scroll to "One script tag. A bubble or a palette."]
 
-[Scroll back to the top. Press ⌘K. The question box already has focus. Type the landing question and
-press Enter. Point at the answer, then at Sources: one row per page, with the numbers that cite
-it.]
+"On your site it's one script tag: a floating bubble in the corner, or a ⌘K palette, the way
+developer docs already work."
 
-"The palette on this page isn't scripted: it's the real widget, answering from Parbot's own docs.
-It streams, and it cites where each part came from."
+[Scroll through "From a URL to answers in three steps" and the features to Pricing, on Monthly.]
 
-_Palette opens in about 10 ms. First words in 3.8 s in one run and 12.8 s in another. Since then, a
-model that sends nothing for 3.5 s gets the next one started beside it._
+"Hobby is free: a hundred pages, two hundred answers a month, and the bubble with Parbot branding.
+Starter, at twenty-nine dollars, is two thousand pages and three thousand answers, with the ⌘K
+palette, your own theme, lead capture and no branding. Growth, at ninety-nine, is the same with
+twenty thousand of each."
 
-[Esc.]
+[Click Yearly. The prices change to $290 and $990 a year.]
 
-## 2. Sign up and the one assistant (0:50 to 1:10)
+"Paid yearly, it's ten months' price."
 
-[Click Start free. Fill in Alex Rivera, the email and a password. Create account.]
+## 2. Sign up and create the assistant (1:00 to 1:20)
+
+[Scroll to the top and click Start free in the header. Fill in Alex Rivera, the email and a
+password. Click Create account.]
 
 "An account is an email and a password. No card."
 
 [Onboarding, "Create your assistant". Type `Northwind Docs` into Name and let the slug fill in.
-Click Create.]
+Click Create assistant.]
 
 "Every account has exactly one assistant: one knowledge base, one widget. There's nothing to
-switch between."
+switch between. Ours answers for Northwind, a payments API."
 
-_Create account to onboarding: 0.7 to 0.8 s. Create to Knowledge: 0.5 to 1.4 s._
+_Create account to onboarding: 0.7 to 0.8 s. Create assistant to Knowledge: 0.5 to 1.4 s._
 
-## 3. Knowledge (1:10 to 2:05)
+## 3. Knowledge, and an assistant with history (1:20 to 3:20)
 
-[You land on Knowledge, which is empty. Click Add source, open the Website tab, type
-`https://hono.dev/docs/api/context` and click Add website.]
+[You land on Knowledge, which is empty. Click Add source. It opens on the Website tab. Type
+`https://hono.dev/docs/api/context` and click Add website. The row appears at once.]
 
 "Sources can be a website, a sitemap, files or pasted text. I'll start with a public docs site I
 don't control, Hono's API reference. From a start page, Parbot follows the links under the same
-path."
+path, in the background."
 
 [While the row shows "Crawling · n pages" and then "Indexing n of 6 pages": click Add source, open
-Upload, choose `northwind-api-limits.docx` and click Upload file. Then click Add source, open Paste
-text, set the Title to `Refund policy`, paste the text and click Add text.]
+Upload, click Choose file, pick `northwind-api-limits.docx` and click Upload file. Do the same for
+`northwind-webhooks-guide.pdf`. Each file is its own trip through the dialog.]
 
-"Our own material goes in too: an internal Word document with our API limits, and a refund policy
-I paste in. All three index at the same time. This is live."
+"Then our own material: an internal Word document with our API limits, and our webhooks guide as a
+PDF. HTML, Markdown and plain text files work the same way."
 
-[Wait until all three rows say Ready. The pages meter counts up with the rows. Point at it: "8 of
-100 pages".]
+[Optional, not in the time budget: upload `northwind-authentication.html`,
+`northwind-error-codes.md` and `northwind-support-sla.txt` the same way. They add 20 embeddings to
+the same minute as the crawl, so leave them out if the dry run showed a failed row.]
 
-"Six pages from the website, one file, one note. The free plan indexes a hundred pages, and the
-meter shows how close you are."
+[Click Add source, open Paste text, type `Refund policy` as the Title, paste the policy and click
+Add text.]
 
-[The website row takes the first page's title, "Context - Hono". Open its ⋯ menu and choose View
-pages. The sheet lists App, Context, HonoRequest, HTTPException, Presets and Routing. Close it.
-Click the title `northwind-api-limits.docx`.]
+"And a refund policy I paste in. They all index at the same time."
 
-"Any source opens as the text the assistant reads: headings, lists and all."
-
-[The document viewer shows the headings. Click Back.]
-
-_Website Ready in 8.4 s and 12.5 s over two runs. Word file 2.3 to 4.0 s. Text 1.3 to 2.6 s. Viewer
-opens in about 1.1 s._
-
-## 4. Chat (2:05 to 3:40)
-
-[Click Chat. Type chat question 1 and press Enter.]
-
-"The chat inside the app is ChatGPT-style. My question is on screen the moment I press Enter, and
-the answer streams in underneath it."
-
-[As it streams, point at the code block, then the citation numbers, then the Sources row with
-"HonoRequest - Hono".]
-
-_Question bubble in 7 to 32 ms. First words in 1.8 s._
-
-[Type `And a path parameter?` and press Enter.]
-
-"A follow-up keeps the context of the conversation."
-
-[Type `Does Hono ship a Postgres driver?` and press Enter.]
-
-"When the docs don't cover something, it says so instead of guessing. The chat is flagged, and the
-question will show up as a gap to write."
-
-[Point at the amber dot next to the chat in the list.]
-
-[Click New chat. Type `@north`, press Enter to pick `northwind-api-limits.docx`, type
-`what happens if we go over?` and press Enter.]
-
-"With @ I can point a question at a file. This question doesn't name the file or say what 'over'
-means, but the file is read first, so the answer comes from our limits document."
-
-[Point at the file chip on the question and at the source "Northwind Payments API: limits and
-retries".]
-
-[Type `How long should we wait before retrying?` and press Enter. Point at the chip still sitting in
-the message box.]
-
-"The file stays attached to the conversation, so follow-ups keep using it until I remove it. The
-paperclip does the same for a new file: it uploads the file to Knowledge and attaches it in one
-step. A file that's already in Knowledge is attached, not uploaded twice."
-
-[Click the source under the last answer.]
-
-"Every citation opens the source with the passage it used highlighted."
-
-[The viewer highlights the "Retrying safely" passage. Click Back. The chat is still there.]
-
-[Click New chat. Paste the chat 3 question and press Enter. When two or three lines have streamed,
-click the Stop button in the message box. If the lines you kept cite a source, its Sources row
-appears under the stopped answer.]
-
-"Stop ends an answer where it is. The answer is saved as stopped and doesn't count against the
-plan."
-
-[Now click between the three chats in the list, slowly, twice.]
-
-"And switching between conversations is instant. The list and every thread are cached in the
-browser, so nothing waits on the server except a new answer."
-
-_Answers began in 1.3 to 2.3 s. The unanswered reply arrives whole after 4.8 s, because a refusal
-is held back until the answer is done. New chat in about 50 ms. Switching between chats took 34 to
-55 ms. Citation to viewer took 0.8 s, and Back took 40 ms._
-
-## 5. Projects (3:40 to 4:20)
-
-[In the chat sidebar, under Projects, click New project. Type `Support replies` and press Enter.
-The folder shows at once and the project's home page opens.]
-
-"Projects are folders for chats, and each one can have its own files and instructions."
-
-[Click Edit project. Paste the instructions. In "Find a file or source in Knowledge", type
-`Refund` and pick Refund policy. Click Save.]
-
-"This one is for the support team: it always reads the refund policy and answers as a reply an
-agent can send. The instructions shape the tone. They can't make it answer from anything but our
-sources."
-
-[In the project's message box, type the project question and press Enter.]
-
-"I don't mention the policy. The project brings it along."
-
-[Point at the reply, at "Policy: Refund policy", and at the fixed Refund policy chip in the
-message box.]
-
-[Optional: drag the "what happens if we go over?" chat onto the Support replies folder. The chat's
-⋯ menu > Move to project does the same.]
-
-_Project folder in 16 ms. Save in 0.2 s. First words in 1.8 to 2.1 s. Both rehearsals followed the
-format and cited Refund policy._
-
-## 6. The widget on the free plan (4:20 to 4:50)
-
-[Click Widget.]
-
-"This is what readers get on your site. On the free plan it's a bubble in Parbot's amber. Palette
-mode, your colours, removing our branding and lead capture are marked Starter and up."
-
-[Point at the "Starter and up" badges, then at the Install card. Click Copy.]
-
-"Installing it is this one script tag."
-
-[Click Open the demo page. A new tab opens: "Example docs for Northwind". Click the bubble in the
-corner, type the demo page bubble question and press Enter. Point at Sources under the answer: one
-row per page, with the numbers of the citations that used it.]
-
-"Here it is on a page that isn't Parbot, answering from the Hono docs we just indexed, with its
-sources and our small 'Powered by Parbot' line underneath."
-
-[Close the tab with ⌘W.]
-
-_Widget page in 0.8 s. Bubble ready 1.5 s after the demo page loads. First words in 1.4 to 1.9 s._
-
-## 7. Billing, then the paid widget (4:50 to 5:35)
-
-[Click Billing. Point at the "Billing runs in test mode. No card is charged." banner and the usage
-meters. Click Choose Starter, then Apply.]
-
-"Plans and usage live here. Checkout runs in test mode, so nothing is charged, and an upgrade
-lifts the limits at once."
-
-[The plan card now says Starter and the sidebar badge says STARTER. Click Widget. The Starter and
-up badges are gone. Click Palette (⌘K), pick the green accent, switch on Hide "Powered by Parbot"
-and Lead capture. Click Save changes. The switches stay on. Scroll to Live preview.]
-
-"The paid features switch on immediately. The live preview is our demo page with the saved
-settings: now it's a ⌘K palette in our colour, with no Parbot branding."
-
-[In the live preview, type `Is there a Go SDK?` and press Enter. When the email form appears, fill
-in `sam@example.com` and the note, then click Send.]
-
-"When the docs can't answer, the widget offers to take the reader's email instead of guessing.
-That lead goes straight to the inbox."
-
-_Apply took 1.3 to 2.1 s. Save took 0.8 s. Lead form after 1.4 to 1.5 s, and Send took 0.26 s._
-
-## 8. Inbox (5:35 to 5:55)
-
-[Click Inbox. The "Is there a Go SDK?" conversation is at the top, marked Widget and Unanswered.
-Below it are the in-app chats, and the ones in the project say "Project: Support replies". Open
-the top one.]
-
-"Every conversation, from the widget and from the chat, lands in one inbox, with the page the
-reader was on."
-
-[Click the Leads tab. Set the lead's status to Contacted.]
-
-"And every lead, with the reader's note and a status to work through."
-
-_Inbox in 0.8 s. Transcript in about 25 ms._
-
-## 9. Overview, on an account with history (5:55 to 6:40)
+_Website Ready in 8.4 s and 12.5 s in rehearsal and 16.1 s in the test. Word file 2.3 to 4.0 s,
+PDF 2.4 s, HTML and Markdown 2.3 s, text file 3.3 s, pasted text 1.3 to 2.6 s._
 
 [Switch to window B, the demo account's Overview. It opens on the last 7 days.]
 
-"This is an assistant that has had two weeks of traffic. The Overview shows the last week against
-the week before, and it's built around what to fix next."
+"While that runs, here's an assistant that has had two weeks of traffic. This is another browser
+profile, signed in to our demo account. The Overview shows the last week against the week before,
+and it's built around what to fix next."
 
 [Point at Answer quality. With the refreshed history, the answer rate is down on the week before,
 while helpfulness and the time to answer are better.]
 
 "The answer rate is how often the docs had the answer. When it drops, the docs have a hole. Next
 to it, how helpful readers found the answers, with the number of ratings so a small sample reads
-as one, and the median time to answer. Each is compared with the week before."
+as one, and the median time to answer."
 
-[Scroll to Knowledge gaps. The two Slack questions are one gap, asked twice.]
+[Scroll to Knowledge gaps. The two Slack questions are one gap, asked twice. Point at Add docs,
+without clicking it.]
 
 "Knowledge gaps are the questions the docs couldn't answer, with different wordings grouped. That
-list is your writing backlog. Add docs goes straight to Knowledge."
+list is your writing backlog, and Add docs goes straight to Knowledge."
 
-[Scroll past "Answers readers disliked" and "Where readers ask".]
+[Scroll to "Answers readers disliked" and "Where readers ask", side by side.]
 
 "The answers readers disliked point at pages that are wrong or out of date. Where readers ask
 shows which pages of your site need help, and flags a low answer rate on a page."
 
-[Scroll to "Content that works, and content that does not", then to Usage and Leads.]
+[Scroll to "Content that works, and content that does not", then to "Usage against the plan" and
+Leads.]
 
-"Which pages answers use, and which they never use. Usage against the plan, with a projection for
-the month. And the leads still waiting for a reply."
+"Which docs the answers use, and which were never cited. Usage against the plan, with a projection
+for the month. And the leads still waiting for a reply."
 
-## 10. Close (6:40 to 6:50)
+[Click Inbox. If you recorded section 1 today, its question is at the top, marked Widget. Open the
+top conversation, then click the Leads tab. Leave the lead's status as it is, so a retake looks the
+same.]
 
-[Back in window A, open the landing page and scroll to the top.]
+"Every conversation, from the widget and from the chat, lands in one inbox, with the page the
+reader was on. And every lead, with the reader's note."
+
+_Inbox in 0.8 s. Transcript in about 25 ms._
+
+[Switch back to window A. Every row says Ready. Point at the pages meter: "9 of 100 pages", or
+"12 of 100" with the three optional files.]
+
+"Back on the new account, everything is ready: six pages from the website, two files and a note.
+The free plan indexes a hundred pages, and the meter shows how close you are."
+
+(With the optional files, say "five files".)
+
+[Open the website row's ⋯ menu and choose View pages. The sheet lists App, Context, HonoRequest,
+HTTPException, Presets and Routing. Close it. Click the title `northwind-api-limits.docx`.]
+
+"Any source opens as the text the assistant reads: headings, lists and all."
+
+[The document viewer shows the headings. Click Back.]
+
+_View pages took 6.5 s the first time in the test (a cold function) and 0.3 s after. If it spins,
+keep talking. The viewer opens in about 1.1 s._
+
+[Optional, the sitemap: if the other rows turned Ready at least a minute ago, click Add source,
+open Sitemap, type `https://webhooks.fyi/sitemap.xml` and click Add sitemap. Otherwise open the
+Sitemap tab, say the line and close the dialog.]
+
+"A sitemap works too. This one is an index of sitemaps, and Parbot follows it to every page."
+
+_29 pages, 88 passages. Ready in 24.2 s on a fresh add, 17.0 s on a Re-index. The first try in the
+test, started 25 s after the website was Ready, failed at page 5; a Re-index a minute later
+worked. If you add it, wait a minute after it is Ready before you ask section 4's first question._
+
+## 4. Chat (3:20 to 4:50)
+
+[Click Chat. Type `How do I read a query parameter?` and press Enter.]
+
+"The chat inside the app is ChatGPT-style. My question is on screen the moment I press Enter, and
+the answer streams in underneath it."
+
+[As it streams, point at the code block, then the citation numbers, then the source "HonoRequest -
+Hono" with hono.dev next to it.]
+
+"The numbers mark where each part came from, and the sources list those pages. A web page opens
+on its own site."
+
+_Question bubble in 7 to 32 ms. First words in 1.8 s._
+
+Don't click this source: a web page's source opens the page itself in a new tab. The viewer beat
+comes with the file answer next.
+
+[Type `@northwind-api`, press Enter to pick `northwind-api-limits.docx`, type
+`what happens if we go over?` and press Enter.]
+
+"With @ I can point a question at a file. This question doesn't say what 'over' means, but the
+file is read first, so the answer comes from our limits document."
+
+[Point at the file chip on the question, and at the chip still sitting in the message box.]
+
+"The file stays attached to this conversation, so follow-ups keep using it until I remove it."
+
+[Click the source "Northwind Payments API: limits and retries" under the answer.]
+
+"A file's citation opens the viewer, with the passage the answer used highlighted."
+
+[The viewer opens on the highlighted passage. Click Back. The chat is still there.]
+
+_Citation to viewer 0.8 s. Back 40 ms._
+
+[Click New chat. Type
+`Our webhook endpoint was down all weekend. How do we get the events we missed?` and press Enter.]
+
+"A new chat, and no file picked this time. It finds the webhooks guide on its own."
+
+_New chat in about 50 ms. First words in 1.3 to 1.7 s in the test._
+
+[Optional, Stop: click New chat, type the Stop question and press Enter. When two or three lines
+have streamed, click the Stop button in the message box. If the lines you kept cite a source, its
+Sources row appears under the stopped answer.]
+
+"Stop ends an answer where it is. The answer is saved as stopped and doesn't count against the
+plan."
+
+[Optional, a Project: in the chat sidebar, under Projects, click New project, type
+`Support replies` and press Enter. Click Edit project, paste the instructions, and in "Find a file
+or source in Knowledge" type `Refund` and pick Refund policy. Click Save. In the project's message
+box, type the project question and press Enter. Point at the reply, at "Policy: Refund policy",
+and at the fixed Refund policy chip in the message box.]
+
+"Projects are folders for chats, each with its own files and instructions. This one always reads
+the refund policy and writes a reply the support team can send. I don't mention the policy: the
+project brings it along."
+
+_Project folder in 16 ms. Save in 0.2 s. First words in 1.8 to 2.1 s. Both rehearsals followed the
+format and cited Refund policy._
+
+[Now click between the chats in the list, slowly, twice.]
+
+"And switching between conversations is instant. The list and every thread are cached in the
+browser, so nothing waits on the server except a new answer."
+
+_Switching between chats took 34 to 55 ms._
+
+## 5. Billing (4:50 to 5:15)
+
+[Click Billing. Point at the "Billing runs in test mode. No card is charged." banner and at the
+Usage meters: indexed pages of 100, answers this month of 200. Click Choose Starter on Monthly. On
+the "Apply Starter in test mode" card, click Apply Starter.]
+
+"Plans and usage live here. Checkout runs in test mode, so nothing is charged."
+
+[The plan card now says Starter, the sidebar badge says STARTER, and the meters read of 2,000
+pages and of 3,000 answers.]
+
+"And the upgrade lifts the limits at once."
+
+_Apply took 1.3 to 2.1 s._
+
+To retake this section, first click Switch to Hobby on the Hobby card, then Switch to Hobby on the
+test-mode card it opens.
+
+## 6. Widget (5:15 to 6:20)
+
+[Click Widget. The "Starter and up" badges are gone. Work down the settings on the left: click
+Palette (⌘K), pick the green accent, set Position to Bottom left, and switch on Hide "Powered by
+Parbot" (and Lead capture, for the optional lead form). Click Save changes. The switches stay on.
+Point at Live preview in the right column.]
+
+"Starter unlocks the rest of the widget: the ⌘K palette, our own colour, the launcher on the left,
+and no Parbot branding. The live preview is our demo page with the saved settings."
+
+_Widget page in 0.8 s. Save took 0.8 s._
+
+[Point at the Install card above the preview and click Copy.]
+
+"On your site, installing it is this one script tag. Settings changed here reach the site without
+touching the tag again."
+
+[Click Open the demo page on the Live preview card. A new tab opens: "Example docs for
+Northwind". Press ⌘K, or click the launcher at the bottom left. Type the demo page question and
+press Enter. Point at the code, then at Sources: one row per page, with the numbers of the
+citations that used it.]
+
+"And here it is on a page that isn't Parbot: the palette in our colour, answering from the Hono
+docs we indexed a few minutes ago, with its sources."
+
+_Rehearsed in bubble mode: the widget was ready 1.5 s after the demo page loaded, and first words
+came in 1.4 to 1.9 s. The same question in the chat: first words in 2.7 s._
+
+[Close the tab with ⌘W.]
+
+[Optional, the lead form: in the live preview, open the palette if it is closed, type
+`Is there a Go SDK?` and press Enter. When the email form appears, fill in `sam@example.com` and
+the note, then click Send.]
+
+"When the docs can't answer, the widget offers to take the reader's email instead of guessing.
+That lead goes straight to the inbox."
+
+_Lead form after 1.4 to 1.5 s, and Send took 0.26 s._
+
+## 7. Close (6:20 to 6:30)
+
+[In window A, open the landing page and scroll to the top.]
 
 "That's Parbot: your docs, answering, in your app and on your site. Thanks for watching."
 
@@ -520,26 +595,36 @@ the month. And the leads still waiting for a reply."
   cost a few seconds, not twenty. It still retries and falls back on errors. If a message fails, it
   says so with a Retry button. Say "the free tier is rate limited" and click Retry. If it stays
   slow, stop and record the section later.
-- **The crawl takes long or fails.** Keep going with the upload and the pasted text while it runs;
-  the row updates live. If it fails, open "Show what happened", then choose Re-index from the row's
-  menu. If it still fails, skip the two Hono questions and ask the Word file something instead,
-  for example "What are the rate limits on the Standard plan?". That one was not rehearsed.
+- **A row fails.** "Failed · The embedding model is busy right now" means an embedding limit, not a
+  problem with the source. Keep going with the other sources while it waits. After a minute, open
+  the row's ⋯ menu and choose Re-index: pages already indexed are kept. If every new source fails
+  after its first page, the daily quota is gone: stop for the day, since chat answers fail too.
+- **hono.dev is slow or down.** Use `https://docs.lemonsqueezy.com/help/webhooks/signing-requests`
+  as the website: 5 pages, 21 passages, Ready in 6.4 s, and the row becomes "Signing Requests".
+  The Hono questions no longer apply. Ask `Which webhook event fires when an order is refunded?`
+  (`order_refunded`, from Event Types) in chat 1 and on the demo page, and avoid retry questions:
+  its retry timings differ from the Word file's.
+- **`@north…` picked the wrong file.** Remove the chip with its ×, and type `@northwind-api` again.
+- **The @ answer talks about Hono instead of the limits.** The file is read first, but the earlier
+  answer is context too. Retake the section with the @ question in a New chat of its own, as
+  rehearsed, and the chat 2 question in another New chat.
 - **A question comes back unanswered when it shouldn't.** Use the exact wording from the inputs
   table. Retrieval is by meaning, and a question whose parts sit in different places can still
   miss.
 - **The Go SDK question gets an answer and no email form.** A question that some source touches
-  now gets an answer about that part. Retake the section. If it happens again, stop and find
-  another question as in the dry run.
+  now gets an answer about that part. Skip the beat, or retake the section with the question the
+  dry run found.
 - **Stop was pressed before any text arrived.** The question stays, marked as stopped, and
   nothing is counted against the plan. Ask the question again and stop later.
 - **A demo page tab shows the old settings.** A tab opened before Save keeps the widget it loaded.
   Reload it: the demo page reads the latest settings on every load. Only the landing's palette and
   sites that install the widget cache the settings, for up to a minute.
-- **⌘K doesn't open the palette on the landing.** Click an empty part of the page first so it has
-  focus, or click the "Ask AI ⌘K" pill in the bottom right corner. If there is no pill and the hero
-  says "Try it live on the Parbot docs" instead of the ⌘K hint, the page is narrower than 1024 px:
-  set the zoom back to 125% and reload.
-- **Dragging a chat onto a project doesn't take.** Use the chat's ⋯ menu > Move to project.
+- **⌘K doesn't open the palette.** Click an empty part of the page first so it has focus, or click
+  the "Ask AI ⌘K" pill in the bottom right corner (the launcher at the bottom left on the demo
+  page). If the landing has no pill and the hero says "Try it live on the Parbot docs" instead of
+  the ⌘K hint, the page is narrower than 1024 px: set the zoom back to 125% and reload.
+- **Window B shows the new account.** The sign-up happened in window B's profile. Sign out there,
+  sign in as the demo account again, and retake from section 2 in window A.
 - **A screen takes seconds to open.** That's a cold function. It only happens on the first visit
   after a quiet spell. Warming up covers it.
 
@@ -577,8 +662,11 @@ same options, as in "On recording day" above. The seed needs `NEXT_PUBLIC_SUPABA
 widget URL. Don't use `--reset` on the hosted project: the new assistant gets a new public key (see
 above). See the README, "Demo data" and "Deploying".
 
-The file uploaded in section 3 is `docs/demo-assets/northwind-api-limits.docx`. Its source is the
-Markdown file next to it (`pandoc northwind-api-limits.md -o northwind-api-limits.docx`). Upload
-the Word file, as rehearsed. PDFs now keep their headings, paragraphs and lists too, but headings
-are found by font size, so a bold heading at body size reads as a paragraph, and no PDF has been
-uploaded on the live site since the fix.
+The new account's sources are the tested inputs in `~/Wo/par/utils`, outside the repo: the website
+and sitemap addresses in `website.txt` and `sitemap.txt` (with their timelines, page lists and
+backups), the five files in `uploads/` and the refund policy in `paste-text/`. `utils/README.md` is
+the one-page crib sheet. The Word file has the same bytes as
+`docs/demo-assets/northwind-api-limits.docx`, whose source is the Markdown file next to it
+(`pandoc northwind-api-limits.md -o northwind-api-limits.docx`). PDFs keep their headings,
+paragraphs and lists, but headings are found by font size, so a bold heading at body size reads as
+a paragraph.
