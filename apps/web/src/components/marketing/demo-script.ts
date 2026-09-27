@@ -204,10 +204,6 @@ export function* demoSteps(
   }
 
   let turns = initialView(scenes).turns;
-
-  yield { wait: 0, view: initialView(scenes) };
-
-  let wait = timing.startMs;
   let keystroke = 0;
   let chunk = 0;
   const view = (update: Partial<DemoView> = {}): DemoView => ({
@@ -216,6 +212,10 @@ export function* demoSteps(
     sending: false,
     ...update,
   });
+
+  yield { wait: 0, view: view() };
+
+  let wait = timing.startMs;
   const replaceLast = (update: Partial<DemoTurn>) => {
     turns = [...turns.slice(0, -1), { ...turns.at(-1)!, ...update }];
   };

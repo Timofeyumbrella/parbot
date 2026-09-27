@@ -196,7 +196,7 @@ export const ScriptedDemo = ({
         assistant: {scenes.map((scene) => scene.question).join(' ')} Each answer streams in with the
         sources it came from.
         {scenes.some((scene) => scene.lead)
-          ? ' When the docs do not cover a question, the assistant says so and offers to take the reader’s email.'
+          ? " When the docs do not cover a question, the assistant says so and offers to take the reader's email."
           : ''}
       </figcaption>
       <DemoFrame
