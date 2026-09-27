@@ -128,7 +128,7 @@ const seed = async (service: SupabaseClient): Promise<Seed> => {
       .select('id'),
   );
 
-  // One question well over a week old, so its row in Top questions shows a date instead of "3 days ago".
+  // One question well over a week old, so its knowledge gap shows a date instead of "3 days ago".
   const questionAt = (index: number) =>
     new Date(
       index === asked.length - 1 ? now - 10 * DAY : now - (index + 5) * MINUTE,
