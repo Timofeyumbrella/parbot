@@ -18,6 +18,16 @@ Everything the assistant knows comes from the sources you add under Knowledge. P
 3. The Markdown is split into passages of about 1,200 characters along its headings. Code blocks are never cut in half.
 4. Each passage is embedded and stored with its heading path, for example "Guide › Authentication › API keys".
 
+## Reading what was indexed
+
+Open a source from Knowledge to read the text Parbot indexed from it, as the assistant reads it. A website lists its pages; each opens on its own. Files and pasted text also offer the original: PDF, HTML, Markdown and plain text open in the browser, Word files download. In Chat and the Inbox, a citation to a file or a note opens its text with the cited passage highlighted.
+
+## Pointing a question at a file
+
+In Chat, type @ in the message box to pick a file or source from the assistant's knowledge, or attach a file with the paperclip. An attached file is added to Knowledge like any upload and counts toward your plan's pages; you can send the question while it uploads, and the answer waits a few seconds for it to be indexed.
+
+The files you pick are read first, even when the question does not name them, so "what does this file say about limits?" finds the right passages. They stay with the conversation: follow-up questions keep using them until you remove the chip from the message box. The widget does not offer this, since visitors cannot see your files.
+
 ## Keeping sources fresh
 
 Re-index a source from its menu at any time. Pages whose content has not changed are skipped, pages that disappeared are removed, and new or changed pages are indexed again. Parbot does not crawl on a schedule yet.
@@ -28,4 +38,4 @@ Each plan includes a number of indexed pages across all of your assistants: 100 
 
 ## Disabling or removing a source
 
-Deleting a source removes its pages and passages immediately. Answers already given keep their citations as text but the links may no longer resolve.
+Deleting a source removes its pages and passages immediately. Answers already given keep their citations; one that points at a removed page opens a note saying the page is gone.
