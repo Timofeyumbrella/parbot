@@ -6,7 +6,7 @@ The pages you index are stored in Parbot's database as text and as vectors. When
 
 ## Who can see what
 
-Each account sees only its own assistants, sources, conversations and leads. This is enforced in the database itself, on every row, not just in the application.
+Each account sees only its own assistant, sources, conversations and leads. This is enforced in the database itself, on every row, not just in the application.
 
 The widget is anonymous by design. It never receives an assistant's sources, only answers. It can be restricted to the origins you list.
 
@@ -16,8 +16,8 @@ Readers are identified by a random id stored in their browser. No cookies are se
 
 ## Rate limits
 
-The widget accepts twelve questions a minute per reader, thirty a minute per network address, sixty a minute per assistant and a hundred and twenty a minute across all of an account's assistants. The in-app chat accepts thirty a minute per account. These protect your monthly answer allowance from abuse.
+The widget accepts twelve questions a minute per reader, thirty a minute per network address and sixty a minute per assistant. The in-app chat accepts thirty a minute per account. These protect your monthly answer allowance from abuse.
 
 ## Deleting data
 
-Delete a source, a conversation or a whole assistant from the app and it is gone from the database at that moment. To delete your account, write to privacy@parbot.dev.
+Delete a source or a conversation from the app and it is gone from the database at that moment. Deleting your assistant in Settings removes everything it owns, uploaded files included, and you start over with a new one. Deleting your account on the Account page removes the account and everything in it.

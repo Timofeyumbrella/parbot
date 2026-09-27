@@ -8,6 +8,8 @@ Before recording:
 - `pnpm dev` running with `GEMINI_API_KEY` set and `NEXT_PUBLIC_DEMO_ASSISTANT_KEY` in `.env`
   (the seed writes it). Sign out in the browser.
 - A second browser window or profile signed out, for the widget on the demo page.
+- A third profile signed in as the demo account, for the Overview with history (an account has
+  one assistant, so the fresh account from section 2 cannot show the seeded traffic).
 - The demo account (`demo@parbot.dev`) on Starter with the "Parbot Docs" assistant seeded with
   `--history`, so the Inbox and Overview already have two weeks of conversations.
 - A public docs site to index live. `https://docs.astro.build/sitemap-index.xml` or the Hono docs
@@ -46,8 +48,8 @@ of ten. I'll start free."
 
 [Onboarding: name the assistant "Hono Docs". Show the slug filling in. Create.]
 
-"One account can run several assistants. Each one is a knowledge base and a widget. This one is
-for a docs site I don't control, to show it works on anything public."
+"Each account has one assistant: a knowledge base and a widget. This one is for a docs site I
+don't control, to show it works on anything public."
 
 ## 3. Knowledge (1:20 to 2:20)
 
@@ -120,7 +122,8 @@ while we were on the other page."
 
 [Click the Leads tab, show the lead, set it to Contacted.]
 
-[Switch to the Parbot Docs assistant with the sidebar switcher. Click Overview.]
+[Switch to the profile signed in as the demo account. Its Parbot Docs assistant opens on the
+Overview.]
 
 "With two weeks of traffic it looks like this: how many questions, how many the docs answered,
 the questions people ask most, and the ones the docs couldn't answer. That last list is your
@@ -150,7 +153,8 @@ charged. Upgrading lifts the limits at once."
 - **The model is slow or busy.** The engine falls back through three Gemini models. Wait it out
   once; if it fails, say "the free tier is rate limited, let me ask again" and resend.
 - **The crawl is slower than expected.** Keep talking through what indexing does; the row updates
-  live. If it stalls, switch to the pre-indexed Parbot Docs assistant for the chat section.
+  live. If it stalls, switch to the demo account's profile and use its pre-indexed Parbot Docs
+  assistant for the chat section.
 - **A question comes back unanswered when it shouldn't.** Rephrase closer to the docs' wording.
   Retrieval is by meaning, but very short questions carry little signal.
 - **The widget on the demo page shows the old colour.** Reload the demo page; the config is

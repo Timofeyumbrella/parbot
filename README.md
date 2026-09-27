@@ -4,7 +4,7 @@ Turn your documentation into an assistant. Readers ask in plain language and get
 drawn from your docs with the pages it used listed underneath, inside the app as a ChatGPT-style chat
 and on your own site as a one-script-tag widget: a floating bubble or a ⌘K palette. You get every
 conversation in an inbox, the top questions, the ones your docs could not answer, and the emails
-readers leave when they could not.
+readers leave when they could not. Each account has one assistant, created right after sign-up.
 
 ## Stack
 
