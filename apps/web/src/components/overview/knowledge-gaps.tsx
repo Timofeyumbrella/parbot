@@ -21,7 +21,10 @@ const Variants = ({ variants }: { variants: string[] }) => {
   const more = variants.length - 1;
 
   return (
-    <p className="text-muted-foreground truncate text-xs" title={variants.join('\n')}>
+    <p
+      className="text-muted-foreground line-clamp-2 break-words text-xs"
+      title={variants.join('\n')}
+    >
       Also asked as “{first}”{more > 0 ? ` and ${formatCount(more)} more` : ''}
     </p>
   );

@@ -60,7 +60,11 @@ export const Section = ({
       </CardHeader>
       <div className="flex flex-1 flex-col">{children}</div>
       {footer ? (
-        <div className="bg-muted/50 px-(--card-spacing) text-muted-foreground border-t py-2.5 text-xs">
+        // The card drops its bottom padding when it has a footer slot, so the strip sits flush.
+        <div
+          data-slot="card-footer"
+          className="bg-muted/50 px-(--card-spacing) text-muted-foreground border-t py-2.5 text-xs"
+        >
           {footer}
         </div>
       ) : null}

@@ -11,7 +11,7 @@ const SectionSkeleton = ({
   testId?: string;
 }) => (
   <div
-    className="ring-foreground/10 flex flex-col overflow-hidden rounded-xl ring-1"
+    className="bg-card ring-foreground/10 flex flex-col overflow-hidden rounded-xl ring-1"
     data-testid={testId}
   >
     <div className="flex items-start justify-between gap-4 border-b p-4">
