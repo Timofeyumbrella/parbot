@@ -2,6 +2,8 @@ import type { ChatErrorCode, ChatStreamEvent, Citation } from '@parbot/shared';
 
 import type { Json } from '@/lib/db/types';
 
+import { type MessageReference, parseReferences } from './references';
+
 /**
  * The thread cache is the single source of truth for what the chat renders. Every transition is a
  * pure function over it, so the same code runs for a stream that is being consumed, a remount in
@@ -36,6 +38,10 @@ export type ThreadMessage = {
   latency_ms: number | null;
   status: MessageStatus;
   error?: { code: ChatErrorCode; message: string };
+  /** On a question: the files and sources it was asked with, shown as chips on the bubble. */
+  references?: MessageReference[];
+  /** On an answer that has no text yet: what the engine is doing ("Reading guide.pdf…"). */
+  progress?: string;
 };
 
 /** The pair of messages a stream is writing into, by their current ids. */
@@ -56,10 +62,12 @@ export type MessageRow = {
   feedback: number | null;
   created_at: string;
   latency_ms: number | null;
+  /** Older reads and rows from before references existed have none. */
+  source_references?: Json;
 };
 
 export const THREAD_MESSAGE_COLUMNS =
-  'id, role, content, citations, answered, feedback, created_at, latency_ms';
+  'id, role, content, citations, answered, feedback, created_at, latency_ms, source_references';
 
 export const emptyThread = (): Thread => ({ messages: [], active: null });
 
@@ -85,6 +93,7 @@ export const messageFromRow = (row: MessageRow): ThreadMessage => ({
   // The engine saves what the reader saw before pressing Stop with answered = null, so a reload
   // shows it as stopped, not as a finished answer.
   status: row.role === 'assistant' && row.answered === null ? 'stopped' : 'complete',
+  ...(row.role === 'user' ? { references: parseReferences(row.source_references) } : {}),
 });
 
 export const threadFromRows = (rows: MessageRow[]): Thread => ({
@@ -123,6 +132,9 @@ export type BeginExchangeInput = {
   assistantId: string;
   content: string;
   now?: string;
+  references?: MessageReference[];
+  /** What the answer waits on before the request goes out, such as files still uploading. */
+  progress?: string;
 };
 
 /** Appends the reader's message and an empty assistant placeholder, and points `active` at them. */
@@ -142,6 +154,7 @@ export const beginExchange = (thread: Thread, input: BeginExchangeInput): Thread
         created_at: now,
         latency_ms: null,
         status: 'pending',
+        references: input.references ?? [],
       },
       {
         id: input.assistantId,
@@ -153,6 +166,7 @@ export const beginExchange = (thread: Thread, input: BeginExchangeInput): Thread
         created_at: now,
         latency_ms: null,
         status: 'streaming',
+        ...(input.progress ? { progress: input.progress } : {}),
       },
     ],
     active: { userId: input.userId, assistantId: input.assistantId },
@@ -212,6 +226,12 @@ export const applyStreamEvent = (thread: Thread, event: ChatStreamEvent): Thread
         messages: patchMessage(thread.messages, active.assistantId, { citations: event.citations }),
       };
 
+    case 'status':
+      return {
+        ...thread,
+        messages: patchMessage(thread.messages, active.assistantId, { progress: event.message }),
+      };
+
     case 'done':
       return {
         messages: patchMessage(
@@ -264,6 +284,42 @@ export const activeAnswerText = (thread: Thread | undefined): string | null => {
   }
 
   return thread.messages.find((message) => message.id === active.assistantId)?.content ?? '';
+};
+
+/** Sets what the active answer is waiting on, or clears it with undefined. */
+export const setProgress = (thread: Thread, progress: string | undefined): Thread => {
+  const active = thread.active;
+
+  return active
+    ? { ...thread, messages: patchMessage(thread.messages, active.assistantId, { progress }) }
+    : thread;
+};
+
+/** Replaces the references the active question shows, once the ones that failed to upload are gone. */
+export const setActiveReferences = (thread: Thread, references: MessageReference[]): Thread => {
+  const active = thread.active;
+
+  return active
+    ? { ...thread, messages: patchMessage(thread.messages, active.userId, { references }) }
+    : thread;
+};
+
+/**
+ * The conversation's references: the ones its latest question was asked with. The server keeps
+ * the same set for follow-ups, so the composer starts from it.
+ */
+export const conversationReferences = (thread: Thread | undefined): MessageReference[] => {
+  const messages = thread?.messages ?? [];
+
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index]!;
+
+    if (message.role === 'user') {
+      return message.references ?? [];
+    }
+  }
+
+  return [];
 };
 
 /** Drops a user message and the assistant message that answers it, for a retry. */

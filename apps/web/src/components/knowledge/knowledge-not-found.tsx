@@ -11,7 +11,13 @@ import { Button } from '@/components/ui/button';
  * content. Citations in older answers still point at it, so this says what happened and where
  * the current version lives.
  */
-export const KnowledgeNotFound = ({ title, description }: { title: string; description: string }) => {
+export const KnowledgeNotFound = ({
+  title,
+  description,
+}: {
+  title: string;
+  description: string;
+}) => {
   const params = useParams<{ assistantId?: string }>();
   const knowledgeHref = params.assistantId ? `/a/${params.assistantId}/knowledge` : '/dashboard';
 

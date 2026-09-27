@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import {
   applyStreamEvent,
   beginExchange,
+  conversationReferences,
   emptyThread,
   failedMessage,
   isStreaming,
@@ -12,7 +13,9 @@ import {
   type MessageRow,
   parseCitations,
   removeExchange,
+  setActiveReferences,
   setFeedback,
+  setProgress,
   stopExchange,
   tempId,
   type Thread,
@@ -367,5 +370,74 @@ describe('helpers', () => {
 
     expect(isTempId(id)).toBe(true);
     expect(isTempId('0c9b9e5e-3d47-4a66-8b6e-3c1b8a1b7f00')).toBe(false);
+  });
+});
+
+describe('references in the thread', () => {
+  const limits = { id: 's1', title: 'limits.md', kind: 'upload' as const };
+  const notes = { id: 's2', title: 'Refund policy', kind: 'text' as const };
+
+  const row = (patch: Partial<MessageRow>): MessageRow => ({
+    id: 'm',
+    role: 'user',
+    content: 'Hello',
+    citations: [],
+    answered: null,
+    feedback: null,
+    created_at: '2026-09-23T10:00:00.000Z',
+    latency_ms: null,
+    ...patch,
+  });
+
+  it('puts the references on the question and what the answer waits on beside it', () => {
+    const thread = beginExchange(emptyThread(), {
+      userId: 'tmp_u',
+      assistantId: 'tmp_a',
+      content: 'What does it say?',
+      references: [limits],
+      progress: 'Uploading limits.md…',
+    });
+
+    expect(thread.messages[0]).toMatchObject({ role: 'user', references: [limits] });
+    expect(thread.messages[1]).toMatchObject({
+      role: 'assistant',
+      progress: 'Uploading limits.md…',
+    });
+    expect(setProgress(thread, undefined).messages[1]!.progress).toBeUndefined();
+    expect(setActiveReferences(thread, []).messages[0]!.references).toEqual([]);
+  });
+
+  it("shows a status event as the answer's progress", () => {
+    const thread = applyStreamEvent(applyStreamEvent(started(), meta), {
+      type: 'status',
+      message: 'Reading limits.md…',
+    });
+
+    expect(thread.messages[1]).toMatchObject({ id: 'a1', progress: 'Reading limits.md…' });
+  });
+
+  it('reads the references stored on a question, and none on an answer', () => {
+    const thread = threadFromRows([
+      row({ id: 'u1', source_references: [limits, { broken: true }] }),
+      row({ id: 'a1', role: 'assistant', answered: true, source_references: [limits] }),
+      row({ id: 'u2' }),
+    ]);
+
+    expect(thread.messages[0]!.references).toEqual([limits]);
+    expect(thread.messages[1]!.references).toBeUndefined();
+    expect(thread.messages[2]!.references).toEqual([]);
+  });
+
+  it("takes the conversation's references from its latest question", () => {
+    const thread = threadFromRows([
+      row({ id: 'u1', source_references: [limits] }),
+      row({ id: 'a1', role: 'assistant', answered: true }),
+      row({ id: 'u2', source_references: [limits, notes] }),
+      row({ id: 'a2', role: 'assistant', answered: true }),
+    ]);
+
+    expect(conversationReferences(thread)).toEqual([limits, notes]);
+    expect(conversationReferences(emptyThread())).toEqual([]);
+    expect(conversationReferences(undefined)).toEqual([]);
   });
 });

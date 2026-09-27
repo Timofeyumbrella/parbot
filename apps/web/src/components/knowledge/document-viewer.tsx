@@ -4,12 +4,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import type { Source } from '@/lib/db';
 import { relativeTime } from '@/lib/format';
-import {
-  hasStoredFile,
-  originalLabel,
-  sourceFileHref,
-  sourceHref,
-} from '@/lib/knowledge/links';
+import { hasStoredFile, originalLabel, sourceFileHref, sourceHref } from '@/lib/knowledge/links';
 
 import { renderDocument } from './document-markdown';
 import { describeSource, SOURCE_KINDS } from './format';
@@ -146,8 +141,8 @@ export const DocumentViewer = ({ assistantId, document, source, passage }: Docum
           </figure>
         ) : (
           <p role="status" className="text-muted-foreground rounded-lg border px-3 py-2 text-xs">
-            The cited passage is no longer in this page: it was re-indexed after the answer. The page
-            opens at the top.
+            The cited passage is no longer in this page: it was re-indexed after the answer. The
+            page opens at the top.
           </p>
         )
       ) : null}

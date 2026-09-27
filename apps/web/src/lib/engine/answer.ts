@@ -124,7 +124,15 @@ const toCitations = (answer: string, chunks: RetrievedChunk[]): Citation[] =>
  * the Inbox can.
  */
 const citationsFor = (channel: AnswerConversation['channel'], citations: Citation[]) =>
-  channel === 'widget' ? citations.map(({ chunkId: _chunkId, ...citation }) => citation) : citations;
+  channel === 'widget'
+    ? citations.map((citation) => {
+        const sent = { ...citation };
+
+        delete sent.chunkId;
+
+        return sent;
+      })
+    : citations;
 
 const loadPlan = async (service: ServiceClient, ownerId: string) => {
   const { data } = await service
@@ -400,9 +408,7 @@ export async function* streamAnswer(params: AnswerParams): AsyncGenerator<ChatSt
         owner_id: assistant.owner_id,
         role: 'user',
         content: message,
-        ...(references.length > 0
-          ? { source_references: references.map(toSourceReference) }
-          : {}),
+        ...(references.length > 0 ? { source_references: references.map(toSourceReference) } : {}),
       })
       .select('id')
       .single();

@@ -301,8 +301,7 @@ describe('POST /api/chat', () => {
         {
           type: 'error',
           code: 'bad_request',
-          message:
-            'Reference up to 10 files or sources, picked from the list, and send again.',
+          message: 'Reference up to 10 files or sources, picked from the list, and send again.',
         },
       ]);
     }

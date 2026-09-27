@@ -4,8 +4,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { ConversationRow } from '@/lib/chat/conversations';
 import { conversationsKey, threadKey } from '@/lib/chat/queries';
+import type { MessageReference } from '@/lib/chat/references';
 import { streamRegistry } from '@/lib/chat/streams';
 import { isTempId, type Thread } from '@/lib/chat/thread';
+import { composerUploads } from '@/lib/chat/uploads';
 
 import { retryMessage, sendMessage, stopMessage } from './use-send-message';
 
@@ -547,5 +549,221 @@ describe('sendMessage', () => {
 
     expect(chat.fetch).not.toHaveBeenCalled();
     expect(thread()).toBeUndefined();
+  });
+});
+
+describe('sendMessage with references', () => {
+  const limits: MessageReference = {
+    id: '33333333-3333-4333-8333-333333333333',
+    title: 'limits.md',
+    kind: 'upload',
+  };
+  const notes: MessageReference = {
+    id: '44444444-4444-4444-8444-444444444444',
+    title: 'Refund policy',
+    kind: 'text',
+  };
+
+  /** The chat as fakeChat, plus /api/sources answered when the test says so. */
+  const withUploads = () => {
+    const chat = fakeChat();
+    const uploads: { resolve: (response: Response) => void; body: FormData }[] = [];
+    const fetch = vi.fn((url: string, init?: RequestInit) => {
+      if (url === '/api/sources') {
+        return new Promise<Response>((resolve) => {
+          uploads.push({ resolve, body: init?.body as FormData });
+        });
+      }
+
+      return chat.fetch(url, init);
+    });
+
+    return { chat, fetch, uploads };
+  };
+
+  const chatBodies = (fetch: ReturnType<typeof vi.fn>) =>
+    fetch.mock.calls
+      .filter(([url]) => url === '/api/chat')
+      .map(
+        ([, init]) => JSON.parse((init as RequestInit).body as string) as Record<string, unknown>,
+      );
+
+  const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+  beforeEach(() => {
+    composerUploads.reset();
+  });
+
+  it('shows the chips on the question at once and sends their ids', async () => {
+    const chat = fakeChat();
+
+    vi.stubGlobal('fetch', chat.fetch);
+
+    const pending = sendMessage(queryClient, ASSISTANT, {
+      conversationId: CONVERSATION,
+      content: 'What does this say about limits?',
+      references: [limits, notes],
+    });
+
+    expect(thread()?.messages[0]).toMatchObject({
+      role: 'user',
+      status: 'pending',
+      references: [limits, notes],
+    });
+    expect(chatBodies(chat.fetch)[0]).toMatchObject({ references: [limits.id, notes.id] });
+
+    chat.push(meta);
+    chat.push({ type: 'status', message: 'Reading limits.md…' });
+    await flush();
+    expect(thread()?.messages[1]).toMatchObject({
+      status: 'streaming',
+      progress: 'Reading limits.md…',
+    });
+
+    chat.push({ type: 'done', answered: true, latencyMs: 3 });
+    chat.close();
+    await pending;
+  });
+
+  it('sends an empty list when the reader removed every chip, so the conversation drops them', async () => {
+    const chat = fakeChat();
+
+    vi.stubGlobal('fetch', chat.fetch);
+
+    const pending = sendMessage(queryClient, ASSISTANT, {
+      conversationId: CONVERSATION,
+      content: 'And without the file?',
+      references: [],
+    });
+
+    expect(chatBodies(chat.fetch)[0]).toMatchObject({ references: [] });
+    chat.push(meta);
+    chat.push({ type: 'done', answered: true, latencyMs: 3 });
+    chat.close();
+    await pending;
+  });
+
+  it('waits for a file that is still uploading, saying so, then sends it', async () => {
+    const { chat, fetch, uploads } = withUploads();
+
+    vi.stubGlobal('fetch', fetch);
+
+    const file = new File(['# Limits'], 'limits.md', { type: 'text/markdown' });
+    const upload = composerUploads.start({ id: limits.id, assistantId: ASSISTANT, file });
+    const pending = sendMessage(queryClient, ASSISTANT, {
+      conversationId: CONVERSATION,
+      content: 'What does this file say?',
+      references: [limits],
+    });
+
+    // The question and its chip are on screen; the answer says what it is waiting for.
+    expect(thread()?.messages.map((message) => message.status)).toEqual(['pending', 'streaming']);
+    expect(thread()?.messages[0]!.references).toEqual([limits]);
+    expect(thread()?.messages[1]!.progress).toBe('Uploading limits.md…');
+    await flush();
+    expect(chatBodies(fetch)).toEqual([]);
+    expect(uploads[0]!.body.get('id')).toBe(limits.id);
+    expect(uploads[0]!.body.get('assistantId')).toBe(ASSISTANT);
+
+    uploads[0]!.resolve(Response.json({ source: { id: limits.id } }, { status: 201 }));
+    await upload;
+    await flush();
+
+    expect(chatBodies(fetch)[0]).toMatchObject({ references: [limits.id] });
+    expect(thread()?.messages[1]!.progress).toBeUndefined();
+
+    chat.push(meta);
+    chat.push({ type: 'done', answered: true, latencyMs: 3 });
+    chat.close();
+    await pending;
+  });
+
+  it('leaves out a file the server refused and still asks the question', async () => {
+    const { chat, fetch, uploads } = withUploads();
+
+    vi.stubGlobal('fetch', fetch);
+
+    const file = new File(['x'], 'limits.md', { type: 'text/markdown' });
+
+    void composerUploads.start({ id: limits.id, assistantId: ASSISTANT, file });
+
+    const pending = sendMessage(queryClient, ASSISTANT, {
+      conversationId: CONVERSATION,
+      content: 'Compare them.',
+      references: [limits, notes],
+    });
+
+    uploads[0]!.resolve(
+      Response.json({ error: "Your plan's page limit is reached." }, { status: 403 }),
+    );
+    await flush();
+    await flush();
+
+    expect(composerUploads.state(limits.id)).toEqual({
+      status: 'failed',
+      error: "Your plan's page limit is reached.",
+    });
+    expect(chatBodies(fetch)[0]).toMatchObject({ references: [notes.id] });
+    expect(thread()?.messages[0]!.references).toEqual([notes]);
+
+    chat.push(meta);
+    chat.push({ type: 'done', answered: true, latencyMs: 3 });
+    chat.close();
+    await pending;
+  });
+
+  it('stops at once while a file uploads, and never asks the server', async () => {
+    const { fetch, uploads } = withUploads();
+
+    vi.stubGlobal('fetch', fetch);
+
+    void composerUploads.start({
+      id: limits.id,
+      assistantId: ASSISTANT,
+      file: new File(['x'], 'limits.md'),
+    });
+
+    const pending = sendMessage(queryClient, ASSISTANT, {
+      conversationId: CONVERSATION,
+      content: 'Never mind.',
+      references: [limits],
+    });
+
+    stopMessage(queryClient, CONVERSATION);
+    await pending;
+
+    expect(thread()?.messages.map((message) => message.status)).toEqual(['stopped', 'stopped']);
+    expect(chatBodies(fetch)).toEqual([]);
+    uploads[0]!.resolve(Response.json({ source: { id: limits.id } }, { status: 201 }));
+  });
+
+  it('retries a failed question with the references it was asked with', async () => {
+    const first = fakeChat();
+
+    vi.stubGlobal('fetch', first.fetch);
+
+    const failed = sendMessage(queryClient, ASSISTANT, {
+      conversationId: CONVERSATION,
+      content: 'What does it say?',
+      references: [notes],
+    });
+
+    first.push({ type: 'error', code: 'internal', message: 'The answer could not be produced.' });
+    first.close();
+    await failed;
+
+    const userId = thread()!.messages[0]!.id;
+    const second = fakeChat();
+
+    vi.stubGlobal('fetch', second.fetch);
+
+    const retried = retryMessage(queryClient, ASSISTANT, CONVERSATION, userId);
+
+    expect(chatBodies(second.fetch)[0]).toMatchObject({ references: [notes.id] });
+    expect(thread()?.messages[0]!.references).toEqual([notes]);
+    second.push(meta);
+    second.push({ type: 'done', answered: true, latencyMs: 3 });
+    second.close();
+    await retried;
   });
 });

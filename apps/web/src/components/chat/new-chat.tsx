@@ -4,11 +4,15 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useState } from 'react';
 
 import { useAssistant } from '@/components/assistant-context';
-import { Composer } from '@/components/chat/composer';
+import { ChatComposer } from '@/components/chat/chat-composer';
 import { Thread } from '@/components/chat/thread';
 import { Welcome } from '@/components/chat/welcome';
 import { useSendMessage } from '@/hooks/use-send-message';
 import { NEW_CHAT_DRAFT } from '@/lib/chat/drafts';
+import type { MessageReference } from '@/lib/chat/references';
+
+/** A new chat has no references until its first question brings some. */
+const NO_REFERENCES: MessageReference[] = [];
 
 /**
  * The screen behind "New chat". Sending mints the conversation id here, puts the exchange in the
@@ -22,10 +26,10 @@ export const NewChat = () => {
   const [started, setStarted] = useState<string | null>(null);
 
   const start = useCallback(
-    (content: string) => {
+    (content: string, references?: MessageReference[]) => {
       const conversationId = crypto.randomUUID();
 
-      void send({ conversationId, content });
+      void send({ conversationId, content, references });
       setStarted(conversationId);
       router.push(`/a/${assistant.id}/chat/${conversationId}`);
     },
@@ -40,11 +44,16 @@ export const NewChat = () => {
     <div className="flex h-full min-h-0 flex-col" data-testid="new-chat">
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto flex min-h-full w-full max-w-3xl flex-col justify-center px-4 py-10 sm:px-6">
-          <Welcome assistant={assistant} onPick={start} />
+          <Welcome assistant={assistant} onPick={(content) => start(content)} />
         </div>
       </div>
       <div className="bg-background border-t px-4 pb-3 pt-3 sm:px-6">
-        <Composer className="mx-auto w-full max-w-3xl" draftKey={NEW_CHAT_DRAFT} onSend={start} />
+        <ChatComposer
+          className="mx-auto w-full max-w-3xl"
+          draftKey={NEW_CHAT_DRAFT}
+          conversationReferences={NO_REFERENCES}
+          onSend={start}
+        />
       </div>
     </div>
   );

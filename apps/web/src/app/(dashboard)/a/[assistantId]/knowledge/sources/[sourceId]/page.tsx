@@ -9,12 +9,7 @@ import { ViewerBack } from '@/components/knowledge/viewer-controls';
 import { PageContainer } from '@/components/page-header';
 import { RealtimeRefresh } from '@/components/realtime-refresh';
 import { Button } from '@/components/ui/button';
-import {
-  documentHref,
-  hasStoredFile,
-  originalLabel,
-  sourceFileHref,
-} from '@/lib/knowledge/links';
+import { documentHref, hasStoredFile, originalLabel, sourceFileHref } from '@/lib/knowledge/links';
 import { loadSource, loadSourcePages } from '@/lib/knowledge/documents';
 
 type Props = PageProps<'/a/[assistantId]/knowledge/sources/[sourceId]'>;

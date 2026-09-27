@@ -8,7 +8,12 @@ import {
   resolveReferences,
   waitForReferences,
 } from './references';
-import { mergeReferenced, type RetrievedChunk, type ServiceClient, trimToBudget } from './retrieval';
+import {
+  mergeReferenced,
+  type RetrievedChunk,
+  type ServiceClient,
+  trimToBudget,
+} from './retrieval';
 
 const chunk = (id: string, patch: Partial<RetrievedChunk> = {}): RetrievedChunk => ({
   chunkId: id,
@@ -132,7 +137,10 @@ describe('waitForReferences', () => {
     );
 
     expect(result.map((item) => item.status)).toEqual(['ready', 'failed', 'ready']);
-    expect(reads).toEqual([['a', 'b'], ['a', 'b']]);
+    expect(reads).toEqual([
+      ['a', 'b'],
+      ['a', 'b'],
+    ]);
   });
 
   it('gives up at the deadline and keeps the last status it saw', async () => {

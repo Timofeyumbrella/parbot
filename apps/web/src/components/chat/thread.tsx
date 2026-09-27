@@ -4,18 +4,19 @@ import { UUID_PATTERN } from '@parbot/shared';
 import { cn } from 'cn';
 import { ArrowDown, MessageSquareOff, RotateCcw } from 'lucide-react';
 import Link from 'next/link';
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 
 import { useAssistant } from '@/components/assistant-context';
+import { ChatComposer } from '@/components/chat/chat-composer';
 import { ThreadSkeleton } from '@/components/chat/chat-skeletons';
-import { Composer } from '@/components/chat/composer';
 import { MessageBubble } from '@/components/chat/message-bubble';
 import { Welcome } from '@/components/chat/welcome';
 import { Button } from '@/components/ui/button';
 import { useAutoscroll } from '@/hooks/use-autoscroll';
 import { useSendMessage } from '@/hooks/use-send-message';
 import { useFeedback, useThread } from '@/hooks/use-thread';
-import { isStreaming } from '@/lib/chat/thread';
+import type { MessageReference } from '@/lib/chat/references';
+import { conversationReferences, isStreaming } from '@/lib/chat/thread';
 
 export type ThreadProps = {
   conversationId: string;
@@ -34,17 +35,20 @@ export const Thread = ({ conversationId }: ThreadProps) => {
   const feedback = useFeedback(conversationId);
   const messages = data?.messages ?? [];
   const streaming = isStreaming(data);
+  const activeReferences = useMemo(() => conversationReferences(data), [data]);
   const { ref, pinned, onScroll, scrollToBottom } = useAutoscroll(
     `${conversationId}:${messages.length}`,
   );
 
   const handleSend = useCallback(
-    (content: string) => {
-      void send({ conversationId, content });
+    (content: string, references?: MessageReference[]) => {
+      void send({ conversationId, content, references });
       scrollToBottom();
     },
     [send, conversationId, scrollToBottom],
   );
+  // A suggested question on an empty thread carries no references of its own.
+  const handlePick = useCallback((content: string) => handleSend(content), [handleSend]);
 
   const handleStop = useCallback(() => stop(conversationId), [stop, conversationId]);
   const handleRetry = useCallback(
@@ -110,7 +114,7 @@ export const Thread = ({ conversationId }: ThreadProps) => {
               </Button>
             </div>
           ) : empty ? (
-            <Welcome assistant={assistant} onPick={handleSend} />
+            <Welcome assistant={assistant} onPick={handlePick} />
           ) : (
             messages.map((message, index) => {
               const previous = messages[index - 1];
@@ -147,10 +151,11 @@ export const Thread = ({ conversationId }: ThreadProps) => {
       ) : null}
 
       <div className="bg-background border-t px-4 pb-3 pt-3 sm:px-6">
-        <Composer
+        <ChatComposer
           key={conversationId}
           className="mx-auto w-full max-w-3xl"
           draftKey={conversationId}
+          conversationReferences={activeReferences}
           onSend={handleSend}
           onStop={handleStop}
           streaming={streaming}

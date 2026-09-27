@@ -14,12 +14,7 @@ import {
 } from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { Source } from '@/lib/db';
-import {
-  documentHref,
-  hasStoredFile,
-  originalLabel,
-  sourceFileHref,
-} from '@/lib/knowledge/links';
+import { documentHref, hasStoredFile, originalLabel, sourceFileHref } from '@/lib/knowledge/links';
 import { getSupabaseBrowserClient } from '@/lib/supabase/client';
 
 import { plural } from './format';
