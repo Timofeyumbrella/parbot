@@ -18,6 +18,15 @@ import {
   UNANSWERED_TEXT,
 } from './prompt';
 import {
+  isIndexing,
+  readingMessage,
+  REFERENCE_WAIT_MS,
+  type ReferencedSource,
+  resolveReferences,
+  toSourceReference,
+  waitForReferences,
+} from './references';
+import {
   retrievalQuery,
   retrieveChunks,
   type RetrievedChunk,
@@ -62,6 +71,13 @@ export type AnswerParams = {
   assistantMessageId?: string;
   /** How often to look for a recorded stop while answering. */
   stopPollMs?: number;
+  /**
+   * Source ids the reader referenced (in-app chat only; the widget never sends any). A list
+   * replaces the conversation's references, undefined keeps the ones it has.
+   */
+  references?: string[];
+  /** How long to wait for a referenced source that is still being indexed. */
+  referenceWaitMs?: number;
 };
 
 const HISTORY_TURNS = 6;
@@ -96,10 +112,19 @@ const toCitations = (answer: string, chunks: RetrievedChunk[]): Citation[] =>
             title: chunk.documentTitle,
             url: chunk.documentUrl,
             snippet: snippet(chunk.content),
+            chunkId: chunk.chunkId,
           },
         ]
       : [];
   });
+
+/**
+ * The citations as the reader's client receives them. The widget protocol stays as it was: a
+ * visitor gets no passage ids, which only the owner's app can open. The saved row keeps them, so
+ * the Inbox can.
+ */
+const citationsFor = (channel: AnswerConversation['channel'], citations: Citation[]) =>
+  channel === 'widget' ? citations.map(({ chunkId: _chunkId, ...citation }) => citation) : citations;
 
 const loadPlan = async (service: ServiceClient, ownerId: string) => {
   const { data } = await service
@@ -341,12 +366,26 @@ export async function* streamAnswer(params: AnswerParams): AsyncGenerator<ChatSt
         .eq('id', conversation.id);
     }
 
-    const { data: history } = await service
-      .from('messages')
-      .select('role, content')
-      .eq('conversation_id', conversation.id)
-      .order('created_at', { ascending: false })
-      .limit(HISTORY_TURNS);
+    // References belong to the in-app chat: the widget never sends any, and its visitors cannot
+    // see an owner's private files.
+    const [{ data: history }, resolvedReferences] = await Promise.all([
+      service
+        .from('messages')
+        .select('role, content')
+        .eq('conversation_id', conversation.id)
+        .order('created_at', { ascending: false })
+        .limit(HISTORY_TURNS),
+      conversation.channel === 'app'
+        ? resolveReferences(service, {
+            assistantId: assistant.id,
+            ownerId: assistant.owner_id,
+            conversationId: conversation.id,
+            requested: params.references,
+            existing: Boolean(existing),
+          })
+        : Promise.resolve([] as ReferencedSource[]),
+    ]);
+    let references = resolvedReferences;
 
     // Newest first, so the first user row is the latest question.
     const newestFirst = history ?? [];
@@ -361,6 +400,9 @@ export async function* streamAnswer(params: AnswerParams): AsyncGenerator<ChatSt
         owner_id: assistant.owner_id,
         role: 'user',
         content: message,
+        ...(references.length > 0
+          ? { source_references: references.map(toSourceReference) }
+          : {}),
       })
       .select('id')
       .single();
@@ -385,12 +427,29 @@ export async function* streamAnswer(params: AnswerParams): AsyncGenerator<ChatSt
       assistantMessageId,
     };
 
+    const waiting = references.filter((reference) => isIndexing(reference.status));
+
+    if (waiting.length > 0) {
+      // A file attached a moment ago is usually indexed within a second or two. The reader sees
+      // what the wait is for; past the limit the question is answered from what is ready.
+      yield { type: 'status', message: readingMessage(waiting) };
+      references = await waitForReferences(service, references, {
+        timeoutMs: params.referenceWaitMs ?? REFERENCE_WAIT_MS,
+        signal: signal ? AbortSignal.any([signal, watch.signal]) : watch.signal,
+      });
+
+      if (stopped()) {
+        return;
+      }
+    }
+
     try {
       chunks = await retrieveChunks(
         service,
         provider,
         assistant.id,
         retrievalQuery(message, previousQuestion),
+        { sourceIds: references.map((reference) => reference.id) },
       );
     } catch (cause) {
       await rollback();
@@ -411,8 +470,12 @@ export async function* streamAnswer(params: AnswerParams): AsyncGenerator<ChatSt
         ...priorTurns,
         { role: 'user', text: renderQuestion(message, chunks) },
       ];
+      // Only files that gave passages are named, so the model is never pointed at text it lacks.
+      const referencedTitles = references
+        .filter((reference) => chunks.some((chunk) => chunk.sourceId === reference.id))
+        .map((reference) => reference.title);
       const generator = provider.stream({
-        system: buildSystemPrompt(assistant),
+        system: buildSystemPrompt(assistant, referencedTitles),
         turns,
         signal: signal ? AbortSignal.any([signal, watch.signal]) : watch.signal,
       });
@@ -529,7 +592,7 @@ export async function* streamAnswer(params: AnswerParams): AsyncGenerator<ChatSt
     saved = true;
     metered = true;
 
-    yield { type: 'citations', citations };
+    yield { type: 'citations', citations: citationsFor(conversation.channel, citations) };
     yield { type: 'done', answered, latencyMs };
   } finally {
     watch?.dispose();

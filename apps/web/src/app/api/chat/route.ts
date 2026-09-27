@@ -1,4 +1,4 @@
-import { type ChatStreamEvent, MAX_MESSAGE_LENGTH } from '@parbot/shared';
+import { type ChatStreamEvent, MAX_MESSAGE_LENGTH, MAX_REFERENCES } from '@parbot/shared';
 import type { NextRequest } from 'next/server';
 import { z } from 'zod';
 
@@ -18,6 +18,8 @@ const requestSchema = z.object({
   conversationId: z.uuid(),
   message: z.string().trim().min(1).max(MAX_MESSAGE_LENGTH),
   assistantMessageId: z.uuid().optional(),
+  // Checked again in the engine against the assistant's own sources; anything else is left out.
+  references: z.array(z.uuid()).max(MAX_REFERENCES).optional(),
 });
 
 /** Says which part of the request was wrong, so a broken link reads differently from a long message. */
@@ -30,6 +32,10 @@ const validationMessage = (error: z.ZodError) => {
 
   if (fields.has('conversationId') || fields.has('assistantMessageId')) {
     return 'That conversation link is not valid. Start a new chat.';
+  }
+
+  if (fields.has('references')) {
+    return `Reference up to ${MAX_REFERENCES} files or sources, picked from the list, and send again.`;
   }
 
   return `Ask something between 1 and ${MAX_MESSAGE_LENGTH.toLocaleString('en-US')} characters.`;
@@ -111,6 +117,7 @@ export async function POST(request: NextRequest) {
       conversation: { id: parsed.data.conversationId, channel: 'app' },
       message: parsed.data.message,
       assistantMessageId: parsed.data.assistantMessageId,
+      references: parsed.data.references,
       signal: request.signal,
     }),
   );

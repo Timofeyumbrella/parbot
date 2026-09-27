@@ -244,4 +244,69 @@ describe('POST /api/chat', () => {
     expect(malformed.status).toBe(400);
     expect(engine.streamAnswer).toHaveBeenCalledTimes(1);
   });
+
+  it('passes the referenced sources on, and leaves them out when none were sent', async () => {
+    const source = '55555555-5555-4555-8555-555555555555';
+
+    await events(
+      await post({
+        assistantId: ASSISTANT,
+        conversationId: CONVERSATION,
+        message: 'What does this file say about limits?',
+        references: [source],
+      }),
+    );
+    await events(
+      await post({ assistantId: ASSISTANT, conversationId: CONVERSATION, message: 'And then?' }),
+    );
+    await events(
+      await post({
+        assistantId: ASSISTANT,
+        conversationId: CONVERSATION,
+        message: 'Forget the file.',
+        references: [],
+      }),
+    );
+
+    expect(engine.streamAnswer.mock.calls.map(([params]) => params.references)).toEqual([
+      [source],
+      undefined,
+      [],
+    ]);
+  });
+
+  it('refuses references that are not source ids, or too many of them', async () => {
+    const notIds = await post({
+      assistantId: ASSISTANT,
+      conversationId: CONVERSATION,
+      message: 'hi',
+      references: ['../../etc/passwd'],
+    });
+    const tooMany = await post({
+      assistantId: ASSISTANT,
+      conversationId: CONVERSATION,
+      message: 'hi',
+      references: Array.from({ length: 11 }, () => crypto.randomUUID()),
+    });
+    const notAList = await post({
+      assistantId: ASSISTANT,
+      conversationId: CONVERSATION,
+      message: 'hi',
+      references: '55555555-5555-4555-8555-555555555555',
+    });
+
+    for (const response of [notIds, tooMany, notAList]) {
+      expect(response.status).toBe(400);
+      expect(await events(response)).toEqual([
+        {
+          type: 'error',
+          code: 'bad_request',
+          message:
+            'Reference up to 10 files or sources, picked from the list, and send again.',
+        },
+      ]);
+    }
+
+    expect(engine.streamAnswer).not.toHaveBeenCalled();
+  });
 });
