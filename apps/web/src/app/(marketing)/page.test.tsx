@@ -54,7 +54,7 @@ describe('landing page', () => {
     }
 
     expect(screen.getByRole('figure', { name: /example conversation/i })).toBeInTheDocument();
-    expect(screen.getByText('Demo')).toBeInTheDocument();
+    expect(screen.getByText('Example')).toBeInTheDocument();
     expect(screen.getAllByRole('img').length).toBeGreaterThanOrEqual(2);
   });
 
@@ -131,24 +131,31 @@ describe('landing page', () => {
 
     render(<LandingPage />);
 
-    expect(screen.queryByText('Live')).not.toBeInTheDocument();
+    expect(screen.getByRole('figure', { name: /example conversation/i })).toBeInTheDocument();
+    expect(screen.getByText(/Sign up to point Parbot at your own/)).toBeInTheDocument();
     expect(screen.queryByText(/to try it here/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/⌘K palette on this page/)).not.toBeInTheDocument();
     expect(document.querySelector('script[data-parbot]')).toBeNull();
   });
 
-  it('shows the live panel and the keyboard hint when a demo key is set', () => {
+  it('keeps the hero scripted and adds the real palette and its hints when a demo key is set', () => {
     vi.stubEnv('NEXT_PUBLIC_DEMO_ASSISTANT_KEY', 'pb_demo_key');
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}', { status: 404 }));
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
 
     render(<LandingPage />);
 
-    expect(screen.getByText('Live')).toBeInTheDocument();
-    expect(screen.getByRole('textbox', { name: 'Ask a question' })).toBeInTheDocument();
-    expect(screen.getByText(/to try it here/)).toBeInTheDocument();
+    const hero = section('hero-heading');
+
+    // The hero is the same picture either way: nothing to type into, nothing sent anywhere.
+    expect(hero.getByRole('figure', { name: /example conversation/i })).toBeInTheDocument();
+    expect(hero.queryByRole('textbox')).not.toBeInTheDocument();
+    expect(hero.getByText(/to try it here/)).toBeInTheDocument();
+    expect(hero.getByText(/The ⌘K palette on this page answers live/)).toBeInTheDocument();
     expect(screen.getByText(/ask the assistant on this page/)).toBeInTheDocument();
     expect(document.querySelector('script[data-parbot]')).toHaveAttribute(
       'data-parbot',
       'pb_demo_key',
     );
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 });

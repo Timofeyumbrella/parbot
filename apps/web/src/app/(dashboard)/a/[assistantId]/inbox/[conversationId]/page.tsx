@@ -96,8 +96,9 @@ export default async function ConversationPage({
         />
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
-        <section aria-label="Transcript" className="flex flex-col gap-5">
+      {/* On a phone the column must be allowed to shrink: an auto track grows to a code line's width. */}
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
+        <section aria-label="Transcript" className="flex min-w-0 flex-col gap-5">
           {failure ? (
             <div
               role="alert"

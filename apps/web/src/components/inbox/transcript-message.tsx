@@ -87,7 +87,8 @@ export const TranscriptMessage = ({ assistantId, message, now }: TranscriptMessa
         ) : null}
         <div
           className={cn(
-            'rounded-lg px-3 py-2 text-sm leading-relaxed',
+            // A pasted token or URL has no break opportunity; without this it widens the page.
+            'wrap-anywhere min-w-0 max-w-full rounded-lg px-3 py-2 text-sm leading-relaxed',
             isUser ? 'bg-muted' : 'bg-card ring-foreground/10 ring-1',
             unanswered && 'ring-warning/40',
             'group-target/message:ring-primary group-target/message:ring-2',

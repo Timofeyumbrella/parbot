@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 
 import { formatPrice, PLANS } from '../src/lib/plans';
 
@@ -53,56 +53,99 @@ test.describe('landing page', () => {
   });
 });
 
-test.describe('the live demo in the hero', () => {
-  test.skip(!process.env.NEXT_PUBLIC_DEMO_ASSISTANT_KEY, 'Needs NEXT_PUBLIC_DEMO_ASSISTANT_KEY.');
+test.describe('the scripted demo in the hero', () => {
+  const demo = (page: Page) => page.getByRole('figure', { name: /example conversation/i });
+  const frame = (page: Page) => demo(page).getByTestId('demo-frame');
+  const questions = (page: Page) => frame(page).getByTestId('demo-user-message');
 
-  test('lists each cited page once, markers ascending', async ({ page }) => {
-    const citation = (index: number, slug: string, title: string) => ({
-      index,
-      documentId: slug,
-      title,
-      url: `https://docs.acme.test/${slug}`,
-      snippet: '',
+  /** Every request to the chat endpoints, from the hero or anything else on the page. */
+  const watchChatRequests = (page: Page) => {
+    const sent: string[] = [];
+
+    page.on('request', (request) => {
+      if (/\/api\/(widget\/)?chat\b/.test(request.url())) {
+        sent.push(request.url());
+      }
     });
-    const events = [
-      {
-        type: 'token',
-        text: 'Paste the script tag [2] with your public key [3], then reload [1].',
-      },
-      {
-        type: 'citations',
-        citations: [
-          citation(2, 'install', 'Installing the widget'),
-          citation(3, 'keys', 'Public keys'),
-          citation(1, 'install', 'Installing the widget'),
-        ],
-      },
-      { type: 'done', answered: true, latencyMs: 5 },
-    ];
 
-    // The answer's citation order is the model's; a fixed stream pins the case that duplicated.
-    await page.route('**/api/widget/chat', (route) =>
-      route.fulfill({
-        status: 200,
-        contentType: 'text/event-stream',
-        body: events.map((event) => `data: ${JSON.stringify(event)}\n\n`).join(''),
-      }),
-    );
-    await page.goto('/');
+    return sent;
+  };
 
-    const input = page.getByRole('textbox', { name: 'Ask a question' });
+  test('shows a finished, cited exchange on fictional docs, then plays the next one on its own', async ({
+    page,
+  }) => {
+    const sent = watchChatRequests(page);
 
-    // A production build hydrates quickly, but a submit that lands before React is lost.
-    await expect(async () => {
-      await input.fill('How do I install the widget?');
-      await input.press('Enter');
-      await expect(page.getByRole('list', { name: 'Sources' })).toBeVisible({ timeout: 1_000 });
-    }).toPass({ timeout: 30_000 });
+    await visit(page, '/');
 
-    await expect(page.getByRole('list', { name: 'Sources' }).getByRole('listitem')).toHaveText([
-      '12Installing the widget',
-      '3Public keys',
+    await expect(frame(page)).toHaveAttribute('inert', '');
+    await expect(frame(page)).toContainText('Northwind Payments');
+    await expect(frame(page).getByTestId('demo-sources-strip')).toContainText('4 sources ready');
+    await expect(frame(page).getByTestId('demo-sources-strip')).toContainText('api-reference.pdf');
+    await expect(questions(page)).toHaveText(['How do I refund part of a payment?']);
+    await expect(frame(page).getByTestId('demo-code-block')).toContainText('curl');
+    await expect(frame(page).getByTestId('demo-sources').getByRole('listitem')).toHaveText([
+      '1api-reference.pdf',
+      '2auth-guide.docx',
     ]);
+    // Nothing in the hero takes typing or a click.
+    await expect(demo(page).locator('input, textarea, button, a')).toHaveCount(0);
+    await expect(
+      page.locator('section[aria-labelledby="hero-heading"]').getByRole('textbox'),
+    ).toHaveCount(0);
+
+    // The next question types itself, is sent, and its answer streams in with grouped sources.
+    await expect(frame(page).getByTestId('demo-composer')).toContainText('How do I verify', {
+      timeout: 10_000,
+    });
+    await expect(questions(page)).toHaveText(
+      ['How do I refund part of a payment?', 'How do I verify a webhook signature?'],
+      { timeout: 10_000 },
+    );
+    await expect(frame(page).getByTestId('demo-sources').nth(1).getByRole('listitem')).toHaveText(
+      ['13webhooks.md', '2Changelogdocs.northwind.dev'],
+      { timeout: 15_000 },
+    );
+
+    // The docs do not cover the third: the assistant says so and the email offer is filled in.
+    await expect(frame(page).getByTestId('demo-lead-thanks')).toHaveText(
+      'Thanks. The team will reply to dana@example.com.',
+      { timeout: 30_000 },
+    );
+    expect(sent).toEqual([]);
+  });
+
+  test('holds still while scrolled out of view', async ({ page }) => {
+    await visit(page, '/');
+    await expect(questions(page)).toHaveCount(2, { timeout: 15_000 });
+
+    await page.locator('footer').last().scrollIntoViewIfNeeded();
+    await expect(frame(page)).not.toBeInViewport();
+    // The observer reports the scroll asynchronously; give it a moment before taking the snapshot.
+    await page.waitForTimeout(500);
+
+    const before = await frame(page).innerText();
+
+    await page.waitForTimeout(5_000);
+    expect(await frame(page).innerText()).toBe(before);
+
+    await demo(page).scrollIntoViewIfNeeded();
+    await expect.poll(() => frame(page).innerText(), { timeout: 15_000 }).not.toBe(before);
+  });
+
+  test.describe('with reduced motion', () => {
+    test.use({ reducedMotion: 'reduce' });
+
+    test('shows the first exchange finished and never moves', async ({ page }) => {
+      await visit(page, '/');
+      await expect(frame(page).getByTestId('demo-sources')).toBeVisible();
+
+      const before = await frame(page).innerText();
+
+      await page.waitForTimeout(6_000);
+      expect(await frame(page).innerText()).toBe(before);
+      await expect(questions(page)).toHaveText(['How do I refund part of a payment?']);
+    });
   });
 });
 

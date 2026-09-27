@@ -29,7 +29,8 @@ const UserBubble = ({ message, assistantId }: { message: ThreadMessage; assistan
     {message.references?.length ? (
       <MessageReferences references={message.references} assistantId={assistantId} />
     ) : null}
-    <div className="bg-muted text-foreground max-w-[85%] whitespace-pre-wrap break-words rounded-2xl rounded-br-md px-3.5 py-2 text-sm leading-relaxed">
+    {/* `anywhere`, not `break-word`: a pasted token must not set the column's minimum width either. */}
+    <div className="bg-muted text-foreground wrap-anywhere max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-md px-3.5 py-2 text-sm leading-relaxed">
       {message.content}
     </div>
     {message.status === 'failed' ? (

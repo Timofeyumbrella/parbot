@@ -103,7 +103,8 @@ The app is one Next.js project; the widget is built into it before `next build`.
    endpoint for `<app url>/api/stripe/webhook` with the subscription events, set
    `STRIPE_WEBHOOK_SECRET`, then `BILLING_PROVIDER=stripe`. Test cards: `4242 4242 4242 4242`.
 5. **Demo content.** Run the seed against the hosted project by pointing `.env` at it, then set
-   `NEXT_PUBLIC_DEMO_ASSISTANT_KEY` on Vercel and redeploy.
+   `NEXT_PUBLIC_DEMO_ASSISTANT_KEY` on Vercel and redeploy. The key turns on the ⌘K palette on the
+   landing page; the hero's example conversation is scripted and needs no key.
 
 ## Layout
 
