@@ -9,6 +9,15 @@ export {
   embeddingText,
   firstChunkDeadlineFrom,
 } from './gemini';
+export {
+  activeDailyLimit,
+  type DailyLimitKind,
+  type DailyLimitNotice,
+  forgetDailyLimits,
+  nextDailyReset,
+  parseQuotaRefusal,
+  type QuotaRefusal,
+} from './quota';
 export { createStubProvider, stubAnswer, stubEmbedding } from './stub';
 
 const setting = (value: string | undefined) => (value?.trim() ? value.trim() : undefined);
