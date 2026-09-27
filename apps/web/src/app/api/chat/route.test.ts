@@ -10,6 +10,9 @@ const session = vi.hoisted(() => ({
     name: string;
     instructions: string | null;
   } | null,
+  /** The caller's projects, by id and assistant, as row level security lets them see them. */
+  projects: [] as { id: string; assistant_id: string }[],
+  lookups: [] as { table: string; filters: Record<string, unknown> }[],
 }));
 
 const engine = vi.hoisted(() => ({
@@ -21,11 +24,33 @@ vi.mock('@/lib/session', () => ({
   getSession: vi.fn(async () => ({
     user: session.user,
     supabase: {
-      from: () => ({
-        select: () => ({
-          eq: () => ({ maybeSingle: async () => ({ data: session.assistant, error: null }) }),
-        }),
-      }),
+      from: (table: string) => {
+        const filters: Record<string, unknown> = {};
+        const query = {
+          select: () => query,
+          eq: (column: string, value: unknown) => {
+            filters[column] = value;
+
+            return query;
+          },
+          maybeSingle: async () => {
+            session.lookups.push({ table, filters });
+
+            if (table === 'chat_projects') {
+              const found = session.projects.find(
+                (project) =>
+                  project.id === filters.id && project.assistant_id === filters.assistant_id,
+              );
+
+              return { data: found ? { id: found.id } : null, error: null };
+            }
+
+            return { data: session.assistant, error: null };
+          },
+        };
+
+        return query;
+      },
     },
   })),
 }));
@@ -73,6 +98,8 @@ describe('POST /api/chat', () => {
   beforeEach(() => {
     session.user = { id: 'user-1' };
     session.assistant = { id: ASSISTANT, owner_id: 'user-1', name: 'Docs', instructions: null };
+    session.projects = [];
+    session.lookups = [];
     engine.streamAnswer.mockImplementation(async function* () {
       yield {
         type: 'meta',
@@ -307,5 +334,93 @@ describe('POST /api/chat', () => {
     }
 
     expect(engine.streamAnswer).not.toHaveBeenCalled();
+  });
+
+  describe('projects', () => {
+    const PROJECT = '66666666-6666-4666-8666-666666666666';
+
+    it("starts the conversation in the caller's project on this assistant", async () => {
+      session.projects = [{ id: PROJECT, assistant_id: ASSISTANT }];
+
+      const response = await post({
+        assistantId: ASSISTANT,
+        conversationId: CONVERSATION,
+        message: 'What does the pricing sheet say?',
+        projectId: PROJECT,
+      });
+
+      expect(response.status).toBe(200);
+      await events(response);
+      // Looked up with the caller's own session, scoped to the assistant the request names.
+      expect(session.lookups).toContainEqual({
+        table: 'chat_projects',
+        filters: { id: PROJECT, assistant_id: ASSISTANT },
+      });
+      expect(engine.streamAnswer).toHaveBeenCalledWith(
+        expect.objectContaining({ projectId: PROJECT }),
+      );
+    });
+
+    it('sends no project when none was asked for, and looks none up', async () => {
+      await events(
+        await post({ assistantId: ASSISTANT, conversationId: CONVERSATION, message: 'hi' }),
+      );
+
+      expect(engine.streamAnswer.mock.calls[0]![0].projectId).toBeUndefined();
+      expect(session.lookups.map((lookup) => lookup.table)).not.toContain('chat_projects');
+    });
+
+    it("answers 404 for a project the caller cannot see, or another assistant's", async () => {
+      // Row level security hides another account's projects, so the lookup finds nothing.
+      const stranger = await post({
+        assistantId: ASSISTANT,
+        conversationId: CONVERSATION,
+        message: 'hi',
+        projectId: PROJECT,
+      });
+
+      session.projects = [{ id: PROJECT, assistant_id: '77777777-7777-4777-8777-777777777777' }];
+
+      const otherAssistant = await post({
+        assistantId: ASSISTANT,
+        conversationId: CONVERSATION,
+        message: 'hi',
+        projectId: PROJECT,
+      });
+
+      for (const response of [stranger, otherAssistant]) {
+        expect(response.status).toBe(404);
+        expect(await events(response)).toEqual([
+          {
+            type: 'error',
+            code: 'not_found',
+            message:
+              'That project no longer exists. Start the chat outside it, or pick another project.',
+          },
+        ]);
+      }
+
+      expect(engine.streamAnswer).not.toHaveBeenCalled();
+    });
+
+    it('refuses a project id that is not an id', async () => {
+      const response = await post({
+        assistantId: ASSISTANT,
+        conversationId: CONVERSATION,
+        message: 'hi',
+        projectId: 'my-project',
+      });
+
+      expect(response.status).toBe(400);
+      expect(await events(response)).toEqual([
+        {
+          type: 'error',
+          code: 'bad_request',
+          message:
+            'That project link is not valid. Open the project from the chat sidebar and try again.',
+        },
+      ]);
+      expect(engine.streamAnswer).not.toHaveBeenCalled();
+    });
   });
 });
