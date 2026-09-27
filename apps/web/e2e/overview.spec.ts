@@ -25,7 +25,6 @@ const USED_THIS_MONTH = 150;
 type Seeded = {
   userId: string;
   assistantId: string;
-  emptyAssistantId: string;
   dislikedConversationId: string;
   dislikedMessageId: string;
 };
@@ -174,17 +173,6 @@ const seed = async (service: SupabaseClient, email: string): Promise<Seeded> => 
         name: 'Acme Docs (overview e2e)',
         slug: `overview-e2e-${tag}`,
         lead_capture: true,
-      })
-      .select('id')
-      .single(),
-  );
-  const empty = must(
-    await service
-      .from('assistants')
-      .insert({
-        owner_id: userId,
-        name: 'Quiet Docs (overview e2e)',
-        slug: `overview-quiet-${tag}`,
       })
       .select('id')
       .single(),
@@ -353,7 +341,6 @@ const seed = async (service: SupabaseClient, email: string): Promise<Seeded> => 
   return {
     userId,
     assistantId,
-    emptyAssistantId: empty.id as string,
     dislikedConversationId: disliked!.conversationId,
     dislikedMessageId: disliked!.messageId,
   };
@@ -607,11 +594,44 @@ test.describe('the Overview', () => {
     await expect(section(page, 'leads-summary').getByTestId('leads-count')).toHaveText('2');
   });
 
-  test('an assistant with no traffic yet shows the first-use state', async () => {
-    await visit(page, `/a/${seeded.emptyAssistantId}`);
+  test('an assistant with no traffic yet shows the first-use state', async ({ browser }) => {
+    // Its own account: an account may be limited to one assistant.
+    const quietEmail = testEmail('overview-quiet');
 
-    await expect(page.getByTestId('first-use')).toBeVisible();
-    await expect(page.getByTestId('answer-quality')).toHaveCount(0);
-    await expect(page.getByRole('navigation', { name: 'Period' })).toHaveCount(0);
+    try {
+      const { data: created, error } = await service.auth.admin.createUser({
+        email: quietEmail,
+        password: PASSWORD,
+        email_confirm: true,
+      });
+
+      if (error || !created.user) {
+        throw new Error(error?.message ?? 'The throwaway account could not be created.');
+      }
+
+      const quiet = must(
+        await service
+          .from('assistants')
+          .insert({
+            owner_id: created.user.id,
+            name: 'Quiet Docs (overview e2e)',
+            slug: `overview-quiet-${Date.now().toString(36)}`,
+          })
+          .select('id')
+          .single(),
+      );
+      const quietPage = await browser.newPage();
+
+      try {
+        await signIn(quietPage, quietEmail, `/a/${quiet.id as string}`);
+        await expect(quietPage.getByTestId('first-use')).toBeVisible();
+        await expect(quietPage.getByTestId('answer-quality')).toHaveCount(0);
+        await expect(quietPage.getByRole('navigation', { name: 'Period' })).toHaveCount(0);
+      } finally {
+        await quietPage.close();
+      }
+    } finally {
+      await removeAccount(quietEmail);
+    }
   });
 });

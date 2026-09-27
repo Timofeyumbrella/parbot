@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
-import { parseAddSourceTab } from '@/components/knowledge/add-source-dialog';
+import { parseAddSourceTab } from '@/components/knowledge/add-source-tab';
 import { KnowledgeScreen } from '@/components/knowledge/knowledge-screen';
 import { PageContainer } from '@/components/page-header';
 import { getAccountPlan, getAccountUsage } from '@/lib/account';

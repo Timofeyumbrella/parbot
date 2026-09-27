@@ -30,9 +30,10 @@ import {
   uploadTypeFor,
 } from '@/lib/uploads';
 
+import type { AddSourceTab } from './add-source-tab';
 import { optimisticSource } from './optimistic';
 
-export type AddSourceTab = 'url' | 'sitemap' | 'upload' | 'text';
+export type { AddSourceTab } from './add-source-tab';
 
 type RemoteOrTextKind = Exclude<AddSourceTab, 'upload'>;
 
@@ -52,13 +53,6 @@ export const ADD_SOURCE_TABS: {
     blurb: 'Notes, FAQs, anything in plain text.',
   },
 ];
-
-/** Reads `?add=` into a tab of the dialog, or null when the dialog should stay closed. */
-export const parseAddSourceTab = (value: string | string[] | undefined): AddSourceTab | null => {
-  const raw = Array.isArray(value) ? value[0] : value;
-
-  return ADD_SOURCE_TABS.find((tab) => tab.id === raw)?.id ?? null;
-};
 
 export type AddSourceDialogProps = {
   assistantId: string;

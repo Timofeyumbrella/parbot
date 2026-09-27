@@ -29,7 +29,7 @@ export const PlanUsage = ({ planName, projection }: PlanUsageProps) => {
     <Section
       testId="plan-usage"
       title="Usage against the plan"
-      why={`Answers this month across all your assistants, against the ${planName} limit. When it runs out, readers stop getting answers.`}
+      why={`Answers used on your account this month, against the ${planName} plan. When they run out, readers stop getting answers.`}
       footer={
         exceedsLimit ? (
           <NextStep href="/billing">Compare plans in Billing</NextStep>

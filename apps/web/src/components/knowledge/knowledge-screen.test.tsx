@@ -7,7 +7,7 @@ import type { AddSourceState } from '@/actions/sources';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import type { Source } from '@/lib/db';
 
-import { parseAddSourceTab } from './add-source-dialog';
+import { parseAddSourceTab } from './add-source-tab';
 import { KnowledgeScreen, STUB_NOTICE } from './knowledge-screen';
 import { sourcesQueryKey } from './use-sources';
 
