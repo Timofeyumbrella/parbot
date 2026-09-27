@@ -1,7 +1,15 @@
 // @vitest-environment node
+import type { GoogleGenAI } from '@google/genai';
 import { describe, expect, it, vi } from 'vitest';
 
-import { ModelBusyError, ProviderError, ProviderLimitError } from '@/lib/ai';
+import {
+  createGeminiProvider,
+  forgetDailyLimits,
+  ModelBusyError,
+  ProviderError,
+  ProviderLimitError,
+} from '@/lib/ai';
+import { dailyLimit } from '@/lib/ai/quota.fixtures';
 import { pausedUntil } from '@/lib/knowledge/indexing-paused';
 
 import { BUSY_FAILURE, GENERIC_FAILURE, humanizeIngestError, IngestError } from './errors';
@@ -43,6 +51,31 @@ describe('humanizeIngestError', () => {
     );
     expect(pausedUntil(message)).toEqual(resetAt);
     expect(message).not.toMatch(/gemini|quota|429|busy/i);
+  });
+
+  it('says the same for the refusal the Gemini provider turns a daily-cap 429 into', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-09-28T02:27:00Z'));
+
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const client = {
+      models: { embedContent: () => Promise.reject(dailyLimit()) },
+    } as unknown as Pick<GoogleGenAI, 'models'>;
+    const provider = createGeminiProvider({ apiKey: 'test', clientImpl: client });
+
+    try {
+      const cause: unknown = await provider
+        .embed([{ title: 'Guide', text: 'Keys live in Settings.' }], 'document')
+        .catch((error: unknown) => error);
+
+      expect(humanizeIngestError(cause)).toBe(
+        "Indexing paused: the AI provider's daily limit for this deployment is used up. It resets at 2026-09-28T07:00:00.000Z; re-index after that.",
+      );
+    } finally {
+      vi.useRealTimers();
+      warn.mockRestore();
+      forgetDailyLimits();
+    }
   });
 
   it('keeps the busy sentence for a per-minute limit', () => {

@@ -1,14 +1,19 @@
 // @vitest-environment node
+import type { GoogleGenAI } from '@google/genai';
 import type { ChatStreamEvent } from '@parbot/shared';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   type AiProvider,
+  createGeminiProvider,
+  forgetDailyLimits,
   type GenerateChunk,
   type GenerateResult,
   ModelBusyError,
   ProviderLimitError,
 } from '@/lib/ai';
+import { QUERY_QUOTA_WAIT_MS } from '@/lib/ai/gemini';
+import { dailyLimit, minuteLimit } from '@/lib/ai/quota.fixtures';
 import { PLANS } from '@/lib/plans';
 
 import { ANSWER_ERROR_COPY, historyTurns, streamAnswer } from './answer';
@@ -1083,5 +1088,109 @@ describe('streamAnswer unanswered', () => {
       answered: true,
       citations: [expect.objectContaining({ index: 1, documentId: 'd1' })],
     });
+  });
+});
+
+describe('streamAnswer on the Gemini provider under quota limits', () => {
+  const NOW = new Date('2026-09-28T02:27:00Z');
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    vi.spyOn(console, 'info').mockImplementation(() => undefined);
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+    forgetDailyLimits();
+  });
+
+  /** The real provider on a client whose embeddings answer with `refusal`; no model is reached. */
+  const geminiRefusing = (refusal: () => unknown) => {
+    const calls = { embed: 0, generate: 0 };
+    const client = {
+      models: {
+        embedContent: () => {
+          calls.embed += 1;
+
+          return Promise.reject(refusal());
+        },
+        generateContentStream: () => {
+          calls.generate += 1;
+
+          return Promise.reject(new Error('The model was asked.'));
+        },
+      },
+    } as unknown as Pick<GoogleGenAI, 'models'>;
+
+    return { provider: createGeminiProvider({ apiKey: 'test', clientImpl: client }), calls };
+  };
+
+  const ask = (provider: AiProvider) => {
+    const fake = fakeService({ conversationReads: [ownConversation], chunks: [chunk('A.')] });
+    const done = collect(
+      streamAnswer({
+        service: fake.service,
+        provider,
+        assistant,
+        conversation: { id: 'c1', channel: 'app' },
+        message: 'Where do I create an API key?',
+      }),
+    );
+
+    return { fake, done };
+  };
+
+  it('stops a question at the daily limit at once and says when answers resume', async () => {
+    const { provider, calls } = geminiRefusing(() => dailyLimit());
+    const { fake, done } = ask(provider);
+
+    // No timer is advanced: the answer comes without a wait of any kind.
+    const events = await done;
+
+    expect(events.at(-1)).toEqual({
+      type: 'error',
+      code: 'provider_limit',
+      message:
+        "Answers are paused: the AI provider's daily limit for this deployment is used up. Try again in about 5 hours.",
+      retryAt: '2026-09-28T07:00:00.000Z',
+    });
+    expect(calls).toEqual({ embed: 1, generate: 0 });
+    expect(fake.rpcNames()).toEqual(['release_message']);
+  });
+
+  it('gives up at once on a per-minute quota that needs longer than a reader waits', async () => {
+    const { provider, calls } = geminiRefusing(() => minuteLimit('37s'));
+    const events = await ask(provider).done;
+
+    expect(events.at(-1)).toEqual({
+      type: 'error',
+      code: 'model_busy',
+      message: ANSWER_ERROR_COPY.model_busy,
+    });
+    expect(calls.embed).toBe(1);
+  });
+
+  it('waits a few seconds at most for a quota that frees in a moment, then gives up', async () => {
+    const { provider, calls } = geminiRefusing(() => minuteLimit('2s'));
+    const { done } = ask(provider);
+    let settled = false;
+
+    void done.then(() => {
+      settled = true;
+    });
+
+    await vi.advanceTimersByTimeAsync(QUERY_QUOTA_WAIT_MS - 1);
+    expect(settled).toBe(false);
+    expect(calls.embed).toBe(1);
+
+    await vi.advanceTimersByTimeAsync(1);
+
+    const events = await done;
+
+    expect(events.at(-1)).toMatchObject({ code: 'model_busy' });
+    expect(calls.embed).toBe(2);
   });
 });
