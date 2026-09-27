@@ -89,8 +89,8 @@ export const AnswerQuality = ({
       footer={
         current.unanswered > 0 ? (
           <NextStep href={inboxHref(assistantId, 'conversations', 'unanswered')}>
-            Read the {plural(current.unanswered, 'unanswered question', 'unanswered questions')}{' '}
-            in the Inbox
+            Read the {plural(current.unanswered, 'unanswered question', 'unanswered questions')} in
+            the Inbox
           </NextStep>
         ) : (
           'Every finished answer in this period came from the docs.'

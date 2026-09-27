@@ -165,7 +165,9 @@ describe('trigram similarity', () => {
     ).toBeGreaterThanOrEqual(0.5);
     expect(similarity('What is palette mode?', 'What is bubble mode?')).toBeLessThan(0.5);
     expect(similarity('Is there an API?', 'Is there a Slack integration?')).toBeLessThan(0.5);
-    expect(similarity('How do I rotate an API key?', 'How do I delete my account?')).toBeLessThan(0.2);
+    expect(similarity('How do I rotate an API key?', 'How do I delete my account?')).toBeLessThan(
+      0.2,
+    );
   });
 
   it('pads words like pg_trgm does', () => {
@@ -252,9 +254,9 @@ describe('groupGaps', () => {
 
 describe('firstLine', () => {
   it('skips code and markdown to the first line a reader would see', () => {
-    expect(firstLine('Add one script tag to any page:\n\n```html\n<script src="x"></script>\n```')).toBe(
-      'Add one script tag to any page:',
-    );
+    expect(
+      firstLine('Add one script tag to any page:\n\n```html\n<script src="x"></script>\n```'),
+    ).toBe('Add one script tag to any page:');
     expect(firstLine('```bash\nnpm i\n```\n\n## Install\nRun it')).toBe('Install');
     expect(firstLine('1. **Create an assistant** in the dashboard [1].')).toBe(
       'Create an assistant in the dashboard.',

@@ -73,11 +73,7 @@ export type Change = {
 };
 
 const toneOf = (direction: Change['direction'], higherIsBetter: boolean): Tone =>
-  direction === 'flat'
-    ? 'neutral'
-    : (direction === 'up') === higherIsBetter
-      ? 'good'
-      : 'bad';
+  direction === 'flat' ? 'neutral' : (direction === 'up') === higherIsBetter ? 'good' : 'bad';
 
 /**
  * How a value moved against the previous period, or null when either side has nothing to compare.
@@ -255,14 +251,20 @@ export const groupGaps = (rows: GapRow[], threshold = GAP_SIMILARITY): GapGroup[
   const ordered = [...rows].sort(
     (a, b) => b.asks - a.asks || Date.parse(b.lastAskedAt) - Date.parse(a.lastAskedAt),
   );
-  const groups: (GapGroup & { grams: Set<string> })[] = [];
+  const groups: GapGroup[] = [];
+  const leaders = new Map<GapGroup, Set<string>>();
 
   for (const row of ordered) {
     const grams = trigramsOf(row.question);
-    const group = groups.find((candidate) => trigramSimilarity(candidate.grams, grams) >= threshold);
+    const group = groups.find(
+      (candidate) => trigramSimilarity(leaders.get(candidate)!, grams) >= threshold,
+    );
 
     if (!group) {
-      groups.push({ ...row, variants: [], grams });
+      const created: GapGroup = { ...row, variants: [] };
+
+      groups.push(created);
+      leaders.set(created, grams);
       continue;
     }
 
@@ -275,9 +277,9 @@ export const groupGaps = (rows: GapRow[], threshold = GAP_SIMILARITY): GapGroup[
     }
   }
 
-  return groups
-    .map(({ grams: _grams, ...group }) => group)
-    .sort((a, b) => b.asks - a.asks || Date.parse(b.lastAskedAt) - Date.parse(a.lastAskedAt));
+  return groups.sort(
+    (a, b) => b.asks - a.asks || Date.parse(b.lastAskedAt) - Date.parse(a.lastAskedAt),
+  );
 };
 
 // ---------------------------------------------------------------------------

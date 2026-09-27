@@ -99,14 +99,14 @@ describe('AnswerQuality', () => {
     );
 
     for (const id of ['metric-answer-rate', 'metric-helpful', 'metric-time']) {
-      expect(metric(id).change).toHaveTextContent(
-        'Nothing to compare with in the 30 days before',
-      );
+      expect(metric(id).change).toHaveTextContent('Nothing to compare with in the 30 days before');
     }
 
     // Twelve ratings are enough to read without a warning.
     expect(metric('metric-helpful').caption).toBe('12 of 12 ratings were a thumb up.');
-    expect(screen.getByText('Every finished answer in this period came from the docs.')).toBeVisible();
+    expect(
+      screen.getByText('Every finished answer in this period came from the docs.'),
+    ).toBeVisible();
   });
 
   it('shows a dash rather than 0% when nothing was answered or rated', () => {

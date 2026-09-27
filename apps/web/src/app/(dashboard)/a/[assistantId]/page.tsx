@@ -86,46 +86,35 @@ export default async function OverviewPage({
   const range = { assistant: assistantId, since: sinceIso };
 
   // Every read goes through the owner's session, so row level security scopes each one.
-  const [
-    account,
-    usage,
-    totals,
-    daily,
-    gaps,
-    disliked,
-    cited,
-    uncited,
-    pages,
-    indexed,
-    messages,
-  ] = await Promise.all([
-    getAccountPlan(),
-    supabase
-      .from('usage_counters')
-      .select('value')
-      .eq('owner_id', user.id)
-      .eq('metric', 'messages')
-      .eq('period_start', usagePeriodStart(now))
-      .maybeSingle(),
-    supabase.rpc('overview_totals', {
-      ...range,
-      previous_since: previousPeriodStart(since, days).toISOString(),
-    }),
-    supabase.rpc('assistant_daily', range),
-    supabase.rpc('knowledge_gaps', { ...range, max_rows: GAP_WORDINGS }),
-    supabase.rpc('disliked_answers', { ...range, max_rows: DISLIKED_ROWS }),
-    supabase.rpc('cited_documents', { ...range, max_rows: DOCUMENT_ROWS }),
-    supabase.rpc('uncited_documents', { ...range, max_rows: DOCUMENT_ROWS }),
-    supabase.rpc('page_activity', { ...range, max_rows: PAGE_ROWS }),
-    supabase
-      .from('documents')
-      .select('id', { count: 'exact', head: true })
-      .eq('assistant_id', assistantId),
-    supabase
-      .from('messages')
-      .select('id', { count: 'exact', head: true })
-      .eq('assistant_id', assistantId),
-  ]);
+  const [account, usage, totals, daily, gaps, disliked, cited, uncited, pages, indexed, messages] =
+    await Promise.all([
+      getAccountPlan(),
+      supabase
+        .from('usage_counters')
+        .select('value')
+        .eq('owner_id', user.id)
+        .eq('metric', 'messages')
+        .eq('period_start', usagePeriodStart(now))
+        .maybeSingle(),
+      supabase.rpc('overview_totals', {
+        ...range,
+        previous_since: previousPeriodStart(since, days).toISOString(),
+      }),
+      supabase.rpc('assistant_daily', range),
+      supabase.rpc('knowledge_gaps', { ...range, max_rows: GAP_WORDINGS }),
+      supabase.rpc('disliked_answers', { ...range, max_rows: DISLIKED_ROWS }),
+      supabase.rpc('cited_documents', { ...range, max_rows: DOCUMENT_ROWS }),
+      supabase.rpc('uncited_documents', { ...range, max_rows: DOCUMENT_ROWS }),
+      supabase.rpc('page_activity', { ...range, max_rows: PAGE_ROWS }),
+      supabase
+        .from('documents')
+        .select('id', { count: 'exact', head: true })
+        .eq('assistant_id', assistantId),
+      supabase
+        .from('messages')
+        .select('id', { count: 'exact', head: true })
+        .eq('assistant_id', assistantId),
+    ]);
 
   const failure = [
     usage,
