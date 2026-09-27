@@ -68,8 +68,8 @@ describe('MessageBubble for the assistant', () => {
     expect(chips).toHaveLength(2);
     expect(chips[0]).toHaveAttribute('href', 'https://docs.acme.test/auth');
     expect(chips[0]).toHaveAttribute('target', '_blank');
-    // A source without a url points at the sources row instead.
-    expect(chips[1]).toHaveAttribute('href', '#sources-a1');
+    // A source without a url opens in the document viewer, in the same tab.
+    expect(chips[1]).toHaveAttribute('href', '/a/asst/knowledge/documents/d2');
     expect(chips[1]).not.toHaveAttribute('target');
   });
 
@@ -84,8 +84,10 @@ describe('MessageBubble for the assistant', () => {
       'https://docs.acme.test/auth',
     );
     expect(within(sources).getByText('docs.acme.test')).toBeInTheDocument();
-    expect(within(sources).getByText('Pasted notes')).toBeInTheDocument();
-    expect(within(sources).queryByRole('link', { name: /Pasted notes/ })).not.toBeInTheDocument();
+    expect(within(sources).getByRole('link', { name: /Pasted notes/ })).toHaveAttribute(
+      'href',
+      '/a/asst/knowledge/documents/d2',
+    );
   });
 
   it('renders fenced code with a language label and a copy button', async () => {

@@ -15,6 +15,7 @@ const citationSchema = z.object({
   title: z.string(),
   url: z.string().nullable().optional(),
   snippet: z.string().optional(),
+  chunkId: z.string().optional(),
 });
 
 /** Citations are stored as JSON; anything malformed is dropped rather than shown broken. */
@@ -31,6 +32,8 @@ export const parseCitations = (value: unknown): Citation[] => {
 };
 
 export type TranscriptMessageProps = {
+  /** Whose document viewer a file's citation opens in. */
+  assistantId: string;
   message: Pick<
     Message,
     'id' | 'role' | 'content' | 'citations' | 'answered' | 'feedback' | 'created_at'
@@ -43,7 +46,7 @@ export type TranscriptMessageProps = {
  * components, so an answer reads the same in the Inbox as it did in the chat, plus feedback and the
  * answered flag.
  */
-export const TranscriptMessage = ({ message, now }: TranscriptMessageProps) => {
+export const TranscriptMessage = ({ assistantId, message, now }: TranscriptMessageProps) => {
   const isUser = message.role === 'user';
   const citations = isUser ? [] : parseCitations(message.citations);
   const unanswered = !isUser && message.answered === false;
@@ -78,12 +81,17 @@ export const TranscriptMessage = ({ message, now }: TranscriptMessageProps) => {
           {isUser ? (
             <p className="whitespace-pre-wrap">{message.content}</p>
           ) : (
-            <AnswerMarkdown content={message.content} citations={citations} sourcesId={sourcesId} />
+            <AnswerMarkdown
+              content={message.content}
+              citations={citations}
+              sourcesId={sourcesId}
+              assistantId={assistantId}
+            />
           )}
 
           {citations.length > 0 ? (
             <div className="mt-2">
-              <Sources citations={citations} id={sourcesId} />
+              <Sources citations={citations} id={sourcesId} assistantId={assistantId} />
             </div>
           ) : null}
         </div>

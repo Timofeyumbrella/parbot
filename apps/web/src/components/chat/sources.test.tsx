@@ -88,6 +88,54 @@ describe('Sources', () => {
   });
 });
 
+describe('Sources for files', () => {
+  const file = (index: number, chunkId?: string): Citation => ({
+    index,
+    documentId: 'd-limits',
+    title: 'limits.md',
+    url: null,
+    snippet: `Passage ${index}`,
+    ...(chunkId ? { chunkId } : {}),
+  });
+
+  it('opens a file in the viewer at the passage of its lowest marker', () => {
+    render(<Sources citations={[file(3, 'c3'), file(1, 'c1')]} id="s" assistantId="asst" />);
+
+    const link = within(screen.getByTestId('sources')).getByRole('link', { name: /limits\.md/ });
+
+    expect(link).toHaveAttribute('href', '/a/asst/knowledge/documents/d-limits?passage=c1');
+    expect(link).not.toHaveAttribute('target');
+    expect(link).toHaveTextContent(/^13limits\.md$/);
+  });
+
+  it('opens an answer saved before passages were recorded at the top of the page', () => {
+    render(<Sources citations={[file(2)]} id="s" assistantId="asst" />);
+
+    expect(screen.getByRole('link', { name: /limits\.md/ })).toHaveAttribute(
+      'href',
+      '/a/asst/knowledge/documents/d-limits',
+    );
+  });
+
+  it('points each inline marker at its own passage', () => {
+    const { container } = render(
+      <AnswerMarkdown
+        content="Five projects [1]. Daily exports [3]."
+        citations={[file(1, 'c1'), file(3, 'c3')]}
+        sourcesId="sources-m1"
+        assistantId="asst"
+      />,
+    );
+
+    const markers = [...container.querySelectorAll('sup[data-citation] a')];
+
+    expect(markers.map((marker) => marker.getAttribute('href'))).toEqual([
+      '/a/asst/knowledge/documents/d-limits?passage=c1',
+      '/a/asst/knowledge/documents/d-limits?passage=c3',
+    ]);
+  });
+});
+
 describe('AnswerMarkdown citation markers', () => {
   it('turns every cited marker into a chip when the cited indexes skip some', () => {
     const { container } = render(

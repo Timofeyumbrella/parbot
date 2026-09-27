@@ -120,7 +120,12 @@ export default async function ConversationPage({
             </div>
           ) : (
             (messages.data ?? []).map((message) => (
-              <TranscriptMessage key={message.id} message={message} now={now} />
+              <TranscriptMessage
+                key={message.id}
+                assistantId={assistantId}
+                message={message}
+                now={now}
+              />
             ))
           )}
         </section>

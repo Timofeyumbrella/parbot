@@ -2,6 +2,7 @@
 
 import type { Citation } from '@parbot/shared';
 import { cn } from 'cn';
+import Link from 'next/link';
 import { memo, useMemo } from 'react';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import rehypeHighlight from 'rehype-highlight';
@@ -16,14 +17,17 @@ import {
   rehypeStreamingCaret,
   rehypeStripCitations,
 } from '@/lib/chat/markdown';
+import { documentHref } from '@/lib/knowledge/links';
 
 import './answer.css';
 
 type AnswerMarkdownProps = {
   content: string;
   citations: Citation[];
-  /** The id the sources row carries, so a chip without a url can jump to it. */
+  /** The id the sources row carries, so a chip with nowhere else to go can jump to it. */
   sourcesId: string;
+  /** Whose document viewer a file's citation opens in; without it the chip jumps to the row. */
+  assistantId?: string;
   streaming?: boolean;
   /** Removes `[n]` markers instead of linking them: for a stopped answer that got no citations. */
   stripCitations?: boolean;
@@ -32,29 +36,43 @@ type AnswerMarkdownProps = {
 
 const remarkPlugins = [remarkGfm];
 
+const CHIP_CLASS =
+  'bg-accent text-accent-foreground hover:bg-primary hover:text-primary-foreground inline-flex h-4 min-w-4 items-center justify-center rounded-sm px-1 align-baseline font-mono text-[10px] font-medium no-underline transition-colors';
+
 const CitationChip = ({
   index,
   citation,
   sourcesId,
+  assistantId,
 }: {
   index: number;
   citation?: Citation;
   sourcesId: string;
+  assistantId?: string;
 }) => {
-  const href = citation?.url ?? `#${sourcesId}`;
-  const external = Boolean(citation?.url);
+  // A web page opens itself; a file or a note opens in the viewer at the passage this marker cites.
+  const viewer =
+    citation && !citation.url && assistantId && citation.documentId
+      ? documentHref(assistantId, citation.documentId, citation.chunkId)
+      : null;
 
   return (
     <sup data-citation={index} className="mx-0.5">
-      <a
-        href={href}
-        target={external ? '_blank' : undefined}
-        rel={external ? 'noreferrer' : undefined}
-        title={citation?.title}
-        className="bg-accent text-accent-foreground hover:bg-primary hover:text-primary-foreground inline-flex h-4 min-w-4 items-center justify-center rounded-sm px-1 align-baseline font-mono text-[10px] font-medium no-underline transition-colors"
-      >
-        {index}
-      </a>
+      {viewer ? (
+        <Link href={viewer} title={citation?.title} className={CHIP_CLASS}>
+          {index}
+        </Link>
+      ) : (
+        <a
+          href={citation?.url ?? `#${sourcesId}`}
+          target={citation?.url ? '_blank' : undefined}
+          rel={citation?.url ? 'noreferrer' : undefined}
+          title={citation?.title}
+          className={CHIP_CLASS}
+        >
+          {index}
+        </a>
+      )}
     </sup>
   );
 };
@@ -68,7 +86,11 @@ const domProps = <T extends { node?: unknown }>(props: T): Omit<T, 'node'> => {
   return rest as Omit<T, 'node'>;
 };
 
-const buildComponents = (citations: Citation[], sourcesId: string): Components => ({
+const buildComponents = (
+  citations: Citation[],
+  sourcesId: string,
+  assistantId: string | undefined,
+): Components => ({
   pre: ({ node, children }) => {
     const element = node as unknown as HastElement | undefined;
     const code = element?.children.find((child) => child.type === 'element') as
@@ -98,6 +120,7 @@ const buildComponents = (citations: Citation[], sourcesId: string): Components =
         index={index}
         citation={citations.find((citation) => citation.index === index)}
         sourcesId={sourcesId}
+        assistantId={assistantId}
       />
     );
   },
@@ -127,6 +150,7 @@ export const AnswerMarkdown = memo(function AnswerMarkdown({
   content,
   citations,
   sourcesId,
+  assistantId,
   streaming = false,
   stripCitations = false,
   className,
@@ -153,7 +177,10 @@ export const AnswerMarkdown = memo(function AnswerMarkdown({
     return plugins;
   }, [max, streaming, stripCitations]);
 
-  const components = useMemo(() => buildComponents(citations, sourcesId), [citations, sourcesId]);
+  const components = useMemo(
+    () => buildComponents(citations, sourcesId, assistantId),
+    [citations, sourcesId, assistantId],
+  );
 
   return (
     <div className={cn('answer-prose', className)}>

@@ -118,6 +118,7 @@ const AssistantBubble = ({
             content={message.content}
             citations={message.citations}
             sourcesId={sourcesId}
+            assistantId={assistantId}
             streaming={streaming}
             stripCitations={message.status === 'stopped' && message.citations.length === 0}
             className={cn(unanswered && 'text-muted-foreground')}
@@ -135,7 +136,7 @@ const AssistantBubble = ({
         ) : null}
 
         {message.citations.length > 0 ? (
-          <Sources citations={message.citations} id={sourcesId} />
+          <Sources citations={message.citations} id={sourcesId} assistantId={assistantId} />
         ) : null}
 
         {settled ? (
