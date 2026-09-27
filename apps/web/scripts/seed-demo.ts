@@ -43,8 +43,6 @@ import {
   citationFor,
   demoAppUrl,
   demoExchanges,
-  type LiveDocument,
-  type LivePassage,
   repointCitations,
   scheduleHistory,
 } from './demo-history';
@@ -52,7 +50,9 @@ import {
   countHistory,
   deleteOldHistory,
   type HistoryCounts,
+  loadKnowledge,
   must,
+  PAGE_SIZE,
   type Service,
 } from './demo-store';
 import { parseSeedFlags } from './seed-flags';
@@ -65,8 +65,6 @@ const DEMO_EMAIL = 'demo@parbot.dev';
 const DEMO_PASSWORD = 'parbot-demo';
 const DEMO_NAME = 'Demo Founder';
 const SLUG = 'parbot-docs';
-/** Rows per request when reading every saved answer; PostgREST caps a response at 1,000. */
-const PAGE_SIZE = 500;
 
 const required = (name: string) => {
   const value = process.env[name]?.trim();
@@ -293,45 +291,6 @@ const indexDocs = async (service: Service, ownerId: string, assistantId: string)
       `${title}: ${source?.status ?? 'unknown'}${source?.chunk_count ? `, ${source.chunk_count} passages` : ''}${source?.error ? `, ${source.error}` : ''}`,
     );
   }
-};
-
-/** The assistant's pages and passages as they are indexed now. */
-const loadKnowledge = async (service: Service, assistantId: string) => {
-  const documents =
-    must(
-      await service.from('documents').select('id, title, url').eq('assistant_id', assistantId),
-      'load the indexed pages',
-    ) ?? [];
-  const passages: LivePassage[] = [];
-
-  for (let from = 0; ; from += PAGE_SIZE) {
-    const rows =
-      must(
-        await service
-          .from('chunks')
-          .select('id, document_id, heading, content, position')
-          .eq('assistant_id', assistantId)
-          .order('id')
-          .range(from, from + PAGE_SIZE - 1),
-        'load the indexed passages',
-      ) ?? [];
-
-    passages.push(
-      ...rows.map((row) => ({
-        id: row.id,
-        documentId: row.document_id,
-        heading: row.heading,
-        content: row.content,
-        position: row.position,
-      })),
-    );
-
-    if (rows.length < PAGE_SIZE) {
-      break;
-    }
-  }
-
-  return { documents: documents satisfies LiveDocument[], passages };
 };
 
 /**

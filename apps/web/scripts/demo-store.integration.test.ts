@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import type { Database } from '../src/lib/db/types';
-import { countHistory, deleteOldHistory } from './demo-store';
+import { countHistory, deleteOldHistory, loadKnowledge } from './demo-store';
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'http://127.0.0.1:54321';
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -181,5 +181,91 @@ describe.skipIf(!serviceKey)('deleting the demo history', () => {
     expect(source.data?.id).toBe(sourceId);
     expect(assistant.data?.public_key).toBe(demo.publicKey);
     expect(others.data?.map(({ id }) => id)).toEqual([otherConversation]);
+  });
+});
+
+/**
+ * What the seed re-points saved citations against: every indexed page of the assistant, even past
+ * the 1,000 rows PostgREST returns at most. A page left out would send its citations to another
+ * page with the same title.
+ */
+describe.skipIf(!serviceKey)('loading the demo knowledge', () => {
+  const service = createClient<Database>(url, serviceKey || 'not-configured', {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const stamp = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+  const PAGES = 1_205;
+  let ownerId: string;
+  let assistantId: string;
+  const ids = new Set<string>();
+
+  beforeAll(async () => {
+    const { data, error } = await service.auth.admin.createUser({
+      email: `demo-store-knowledge-${stamp}@parbot.test`,
+      password: `pw-${crypto.randomUUID()}`,
+      email_confirm: true,
+    });
+
+    if (error || !data.user) {
+      throw new Error(error?.message ?? 'no user');
+    }
+
+    ownerId = data.user.id;
+
+    const { data: assistant } = await service
+      .from('assistants')
+      .insert({ owner_id: ownerId, name: 'Crawled', slug: `crawled-${stamp}` })
+      .select('id')
+      .single();
+
+    assistantId = assistant!.id;
+
+    const owned = { assistant_id: assistantId, owner_id: ownerId };
+    const { data: source } = await service
+      .from('sources')
+      .insert({ ...owned, kind: 'url', title: 'docs', uri: 'https://docs.acme.test' })
+      .select('id')
+      .single();
+    // A crawled site names many of its pages alike.
+    const { data: documents, error: insertError } = await service
+      .from('documents')
+      .insert(
+        Array.from({ length: PAGES }, (_, index) => ({
+          ...owned,
+          source_id: source!.id,
+          url: `https://docs.acme.test/${index}/overview`,
+          title: 'Overview',
+          content: `Page ${index}`,
+          checksum: `checksum-${index}`,
+        })),
+      )
+      .select('id');
+
+    if (insertError) {
+      throw new Error(insertError.message);
+    }
+
+    for (const { id } of documents ?? []) {
+      ids.add(id);
+    }
+  }, 60_000);
+
+  afterAll(async () => {
+    if (ownerId) {
+      await service.auth.admin.deleteUser(ownerId);
+    }
+  });
+
+  it('reads every page, past the 1,000 rows one response carries', async () => {
+    expect(ids.size).toBe(PAGES);
+
+    const { documents } = await loadKnowledge(service, assistantId);
+
+    expect(documents).toHaveLength(PAGES);
+    expect(new Set(documents.map(({ id }) => id))).toEqual(ids);
+    expect(documents[0]).toMatchObject({
+      title: 'Overview',
+      url: expect.stringMatching(/overview$/),
+    });
   });
 });

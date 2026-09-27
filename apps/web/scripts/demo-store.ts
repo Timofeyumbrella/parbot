@@ -1,14 +1,18 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 import type { Database } from '../src/lib/db/types';
+import type { LiveDocument, LivePassage } from './demo-history';
 
 /**
- * The demo history's rows in the database: counting them, and deleting them when the seed
- * refreshes the history. Separate from `seed-demo.ts` so the deletion can be tested against the
- * local database with a throwaway account instead of the demo.
+ * The demo's rows in the database: counting the history, deleting it when the seed refreshes it,
+ * and reading the knowledge its citations point at. Separate from `seed-demo.ts` so these can be
+ * tested against the local database with a throwaway account instead of the demo.
  */
 
 export type Service = SupabaseClient<Database>;
+
+/** Rows per request when reading a whole table; PostgREST caps a response at 1,000. */
+export const PAGE_SIZE = 500;
 
 /** Throws with what was being done when a request fails, and returns its data otherwise. */
 export const must = <T>(result: { data: T; error: { message: string } | null }, what: string) => {
@@ -109,4 +113,65 @@ export const deleteOldHistory = async (
   );
 
   return countRows(service, 'conversations', assistantId);
+};
+
+/**
+ * Every row a query matches, read `PAGE_SIZE` at a time: one response stops at PostgREST's
+ * max_rows, so a single read of a large table is an arbitrary part of it. The query must order by
+ * a unique column for the pages not to overlap.
+ */
+export const readAll = async <T>(
+  page: (
+    from: number,
+    to: number,
+  ) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>,
+  what: string,
+) => {
+  const rows: T[] = [];
+
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const batch = must(await page(from, from + PAGE_SIZE - 1), what) ?? [];
+
+    rows.push(...batch);
+
+    if (batch.length < PAGE_SIZE) {
+      return rows;
+    }
+  }
+};
+
+/**
+ * The assistant's pages and passages as they are indexed now, all of them: a page missing from
+ * the list would have its saved citations moved to another page with the same title.
+ */
+export const loadKnowledge = async (service: Service, assistantId: string) => {
+  const documents: LiveDocument[] = await readAll(
+    (from, to) =>
+      service
+        .from('documents')
+        .select('id, title, url')
+        .eq('assistant_id', assistantId)
+        .order('id')
+        .range(from, to),
+    'load the indexed pages',
+  );
+  const rows = await readAll(
+    (from, to) =>
+      service
+        .from('chunks')
+        .select('id, document_id, heading, content, position')
+        .eq('assistant_id', assistantId)
+        .order('id')
+        .range(from, to),
+    'load the indexed passages',
+  );
+  const passages: LivePassage[] = rows.map((row) => ({
+    id: row.id,
+    documentId: row.document_id,
+    heading: row.heading,
+    content: row.content,
+    position: row.position,
+  }));
+
+  return { documents, passages };
 };
