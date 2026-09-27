@@ -26,7 +26,7 @@ import {
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
-import type { WidgetSettings } from '@/lib/widget-api';
+import type { WidgetFormValues, WidgetSettings } from '@/lib/widget-api';
 
 import { PlanGate } from './plan-gate';
 import { Segmented } from './segmented';
@@ -43,7 +43,8 @@ type WidgetSettingsFormProps = {
   assistantId: string;
   settings: WidgetSettings;
   gates: WidgetPlanGates;
-  onSaved?: (settings: WidgetSettings) => void;
+  /** After a good save: what the server stored, and the config version it now serves. */
+  onSaved?: (settings: WidgetSettings, version: string) => void;
 };
 
 const initialState: WidgetFormState = { status: 'idle' };
@@ -55,20 +56,6 @@ export const WidgetSettingsForm = ({
   onSaved,
 }: WidgetSettingsFormProps) => {
   const [state, formAction, pending] = useActionState(saveWidgetSettings, initialState);
-
-  // React resets the form after every action. The uncontrolled fields therefore take their
-  // defaults from the last outcome: what the visitor typed after a failed save, what the server
-  // stored after a good one, and the row itself before either.
-  const draft = state.status === 'error' ? state.values : null;
-  const saved = state.status === 'saved' ? state.settings : settings;
-  // A gated control shows the free value, so what the reader sees matches what the widget does.
-  const theme = gates.customTheme ? saved.theme : DEFAULT_WIDGET_THEME;
-  const mode = gates.palette ? (draft?.mode ?? saved.mode) : 'bubble';
-  const checked = (field: 'hideBranding' | 'leadCapture', allowed: boolean) =>
-    allowed && (draft ? draft[field] === 'on' : saved[field]);
-
-  const [accent, setAccent] = useState(theme.accent.toLowerCase());
-  const [welcome, setWelcome] = useState(settings.welcomeMessage);
   // Each action result is announced once, however often the parent re-renders around it.
   const announced = useRef<number | null>(null);
 
@@ -81,16 +68,64 @@ export const WidgetSettingsForm = ({
 
     if (state.status === 'saved') {
       toast.success('Widget settings saved');
-      onSaved?.(state.settings);
+      onSaved?.(state.settings, state.version);
     } else {
       toast.error(state.error);
     }
   }, [state, onSaved]);
 
+  // React resets the form after every action, and a Radix switch resets itself to the value it
+  // had when it mounted, whatever its default says by then: a saved switch jumped back to the
+  // page-load value and the next save wrote that stale value. So the fields remount on every
+  // outcome and start from it: what the server stored after a good save, what the visitor typed
+  // after a failed one, and the row itself before either.
+  const outcome = state.status === 'idle' ? 'loaded' : `${state.status}-${state.at}`;
+
   return (
     <form action={formAction} className="flex min-w-0 flex-col gap-4" aria-busy={pending}>
       <input type="hidden" name="assistantId" value={assistantId} />
 
+      <WidgetFields
+        key={outcome}
+        saved={state.status === 'saved' ? state.settings : settings}
+        draft={state.status === 'error' ? state.values : null}
+        gates={gates}
+      />
+
+      <div className="flex flex-wrap items-center gap-3">
+        <Button type="submit" disabled={pending}>
+          {pending ? <Loader2 className="animate-spin" /> : null}
+          Save changes
+        </Button>
+        {state.status === 'error' ? (
+          <p role="alert" className="text-destructive text-sm">
+            {state.error}
+          </p>
+        ) : null}
+      </div>
+    </form>
+  );
+};
+
+type WidgetFieldsProps = {
+  saved: WidgetSettings;
+  draft: WidgetFormValues | null;
+  gates: WidgetPlanGates;
+};
+
+/** Every field of the form, with its starting values taken from one action outcome. */
+const WidgetFields = ({ saved, draft, gates }: WidgetFieldsProps) => {
+  // A gated control shows the free value, so what the reader sees matches what the widget does.
+  const theme = gates.customTheme ? saved.theme : DEFAULT_WIDGET_THEME;
+  const mode = gates.palette ? (draft?.mode ?? saved.mode) : 'bubble';
+  const checked = (field: 'hideBranding' | 'leadCapture', allowed: boolean) =>
+    allowed && (draft ? draft[field] === 'on' : saved[field]);
+
+  const [accent, setAccent] = useState((draft?.accent ?? theme.accent).toLowerCase());
+  const [welcome, setWelcome] = useState(draft?.welcomeMessage ?? saved.welcomeMessage);
+
+  return (
+    <>
       <Card size="sm">
         <CardHeader>
           <CardTitle>Mode</CardTitle>
@@ -307,18 +342,6 @@ export const WidgetSettingsForm = ({
           </div>
         </CardContent>
       </Card>
-
-      <div className="flex flex-wrap items-center gap-3">
-        <Button type="submit" disabled={pending}>
-          {pending ? <Loader2 className="animate-spin" /> : null}
-          Save changes
-        </Button>
-        {state.status === 'error' ? (
-          <p role="alert" className="text-destructive text-sm">
-            {state.error}
-          </p>
-        ) : null}
-      </div>
-    </form>
+    </>
   );
 };

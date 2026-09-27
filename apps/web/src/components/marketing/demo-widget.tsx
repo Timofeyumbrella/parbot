@@ -12,8 +12,9 @@ type LoadedWidget = { script: HTMLScriptElement; api?: WidgetApi };
 
 /**
  * Where the hero goes to two columns (Tailwind's lg). Narrower, the demo panel sits under the copy
- * and the widget's fixed pill would cover its questions and composer, so the pill stays off and
- * the panel is the demo; ⌘K still opens the palette.
+ * and the widget's fixed pill would cover its questions and composer, so the pill stays off; ⌘K
+ * still opens the palette, and the hero and FAQ swap their ⌘K hint (lg:) for a link to the demo
+ * page, the one way in on a phone.
  */
 export const WIDE_HERO_QUERY = '(min-width: 64rem)';
 

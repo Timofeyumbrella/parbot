@@ -1,5 +1,6 @@
 import { ChevronDown } from 'lucide-react';
 
+import { demoPageHref } from '@/components/marketing/demo-key';
 import { formatCount, plansWith } from '@/components/marketing/plan-copy';
 import { Reveal } from '@/components/marketing/reveal';
 import { Container, Section, SectionHeading } from '@/components/marketing/section';
@@ -46,9 +47,27 @@ export const Faq = ({ demoKey }: { demoKey: string | null }) => (
           eyebrow="FAQ"
           title="Questions teams ask before they add it."
           lede={
-            demoKey
-              ? 'Short answers. For anything else, press ⌘K and ask the assistant on this page.'
-              : 'Short answers to what we hear most. The details live in the product docs once you are signed in.'
+            demoKey ? (
+              <>
+                Short answers. For anything else,{' '}
+                <span className="hidden lg:inline">
+                  press ⌘K and ask the assistant on this page.
+                </span>
+                {/* No pill and no ⌘K on a phone: the same assistant waits on its demo page. */}
+                <span className="lg:hidden">
+                  ask{' '}
+                  <a
+                    href={demoPageHref(demoKey)}
+                    className="text-foreground -my-2.5 inline-block py-2.5 underline underline-offset-4"
+                  >
+                    the live assistant
+                  </a>
+                  .
+                </span>
+              </>
+            ) : (
+              'Short answers to what we hear most. The details live in the product docs once you are signed in.'
+            )
           }
         />
       </Reveal>

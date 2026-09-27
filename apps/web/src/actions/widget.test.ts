@@ -6,6 +6,7 @@ import { saveWidgetSettings, type WidgetFormState } from './widget';
 
 const USER_ID = '00000000-0000-4000-8000-000000000001';
 const ASSISTANT_ID = '3fa85f64-5717-4562-b3fc-2c963f66afa6';
+const UPDATED_AT = '2026-09-28T10:15:30.123456+00:00';
 
 type Row = Record<string, unknown>;
 
@@ -90,12 +91,14 @@ beforeEach(() => {
 
 describe('saveWidgetSettings', () => {
   it('saves free settings on Hobby, scoped to the owner, and revalidates the screen', async () => {
-    queue.push({ data: { id: ASSISTANT_ID }, error: null });
+    queue.push({ data: { id: ASSISTANT_ID, updated_at: UPDATED_AT }, error: null });
 
     const state = await saveWidgetSettings(idle, form(free));
 
     expect(state).toMatchObject({
       status: 'saved',
+      // The row's new updated_at, so the preview and the demo link ask for fresh config.
+      version: Date.parse(UPDATED_AT).toString(36),
       settings: {
         mode: 'bubble',
         theme: { scheme: 'auto', accent: '#f59e0b', position: 'right', radius: 'md' },
@@ -155,7 +158,7 @@ describe('saveWidgetSettings', () => {
 
   it('saves every paid setting on Starter with a lower-cased accent', async () => {
     getAccountPlan.mockResolvedValue({ plan: PLANS.starter, status: 'active' });
-    queue.push({ data: { id: ASSISTANT_ID }, error: null });
+    queue.push({ data: { id: ASSISTANT_ID, updated_at: UPDATED_AT }, error: null });
 
     const state = await saveWidgetSettings(idle, form(paid));
 

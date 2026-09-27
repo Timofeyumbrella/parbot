@@ -23,6 +23,7 @@ import {
   takeRateLimits,
   widgetChatSchema,
   widgetConfigFor,
+  widgetConfigVersion,
   widgetLeadSchema,
   widgetSettingsOf,
   type WidgetSettings,
@@ -268,6 +269,26 @@ describe('jsonError and configCacheControl', () => {
     expect(configCacheControl(new Request('http://x/api/widget/config?key=pb_1&v='))).toBe(
       'no-store',
     );
+  });
+});
+
+describe('widgetConfigVersion', () => {
+  it('turns the row timestamp into a token the widget accepts as data-version', () => {
+    const version = widgetConfigVersion('2026-09-28T10:15:30.123456+00:00');
+
+    expect(version).toBe(Date.parse('2026-09-28T10:15:30.123Z').toString(36));
+    // The widget's own pattern for data-version.
+    expect(version).toMatch(/^[A-Za-z0-9_-]{1,32}$/);
+  });
+
+  it('changes with every save, so a later page asks for a different config address', () => {
+    expect(widgetConfigVersion('2026-09-28T10:15:30.123+00:00')).not.toBe(
+      widgetConfigVersion('2026-09-28T10:15:31.004+00:00'),
+    );
+  });
+
+  it('still yields a version for a timestamp it cannot read, so the request stays uncached', () => {
+    expect(widgetConfigVersion('not a date')).toBe('0');
   });
 });
 

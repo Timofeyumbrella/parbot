@@ -183,4 +183,29 @@ test.describe('the demo palette on the landing page', () => {
     await expect(page).toHaveURL(/\/signup/);
     await expect(widget).toHaveCount(0);
   });
+
+  test('points a phone at the demo page instead of ⌘K, and a desktop at ⌘K', async ({ page }) => {
+    const hero = page.locator('[aria-labelledby="hero-heading"]');
+    const liveLink = hero.getByRole('link', { name: 'Try it live on the Parbot docs' });
+
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await visit(page, '/');
+    await expect(hero.getByTestId('palette-hint')).toBeVisible();
+    await expect(liveLink).toBeHidden();
+
+    // No pill below lg and no ⌘K on a phone: the hint gives way to a link that works by touch.
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect(hero.getByTestId('palette-hint')).toBeHidden();
+    await expect(hero.getByText(/⌘K palette on this page/)).toBeHidden();
+    await expect(liveLink).toBeVisible();
+
+    await liveLink.click();
+    await expect(page).toHaveURL(
+      new RegExp(`/demo/${process.env.NEXT_PUBLIC_DEMO_ASSISTANT_KEY}\\?mode=bubble$`),
+    );
+
+    const launcher = page.locator('#parbot-widget .pb-launcher');
+    await launcher.click();
+    await expect(page.locator('#parbot-widget .pb-panel')).toHaveClass(/pb-open/);
+  });
 });

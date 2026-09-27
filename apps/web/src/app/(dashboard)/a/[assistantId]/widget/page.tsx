@@ -7,7 +7,7 @@ import { getAccountPlan } from '@/lib/account';
 import { getAssistant } from '@/lib/assistants';
 import { publicEnv } from '@/lib/env';
 import { getSession } from '@/lib/session';
-import { installSnippet, widgetSettingsOf } from '@/lib/widget-api';
+import { installSnippet, widgetConfigVersion, widgetSettingsOf } from '@/lib/widget-api';
 
 export const metadata: Metadata = { title: 'Widget' };
 
@@ -38,6 +38,7 @@ export default async function WidgetPage({ params }: PageProps<'/a/[assistantId]
         assistantId={assistant.id}
         publicKey={assistant.public_key}
         settings={widgetSettingsOf(assistant)}
+        version={widgetConfigVersion(assistant.updated_at)}
         gates={{
           palette: plan.palette,
           customTheme: plan.customTheme,

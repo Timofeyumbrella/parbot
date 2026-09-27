@@ -1,5 +1,7 @@
+import { ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 
+import { demoPageHref } from '@/components/marketing/demo-key';
 import { ScriptedDemo } from '@/components/marketing/scripted-demo';
 import { Container } from '@/components/marketing/section';
 import { Button } from '@/components/ui/button';
@@ -7,12 +9,38 @@ import { Button } from '@/components/ui/button';
 export const HERO_HEADLINE = 'Give your docs an assistant that cites its sources.';
 
 type HeroProps = {
-  /** The real widget is on the page as a ⌘K palette, so the hero can point at it. */
-  paletteHint: boolean;
+  /**
+   * The public key of the real widget on the page, or null when there is none. With one, a wide
+   * screen points at the ⌘K palette and a narrow one, where the pill is hidden and a phone has no
+   * ⌘K, links to the same assistant on its demo page.
+   */
+  demoKey: string | null;
 };
 
+/**
+ * The live demo link below the hero's two-column width: a tap target, not a shortcut. The
+ * vertical padding, taken back by the margin, gives a thumb more to hit without moving the text.
+ */
+const LiveDemoLink = ({
+  demoKey,
+  arrow = false,
+  children,
+}: {
+  demoKey: string;
+  arrow?: boolean;
+  children: React.ReactNode;
+}) => (
+  <a
+    href={demoPageHref(demoKey)}
+    className="text-foreground -my-2.5 inline-flex items-center gap-1 py-2.5 font-medium underline underline-offset-4"
+  >
+    {children}
+    {arrow ? <ArrowRight className="size-3.5 shrink-0" aria-hidden="true" /> : null}
+  </a>
+);
+
 /** The first screen: the promise, two calls to action and a scripted example of the product in use. */
-export const Hero = ({ paletteHint }: HeroProps) => (
+export const Hero = ({ demoKey }: HeroProps) => (
   <section
     aria-labelledby="hero-heading"
     className="relative overflow-hidden pb-20 pt-14 sm:pb-28 sm:pt-20"
@@ -50,12 +78,19 @@ export const Hero = ({ paletteHint }: HeroProps) => (
         <ul className="text-muted-foreground flex flex-wrap gap-x-5 gap-y-1 text-sm">
           <li>Hobby is free. No card needed.</li>
           <li>One script tag to install.</li>
-          {paletteHint ? (
-            <li>
-              Press{' '}
-              <kbd className="bg-muted rounded-md border px-1.5 py-0.5 font-mono text-xs">⌘K</kbd>{' '}
-              to try it here.
-            </li>
+          {demoKey ? (
+            <>
+              <li className="hidden lg:list-item" data-testid="palette-hint">
+                Press{' '}
+                <kbd className="bg-muted rounded-md border px-1.5 py-0.5 font-mono text-xs">⌘K</kbd>{' '}
+                to try it here.
+              </li>
+              <li className="lg:hidden" data-testid="live-demo-hint">
+                <LiveDemoLink demoKey={demoKey} arrow>
+                  Try it live on the Parbot docs
+                </LiveDemoLink>
+              </li>
+            </>
           ) : null}
         </ul>
       </div>
@@ -63,9 +98,20 @@ export const Hero = ({ paletteHint }: HeroProps) => (
       <div className="animate-in fade-in slide-in-from-bottom-2 flex min-w-0 flex-col gap-3 delay-150 duration-700 motion-reduce:animate-none">
         <ScriptedDemo />
         <p className="text-muted-foreground text-pretty text-center text-xs">
-          {paletteHint
-            ? 'A scripted example on fictional docs. The ⌘K palette on this page answers live from the Parbot docs.'
-            : 'A scripted example on fictional docs. Sign up to point Parbot at your own.'}
+          A scripted example on fictional docs.{' '}
+          {demoKey ? (
+            <>
+              <span className="hidden lg:inline">
+                The ⌘K palette on this page answers live from the Parbot docs.
+              </span>
+              <span className="lg:hidden">
+                A live one answers from the Parbot docs on{' '}
+                <LiveDemoLink demoKey={demoKey}>the demo page</LiveDemoLink>.
+              </span>
+            </>
+          ) : (
+            'Sign up to point Parbot at your own.'
+          )}
         </p>
       </div>
     </Container>

@@ -308,9 +308,26 @@ button:focus-visible, textarea:focus-visible, input:focus-visible, a:focus-visib
   font-size: 12px;
   color: var(--pb-muted-fg);
 }
-.pb-sources .pb-sources-title { font-weight: 600; margin-bottom: 2px; }
-.pb-sources ol { margin: 0; padding-left: 18px; }
-.pb-sources li { margin: 1px 0; }
+.pb-sources .pb-sources-title { font-weight: 600; margin-bottom: 4px; }
+.pb-sources ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
+.pb-sources li { display: flex; align-items: flex-start; gap: 6px; min-width: 0; }
+.pb-source-nums { display: inline-flex; flex-shrink: 0; gap: 2px; padding-top: 1px; }
+.pb-source-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  box-sizing: border-box;
+  border: 1px solid var(--pb-border);
+  border-radius: 4px;
+  /* The page colour, since the muted one is the bubble's own; the digits match the inline markers. */
+  background: var(--pb-bg);
+  color: var(--pb-accent-text);
+  font: 600 10px/1 var(--pb-mono);
+}
+.pb-source-title { min-width: 0; overflow-wrap: anywhere; }
 .pb-sources a { color: var(--pb-accent-text); text-decoration: none; }
 .pb-sources a:hover { text-decoration: underline; }
 

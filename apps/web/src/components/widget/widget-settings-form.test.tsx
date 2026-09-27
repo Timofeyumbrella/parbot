@@ -95,7 +95,12 @@ describe('WidgetSettingsForm', () => {
 
   it('submits the assistant id with the fields, toasts and reports the saved settings', async () => {
     const saved: WidgetSettings = { ...settings, welcomeMessage: 'Hello from Acme.' };
-    saveWidgetSettings.mockResolvedValue({ status: 'saved', at: 1, settings: saved });
+    saveWidgetSettings.mockResolvedValue({
+      status: 'saved',
+      at: 1,
+      settings: saved,
+      version: 'mv1',
+    });
     const onSaved = vi.fn();
     const user = userEvent.setup();
 
@@ -114,7 +119,7 @@ describe('WidgetSettingsForm', () => {
     await user.click(screen.getByRole('button', { name: 'Save changes' }));
 
     await vi.waitFor(() => expect(toast.success).toHaveBeenCalledWith('Widget settings saved'));
-    expect(onSaved).toHaveBeenCalledWith(saved);
+    expect(onSaved).toHaveBeenCalledWith(saved, 'mv1');
 
     const formData = saveWidgetSettings.mock.calls[0]?.[1];
     expect(formData?.get('assistantId')).toBe(ASSISTANT_ID);
@@ -125,6 +130,81 @@ describe('WidgetSettingsForm', () => {
     expect(formData?.get('allowedOrigins')).toBe('docs.acme.dev\n*.acme.dev');
     expect(formData?.get('hideBranding')).toBe('on');
     expect(formData?.get('leadCapture')).toBe('on');
+  });
+
+  it('keeps the switches and the other fields at the saved values across two saves', async () => {
+    // The server echoes what it stored, the way the action does.
+    saveWidgetSettings.mockImplementation(async (_state, data) => ({
+      status: 'saved',
+      at: saveWidgetSettings.mock.calls.length,
+      version: `v${saveWidgetSettings.mock.calls.length}`,
+      settings: {
+        mode: data.get('mode') === 'palette' ? 'palette' : 'bubble',
+        theme: {
+          scheme: data.get('scheme') as WidgetSettings['theme']['scheme'],
+          accent: String(data.get('accent')),
+          position: data.get('position') as WidgetSettings['theme']['position'],
+          radius: data.get('radius') as WidgetSettings['theme']['radius'],
+        },
+        welcomeMessage: String(data.get('welcomeMessage')).trim(),
+        suggestedQuestions: String(data.get('suggestedQuestions')).split('\n').filter(Boolean),
+        allowedOrigins: String(data.get('allowedOrigins')).split('\n').filter(Boolean),
+        hideBranding: data.get('hideBranding') === 'on',
+        leadCapture: data.get('leadCapture') === 'on',
+      },
+    }));
+    const user = userEvent.setup();
+
+    render(<WidgetSettingsForm assistantId={ASSISTANT_ID} settings={settings} gates={starter} />);
+
+    const hide = () => screen.getByRole('switch', { name: /Hide/ });
+    const lead = () => screen.getByRole('switch', { name: /Lead capture/ });
+
+    await user.click(hide());
+    await user.click(lead());
+    await user.click(screen.getByRole('radio', { name: 'Bubble' }));
+    await user.click(screen.getByRole('radio', { name: 'Light' }));
+    await user.type(screen.getByLabelText('Welcome message'), '  ');
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+
+    await vi.waitFor(() => expect(saveWidgetSettings).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(toast.success).toHaveBeenCalledTimes(1));
+
+    const first = saveWidgetSettings.mock.calls[0]?.[1];
+    expect(first?.get('hideBranding')).toBeNull();
+    expect(first?.get('leadCapture')).toBeNull();
+
+    // What the page shows after the save is what was stored, not what the page loaded with.
+    expect(hide()).not.toBeChecked();
+    expect(lead()).not.toBeChecked();
+    expect(screen.getByRole('radio', { name: 'Bubble' })).toBeChecked();
+    expect(screen.getByRole('radio', { name: 'Light' })).toBeChecked();
+    expect(screen.getByLabelText('Welcome message')).toHaveValue('Ask me about Acme.');
+
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+
+    await vi.waitFor(() => expect(toast.success).toHaveBeenCalledTimes(2));
+
+    // A second save sends the stored values again instead of the page-load ones.
+    const second = saveWidgetSettings.mock.calls[1]?.[1];
+    expect(second?.get('hideBranding')).toBeNull();
+    expect(second?.get('leadCapture')).toBeNull();
+    expect(second?.get('mode')).toBe('bubble');
+    expect(second?.get('scheme')).toBe('light');
+    expect(hide()).not.toBeChecked();
+    expect(lead()).not.toBeChecked();
+
+    // Turning one back on and saving shows it on, and the save after that keeps it on.
+    await user.click(lead());
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+    await vi.waitFor(() => expect(toast.success).toHaveBeenCalledTimes(3));
+    expect(lead()).toBeChecked();
+
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+    await vi.waitFor(() => expect(toast.success).toHaveBeenCalledTimes(4));
+    expect(saveWidgetSettings.mock.calls[3]?.[1]?.get('leadCapture')).toBe('on');
+    expect(lead()).toBeChecked();
+    expect(hide()).not.toBeChecked();
   });
 
   it('keeps what was typed after a failed save and shows the reason', async () => {
@@ -139,6 +219,8 @@ describe('WidgetSettingsForm', () => {
         radius: 'sm',
         suggestedQuestions: '1\n2\n3\n4\n5',
         allowedOrigins: 'one.example',
+        welcomeMessage: 'Typed but not saved.',
+        leadCapture: 'on',
       },
     });
     const user = userEvent.setup();
@@ -156,6 +238,10 @@ describe('WidgetSettingsForm', () => {
     expect(screen.getByRole('radio', { name: 'Bubble' })).toBeChecked();
     expect(screen.getByRole('radio', { name: 'Light' })).toBeChecked();
     expect(screen.getByRole('radio', { name: 'Small' })).toBeChecked();
+    expect(screen.getByLabelText('Welcome message')).toHaveValue('Typed but not saved.');
+    // The switches show what was sent, not the row: branding went off, lead capture stayed on.
+    expect(screen.getByRole('switch', { name: /Hide/ })).not.toBeChecked();
+    expect(screen.getByRole('switch', { name: /Lead capture/ })).toBeChecked();
     expect(
       within(screen.getByRole('group', { name: 'Accent presets' })).getAllByRole('button'),
     ).toHaveLength(6);

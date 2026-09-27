@@ -5,7 +5,12 @@ import Script from 'next/script';
 import { cache } from 'react';
 
 import { createSupabaseServiceClient } from '@/lib/supabase/service';
-import { findAssistantByKey, loadOwnerPlan, widgetConfigFor } from '@/lib/widget-api';
+import {
+  findAssistantByKey,
+  loadOwnerPlan,
+  widgetConfigFor,
+  widgetConfigVersion,
+} from '@/lib/widget-api';
 
 import { demoNames, resolveDemoMode, resolveDemoPreview } from './demo-mode';
 import { SchemeSync } from './scheme-sync';
@@ -27,7 +32,11 @@ const load = cache(async (key: string) => {
 
   const plan = await loadOwnerPlan(service, assistant.owner_id);
 
-  return { name: assistant.name, config: widgetConfigFor(assistant, plan) };
+  return {
+    name: assistant.name,
+    config: widgetConfigFor(assistant, plan),
+    version: widgetConfigVersion(assistant.updated_at),
+  };
 });
 
 export async function generateMetadata({ params }: PageProps<'/demo/[key]'>): Promise<Metadata> {
@@ -176,12 +185,14 @@ export default async function DemoPage({ params, searchParams }: PageProps<'/dem
       </div>
 
       <SchemeSync enabled={config.theme.scheme === 'auto'} />
+      {/* Always versioned: the widget then skips the minute of config caching an installed
+          widget gets, so a demo tab opened or reloaded right after a save shows it. */}
       <Script
         src="/widget.js"
         strategy="afterInteractive"
         data-parbot={key}
         data-mode={override ?? undefined}
-        data-version={preview.version ?? undefined}
+        data-version={found.version}
         data-open={preview.open ? 'true' : undefined}
       />
     </div>

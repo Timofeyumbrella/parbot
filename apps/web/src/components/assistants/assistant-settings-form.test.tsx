@@ -66,6 +66,41 @@ describe('AssistantSettingsForm', () => {
     expect(formData?.has('suggestedQuestions')).toBe(false);
   });
 
+  it('shows what was stored after React resets the form, and a second save sends it again', async () => {
+    // Like the action: the stored values come back, the slug normalised.
+    updateAssistant.mockImplementation(async (_state, data) => ({
+      status: 'success',
+      message: 'Settings saved.',
+      values: {
+        name: String(data.get('name')).trim(),
+        slug: String(data.get('slug')).trim().toLowerCase().replace(/\s+/g, '-'),
+        description: String(data.get('description')),
+        instructions: String(data.get('instructions')),
+      },
+    }));
+    const user = userEvent.setup();
+
+    render(<AssistantSettingsForm assistant={assistant} />);
+
+    await user.clear(screen.getByLabelText('Name'));
+    await user.type(screen.getByLabelText('Name'), 'Acme Cloud');
+    await user.clear(screen.getByLabelText('Slug'));
+    await user.type(screen.getByLabelText('Slug'), 'Acme Cloud');
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+    await vi.waitFor(() => expect(toast.success).toHaveBeenCalledTimes(1));
+
+    expect(screen.getByLabelText('Name')).toHaveValue('Acme Cloud');
+    expect(screen.getByLabelText('Slug')).toHaveValue('acme-cloud');
+
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+    await vi.waitFor(() => expect(toast.success).toHaveBeenCalledTimes(2));
+
+    const second = updateAssistant.mock.calls[1]?.[1];
+    expect(second?.get('name')).toBe('Acme Cloud');
+    expect(second?.get('slug')).toBe('acme-cloud');
+    expect(screen.getByLabelText('Name')).toHaveValue('Acme Cloud');
+  });
+
   it('shows a field error next to the slug', async () => {
     updateAssistant.mockResolvedValue({
       status: 'error',

@@ -22,10 +22,11 @@ type WidgetPreviewProps = {
   demoUrl: string;
   mode: WidgetMode;
   /**
-   * Bumped after every successful save. The frame reloads with it, and the demo page passes it
-   * to the widget, whose config request then skips every cache, so the save shows at once.
+   * The config version, from the row's last change; every save hands back a new one. The frame
+   * reloads with it, and both the frame and the demo link carry it, so neither can show a demo
+   * page from before the save.
    */
-  version: number;
+  version: string;
   hasSources: boolean;
   knowledgeHref: string;
 };
@@ -78,7 +79,7 @@ export const WidgetPreview = ({
       </CardDescription>
       <CardAction>
         <Button asChild variant="outline" size="sm">
-          <a href={demoUrl} target="_blank" rel="noopener noreferrer">
+          <a href={`${demoUrl}?v=${version}`} target="_blank" rel="noopener noreferrer">
             Open the demo page
             <ExternalLink />
           </a>

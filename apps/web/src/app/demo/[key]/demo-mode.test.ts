@@ -34,25 +34,15 @@ describe('resolveDemoMode', () => {
 });
 
 describe('resolveDemoPreview', () => {
-  it('reads the save counter and the open flag the settings preview adds', () => {
-    expect(resolveDemoPreview({ v: '3', open: '1' })).toEqual({ version: '3', open: true });
-    expect(resolveDemoPreview({ v: 'abc_-9', open: 'true' })).toEqual({
-      version: 'abc_-9',
-      open: true,
-    });
+  it('reads the open flag the settings preview adds', () => {
+    expect(resolveDemoPreview({ open: '1' })).toEqual({ open: true });
+    expect(resolveDemoPreview({ open: 'true' })).toEqual({ open: true });
   });
 
-  it('drops anything that is not a plain token', () => {
-    expect(resolveDemoPreview({})).toEqual({ version: null, open: false });
-    expect(resolveDemoPreview({ v: 'not ok!', open: 'yes' })).toEqual({
-      version: null,
-      open: false,
-    });
-    expect(resolveDemoPreview({ v: ['1', '2'], open: ['1'] })).toEqual({
-      version: null,
-      open: false,
-    });
-    expect(resolveDemoPreview({ v: 'x'.repeat(33) })).toEqual({ version: null, open: false });
+  it('stays closed for anything else', () => {
+    expect(resolveDemoPreview({})).toEqual({ open: false });
+    expect(resolveDemoPreview({ open: 'yes' })).toEqual({ open: false });
+    expect(resolveDemoPreview({ open: ['1'] })).toEqual({ open: false });
   });
 });
 

@@ -14,6 +14,7 @@ import {
 
 import { accentText, isWidgetScheme, onAccent } from './config';
 import { renderMarkdown, safeUrl } from './markdown';
+import { groupSources } from './sources';
 import {
   getConversationId,
   getVisitorId,
@@ -677,10 +678,11 @@ export class ParbotWidget {
             this.renderItem(answer);
             this.scrollToBottom(false);
           } else if (event.type === 'citations') {
-            answer.citations = event.citations.map(({ index, title, url }) => ({
+            answer.citations = event.citations.map(({ index, title, url, documentId }) => ({
               index,
               title,
               url,
+              documentId,
             }));
           } else if (event.type === 'done') {
             answer.answered = event.answered;
@@ -941,25 +943,33 @@ export class ParbotWidget {
   private renderSources(message: Message) {
     const sources = el('div', 'pb-sources');
     sources.append(el('div', 'pb-sources-title', 'Sources'));
-    const list = el('ol');
+    const list = el('ul');
 
-    for (const citation of message.citations) {
+    for (const row of groupSources(message.citations)) {
       const entry = el('li');
-      entry.value = citation.index;
+      const numbers = el('span', 'pb-source-nums');
 
-      const href = citation.url ? safeUrl(citation.url) : null;
+      for (const index of row.indexes) {
+        const number = el('span', 'pb-source-num');
+        number.textContent = String(index);
+        numbers.append(number);
+      }
+
+      const href = row.url ? safeUrl(row.url) : null;
+      let title: HTMLElement;
 
       if (href) {
-        const link = el('a');
+        const link = el('a', 'pb-source-title');
         link.href = href;
         link.target = '_blank';
         link.rel = 'noopener noreferrer';
-        link.textContent = citation.title;
-        entry.append(link);
+        title = link;
       } else {
-        entry.textContent = citation.title;
+        title = el('span', 'pb-source-title');
       }
 
+      title.textContent = row.title;
+      entry.append(numbers, title);
       list.append(entry);
     }
 
