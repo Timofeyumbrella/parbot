@@ -194,12 +194,21 @@ describe('Composer references', () => {
     empty.unmount();
     resetDrafts();
 
-    render(<Harness />);
+    const onSend = vi.fn();
+
+    render(<Harness onSend={onSend} />);
     await user.type(box(), '@zzz');
     expect(screen.getByRole('status')).toHaveTextContent('Nothing matches “zzz”.');
 
-    // With no match, Enter sends the text as written.
+    // The reader is picking a file: with no match, Enter keeps the text and the list.
     await user.keyboard('{Enter}');
+    expect(onSend).not.toHaveBeenCalled();
+    expect(box()).toHaveValue('@zzz');
+    expect(picker()).toBeInTheDocument();
+
+    // Esc closes the list; from then on Enter sends the text as written.
+    await user.keyboard('{Escape}{Enter}');
+    expect(onSend).toHaveBeenCalledWith('@zzz', []);
     expect(box()).toHaveValue('');
   });
 
@@ -262,6 +271,85 @@ describe('Composer references', () => {
     await user.type(box(), '@');
 
     expect(screen.getByLabelText('Loading sources')).toBeInTheDocument();
+  });
+
+  it('never sends on Enter while the list loads, and picks the first match once it arrives', async () => {
+    const user = userEvent.setup();
+    const onSend = vi.fn();
+    const view = render(<Harness onSend={onSend} options={null} />);
+
+    await user.type(box(), 'Explain @ref');
+    expect(screen.getByLabelText('Loading sources')).toBeInTheDocument();
+
+    await user.keyboard('{Enter}');
+
+    expect(onSend).not.toHaveBeenCalled();
+    expect(box()).toHaveValue('Explain @ref');
+    expect(chips()).toHaveLength(0);
+
+    view.rerender(<Harness onSend={onSend} options={OPTIONS} />);
+
+    expect(chips().map((chip) => chip.textContent)).toEqual([
+      expect.stringContaining('Refund policy'),
+    ]);
+    expect(box()).toHaveValue('Explain ');
+    expect(picker()).toBeNull();
+    expect(onSend).not.toHaveBeenCalled();
+  });
+
+  it('picks nothing when the list arrives without a match, or after the reader typed on', async () => {
+    const user = userEvent.setup();
+    const onSend = vi.fn();
+    const view = render(<Harness onSend={onSend} options={null} />);
+
+    await user.type(box(), '@zeph');
+    await user.keyboard('{Enter}');
+    view.rerender(<Harness onSend={onSend} options={OPTIONS} />);
+
+    expect(onSend).not.toHaveBeenCalled();
+    expect(chips()).toHaveLength(0);
+    expect(box()).toHaveValue('@zeph');
+    expect(screen.getByRole('status')).toHaveTextContent('Nothing matches “zeph”.');
+
+    view.unmount();
+    resetDrafts();
+
+    const again = render(<Harness onSend={onSend} options={null} />);
+
+    await user.type(box(), '@li');
+    await user.keyboard('{Enter}');
+    // Typing on after Enter means the reader is still choosing; the list opens as usual.
+    await user.type(box(), 'm');
+    again.rerender(<Harness onSend={onSend} options={OPTIONS} />);
+
+    expect(chips()).toHaveLength(0);
+    expect(optionNames()).toEqual([expect.stringContaining('limits.md')]);
+    expect(onSend).not.toHaveBeenCalled();
+  });
+
+  it('never sends on Enter when the list could not be loaded', async () => {
+    const user = userEvent.setup();
+    const onSend = vi.fn();
+
+    render(
+      <Composer
+        draftKey="c1"
+        onSend={onSend}
+        references={{
+          chips: [],
+          onChange: vi.fn(),
+          options: undefined,
+          failed: true,
+          onAttach: vi.fn(),
+        }}
+      />,
+    );
+    await user.type(box(), '@guide');
+    await user.keyboard('{Enter}');
+
+    expect(onSend).not.toHaveBeenCalled();
+    expect(box()).toHaveValue('@guide');
+    expect(picker()).toHaveTextContent('The sources could not be loaded.');
   });
 });
 
