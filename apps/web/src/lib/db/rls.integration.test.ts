@@ -153,7 +153,7 @@ describe.skipIf(!serviceKey || !anonKey)('row level security against the local d
   });
 
   afterAll(async () => {
-    await Promise.all(clients.map((client) => client.auth.signOut()));
+    await Promise.all(clients.map((client) => client.auth.signOut({ scope: 'local' })));
 
     for (const id of userIds) {
       // Cascades through every row created above.
