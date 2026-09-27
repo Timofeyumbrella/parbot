@@ -643,7 +643,11 @@ test.describe('the in-app chat', () => {
     ).toBeVisible();
     await expect(last.getByRole('table')).toBeVisible();
     await expect(last.getByRole('columnheader', { name: 'Plan' })).toBeVisible();
-    await expect(last.locator('sup[data-citation] a').nth(1)).toHaveAttribute('href', /#sources-/);
+    // A note has no page of its own: its marker opens it in the document viewer.
+    await expect(last.locator('sup[data-citation] a').nth(1)).toHaveAttribute(
+      'href',
+      `/a/${assistantId}/knowledge/documents/d2`,
+    );
     await expect(last.getByTestId('sources')).toContainText('Pasted notes');
     await expect(last.getByText('Settings', { exact: true })).toHaveJSProperty('tagName', 'STRONG');
 
