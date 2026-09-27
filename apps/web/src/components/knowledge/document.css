@@ -1,0 +1,29 @@
+/*
+ * The document viewer: an indexed page read at length, with the passage a citation pointed at
+ * lit in the primary colour. Tokens only, so both schemes follow globals.css.
+ */
+
+.document-prose {
+  font-size: 0.9rem;
+  line-height: 1.7;
+}
+
+.document-prose img {
+  max-width: 100%;
+  height: auto;
+  border-radius: calc(var(--radius) * 0.8);
+}
+
+.document-prose [data-passage] {
+  scroll-margin-block: 6rem;
+  border-radius: calc(var(--radius) * 0.6);
+  background: color-mix(in oklch, var(--primary), transparent 82%);
+  box-shadow:
+    -0.5rem 0 0 color-mix(in oklch, var(--primary), transparent 82%),
+    0.5rem 0 0 color-mix(in oklch, var(--primary), transparent 82%);
+}
+
+.document-prose td[data-passage],
+.document-prose th[data-passage] {
+  box-shadow: none;
+}
