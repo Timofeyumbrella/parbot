@@ -114,7 +114,11 @@ describe('readStoppedCitations', () => {
     const read = vi.fn(async () => ({ citations: saved }));
 
     await expect(
-      readStoppedCitations(read, input.messageId, 'Rotate a key in Settings [1]. The limit is [3, 1]'),
+      readStoppedCitations(
+        read,
+        input.messageId,
+        'Rotate a key in Settings [1]. The limit is [3, 1]',
+      ),
     ).resolves.toEqual([saved[0], saved[2]]);
     expect(read).toHaveBeenCalledWith(input.messageId);
   });

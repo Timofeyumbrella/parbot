@@ -1,4 +1,9 @@
-import { type AppStopRequest, type Citation, citedIndexes, MAX_STOP_TEXT_LENGTH } from '@parbot/shared';
+import {
+  type AppStopRequest,
+  type Citation,
+  citedIndexes,
+  MAX_STOP_TEXT_LENGTH,
+} from '@parbot/shared';
 
 import type { Json } from '@/lib/db/types';
 
