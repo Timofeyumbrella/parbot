@@ -16,18 +16,29 @@ import {
   type UpdateField,
   updateAssistantSchema,
 } from '@/components/assistants/schema';
-import { getAccountPlan, getAccountUsage } from '@/lib/account';
 import { type FormState, formValues, parseForm } from '@/lib/form';
-import { checkCapacity } from '@/lib/plans';
 import { requireUser } from '@/lib/session';
-import { slugify, uniqueSlug } from '@/lib/slug';
+import { slugify } from '@/lib/slug';
 import { removeStoredFiles } from '@/lib/source-files';
 import { createSupabaseServiceClient } from '@/lib/supabase/service';
 
 /** Postgres: a unique index rejected the row. */
 const UNIQUE_VIOLATION = '23505';
-const INSERT_ATTEMPTS = 3;
 
+type SessionClient = Awaited<ReturnType<typeof requireUser>>['supabase'];
+
+/** The id of the account's assistant, if it has one. Row level security scopes the read. */
+const accountAssistantId = async (supabase: SessionClient) => {
+  const { data } = await supabase.from('assistants').select('id').limit(1).maybeSingle();
+
+  return data?.id ?? null;
+};
+
+/**
+ * Creates the account's one assistant. An account that already has it is sent there instead:
+ * onboarding redirects such an account before showing the form, so this only happens from a
+ * second tab or a form left open, and a unique index on owner_id settles two submits racing.
+ */
 export const createAssistant = async (
   _previous: FormState<CreateField>,
   formData: FormData,
@@ -40,57 +51,46 @@ export const createAssistant = async (
   }
 
   const { supabase, user } = await requireUser();
-  const [account, usage] = await Promise.all([getAccountPlan(), getAccountUsage()]);
-  const capacity = checkCapacity(account.plan.id, usage.assistants, 'assistants');
+  const existingId = await accountAssistantId(supabase);
 
-  if (!capacity.allowed) {
+  if (existingId) {
+    redirect(`/a/${existingId}`);
+  }
+
+  const { data, error } = await supabase
+    .from('assistants')
+    .insert({
+      owner_id: user.id,
+      name: parsed.data.name,
+      slug: parsed.data.slug || slugify(parsed.data.name),
+      description: parsed.data.description || null,
+    })
+    .select('id')
+    .single();
+
+  if (error?.code === UNIQUE_VIOLATION) {
+    // Another tab created the account's assistant between the check above and this insert.
+    const winnerId = await accountAssistantId(supabase);
+
+    if (winnerId) {
+      redirect(`/a/${winnerId}`);
+    }
+
     return {
       status: 'error',
       values,
-      error: `The ${account.plan.name} plan includes ${capacity.limit} ${capacity.limit === 1 ? 'assistant' : 'assistants'} and this account already has ${capacity.used}. Upgrade on the billing page to add another.`,
+      error: 'This account already has an assistant. Reload the page to open it.',
     };
   }
 
-  const base = parsed.data.slug || slugify(parsed.data.name);
-  const { data: existing } = await supabase.from('assistants').select('slug');
-  const taken = new Set((existing ?? []).map((row) => row.slug));
-  let slug = uniqueSlug(base, taken);
-  let createdId: string | null = null;
-
-  // Another tab may have taken the slug between the read and the insert; move on to the next suffix.
-  for (let attempt = 0; attempt < INSERT_ATTEMPTS && !createdId; attempt += 1) {
-    const { data, error } = await supabase
-      .from('assistants')
-      .insert({
-        owner_id: user.id,
-        name: parsed.data.name,
-        slug,
-        description: parsed.data.description || null,
-      })
-      .select('id')
-      .single();
-
-    if (data) {
-      createdId = data.id;
-      break;
-    }
-
-    if (error?.code !== UNIQUE_VIOLATION) {
-      return { status: 'error', values, error: 'The assistant could not be created. Try again.' };
-    }
-
-    taken.add(slug);
-    slug = uniqueSlug(base, taken);
+  if (!data) {
+    return { status: 'error', values, error: 'The assistant could not be created. Try again.' };
   }
 
-  if (!createdId) {
-    return { status: 'error', values, error: 'That slug is taken. Choose another.' };
-  }
+  // The sidebar in the shared layout names the assistant, so every screen's layout is stale.
+  revalidatePath('/', 'layout');
 
-  revalidatePath('/dashboard');
-  revalidatePath('/onboarding');
-
-  redirect(`/a/${createdId}/knowledge`);
+  redirect(`/a/${data.id}/knowledge`);
 };
 
 export const updateAssistant = async (
@@ -127,7 +127,7 @@ export const updateAssistant = async (
       status: 'error',
       values,
       error: 'Check the highlighted fields.',
-      fieldErrors: { slug: 'Another of your assistants already uses this slug.' },
+      fieldErrors: { slug: 'This slug is already in use. Choose another.' },
     };
   }
 
@@ -140,7 +140,6 @@ export const updateAssistant = async (
   }
 
   revalidatePath(`/a/${assistantId}/settings`);
-  revalidatePath('/dashboard');
 
   return {
     status: 'success',
@@ -235,7 +234,9 @@ export const deleteAssistant = async (
     return { status: 'error', values, error: 'The assistant could not be deleted. Try again.' };
   }
 
-  revalidatePath('/dashboard');
+  // It was the account's only assistant: every screen's sidebar changes, and onboarding creates
+  // the next one.
+  revalidatePath('/', 'layout');
 
-  redirect('/dashboard');
+  redirect('/onboarding');
 };

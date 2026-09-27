@@ -19,7 +19,7 @@ export default async function LoginPage({ searchParams }: PageProps<'/login'>) {
   return (
     <AuthCard
       title="Sign in"
-      description="Welcome back. Your assistants are where you left them."
+      description="Welcome back. Your assistant is where you left it."
       footer={
         <>
           New to Parbot?{' '}

@@ -56,7 +56,7 @@ export const ProfileForm = ({ fullName }: { fullName: string }) => {
         <CardHeader>
           <CardTitle>Name</CardTitle>
           <CardDescription>
-            Only you see it. It is not shown to visitors of your assistants.
+            Only you see it. It is not shown to visitors of your assistant.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">

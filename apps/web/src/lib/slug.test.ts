@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { isSlug, SLUG_MAX_LENGTH, slugify, uniqueSlug, withSuffix } from './slug';
+import { isSlug, SLUG_MAX_LENGTH, slugify } from './slug';
 
 describe('slugify', () => {
   it('lowercases and joins words with single hyphens', () => {
@@ -47,27 +47,5 @@ describe('isSlug', () => {
     expect(isSlug('-acme')).toBe(false);
     expect(isSlug('acme_docs')).toBe(false);
     expect(isSlug('a'.repeat(SLUG_MAX_LENGTH + 1))).toBe(false);
-  });
-});
-
-describe('uniqueSlug', () => {
-  it('keeps a free slug', () => {
-    expect(uniqueSlug('acme', ['other'])).toBe('acme');
-  });
-
-  it('suffixes -2, -3 and so on until one is free', () => {
-    expect(uniqueSlug('acme', ['acme'])).toBe('acme-2');
-    expect(uniqueSlug('acme', ['acme', 'acme-2'])).toBe('acme-3');
-    expect(uniqueSlug('acme', ['acme', 'acme-2', 'acme-4'])).toBe('acme-3');
-  });
-
-  it('shortens a long base so the suffixed slug still fits', () => {
-    const base = 'b'.repeat(SLUG_MAX_LENGTH);
-    const result = uniqueSlug(base, [base]);
-
-    expect(result.length).toBe(SLUG_MAX_LENGTH);
-    expect(result.endsWith('-2')).toBe(true);
-    expect(isSlug(result)).toBe(true);
-    expect(withSuffix('abc', 12)).toBe('abc-12');
   });
 });

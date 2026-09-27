@@ -38,7 +38,7 @@ export const planSummary = (account: AccountPlan) => {
   const lead = `${plan.name}, ${price}.`;
 
   if (plan.id === 'hobby') {
-    return `${lead} Upgrade for more assistants, pages and answers.`;
+    return `${lead} Upgrade for more pages and answers.`;
   }
 
   if (!account.currentPeriodEnd) {

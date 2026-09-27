@@ -133,9 +133,8 @@ export const Pricing = ({ plans }: { plans: Plan[] }) => {
 
         <Reveal>
           <p className="text-muted-foreground mx-auto max-w-2xl text-center text-sm leading-relaxed">
-            Every plan includes streamed answers with citations, the conversation inbox and the
-            bubble widget. Limits are per account, shared across its assistants. Prices are in US
-            dollars.
+            Every plan includes an assistant with streamed answers and citations, the conversation
+            inbox and the bubble widget. Prices are in US dollars.
           </p>
         </Reveal>
       </Container>

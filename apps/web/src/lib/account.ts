@@ -52,7 +52,6 @@ export const getAccountPlan = cache(async (): Promise<AccountPlan> => {
 });
 
 export type AccountUsage = {
-  assistants: number;
   pages: number;
   messagesThisMonth: number;
 };
@@ -62,11 +61,10 @@ export const getAccountUsage = cache(async (): Promise<AccountUsage> => {
   const { supabase, user } = await getSession();
 
   if (!user) {
-    return { assistants: 0, pages: 0, messagesThisMonth: 0 };
+    return { pages: 0, messagesThisMonth: 0 };
   }
 
-  const [assistants, pages, usage] = await Promise.all([
-    supabase.from('assistants').select('id', { count: 'exact', head: true }),
+  const [pages, usage] = await Promise.all([
     supabase.from('documents').select('id', { count: 'exact', head: true }),
     supabase
       .from('usage_counters')
@@ -78,7 +76,6 @@ export const getAccountUsage = cache(async (): Promise<AccountUsage> => {
   ]);
 
   return {
-    assistants: assistants.count ?? 0,
     pages: pages.count ?? 0,
     messagesThisMonth: Number(usage.data?.value ?? 0),
   };

@@ -51,14 +51,12 @@ describe('pricing labels', () => {
   });
 
   it('never shows a next date on Hobby, even after a subscription ended or went unpaid', () => {
-    expect(planSummary(account())).toBe(
-      'Hobby, Free. Upgrade for more assistants, pages and answers.',
-    );
+    expect(planSummary(account())).toBe('Hobby, Free. Upgrade for more pages and answers.');
     expect(planSummary(account({ status: 'canceled', currentPeriodEnd: PERIOD_END }))).toBe(
-      'Hobby, Free. Upgrade for more assistants, pages and answers.',
+      'Hobby, Free. Upgrade for more pages and answers.',
     );
     expect(planSummary(account({ status: 'incomplete', currentPeriodEnd: PERIOD_END }))).toBe(
-      'Hobby, Free. Upgrade for more assistants, pages and answers.',
+      'Hobby, Free. Upgrade for more pages and answers.',
     );
   });
 

@@ -61,7 +61,7 @@ export default async function AccountPage() {
           <CardHeader>
             <CardTitle>Sign out</CardTitle>
             <CardDescription>
-              Ends this session on this device. Your assistants keep running.
+              Ends this session on this device. Your assistant keeps running.
             </CardDescription>
           </CardHeader>
           <CardContent>

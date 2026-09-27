@@ -1,15 +1,16 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 
 import { isBillingInterval } from '@/components/auth/schema';
 import { CreateAssistantForm } from '@/components/assistants/create-assistant-form';
-import { LimitReached } from '@/components/assistants/limit-reached';
 import { PageContainer, PageHeader } from '@/components/page-header';
-import { getAccountPlan, getAccountUsage } from '@/lib/account';
-import { checkCapacity, isPlanId, PLANS } from '@/lib/plans';
+import { getAccountPlan } from '@/lib/account';
+import { getAccountAssistant } from '@/lib/assistants';
+import { isPlanId, PLANS } from '@/lib/plans';
 import { requireUser } from '@/lib/session';
 
-export const metadata: Metadata = { title: 'New assistant' };
+export const metadata: Metadata = { title: 'Create your assistant' };
 
 const first = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value);
 
@@ -22,13 +23,16 @@ const FORM_COLUMN = 'flex max-w-2xl flex-col gap-6';
 export default async function OnboardingPage({ searchParams }: PageProps<'/onboarding'>) {
   await requireUser();
 
-  const [params, account, usage] = await Promise.all([
+  const [params, account, assistant] = await Promise.all([
     searchParams,
     getAccountPlan(),
-    getAccountUsage(),
+    getAccountAssistant(),
   ]);
-  const capacity = checkCapacity(account.plan.id, usage.assistants, 'assistants');
-  const isFirst = usage.assistants === 0;
+
+  // An account has one assistant; once it exists there is nothing to set up here.
+  if (assistant) {
+    redirect(`/a/${assistant.id}`);
+  }
 
   // A plan chosen on the pricing page rides along until billing picks it up.
   const chosenPlan = first(params.plan);
@@ -41,29 +45,11 @@ export default async function OnboardingPage({ searchParams }: PageProps<'/onboa
     ? `/billing?plan=${pendingPlan.id}${isBillingInterval(chosenInterval) ? `&interval=${chosenInterval}` : ''}`
     : '/billing';
 
-  if (!capacity.allowed) {
-    return (
-      <PageContainer>
-        <PageHeader
-          title="New assistant"
-          description="Every assistant answers from its own documentation."
-        />
-        <div className={FORM_COLUMN}>
-          <LimitReached plan={account.plan} capacity={capacity} />
-        </div>
-      </PageContainer>
-    );
-  }
-
   return (
     <PageContainer>
       <PageHeader
-        title={isFirst ? 'Create your first assistant' : 'New assistant'}
-        description={
-          isFirst
-            ? 'Name it after the product it will answer for. Next you will point it at your docs.'
-            : 'Each assistant has its own docs, inbox and widget. Next you will point this one at its docs.'
-        }
+        title="Create your assistant"
+        description="Each account has one assistant. Name it after the product it will answer for. Next you will point it at your docs."
       />
       <div className={FORM_COLUMN}>
         {pendingPlan ? (

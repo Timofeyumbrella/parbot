@@ -61,7 +61,7 @@ type UsageMetersProps = {
   className?: string;
 };
 
-/** The three limits a plan sets, with how much of each the account has used. */
+/** The limits a plan sets, with how much of each the account has used. */
 export const UsageMeters = ({ usage, plan, className }: UsageMetersProps) => (
   <Card className={className}>
     <CardHeader>
@@ -71,7 +71,6 @@ export const UsageMeters = ({ usage, plan, className }: UsageMetersProps) => (
       </CardDescription>
     </CardHeader>
     <CardContent className="flex flex-col gap-4">
-      <UsageMeter label="Assistants" used={usage.assistants} limit={plan.assistants} />
       <UsageMeter label="Indexed pages" used={usage.pages} limit={plan.pages} />
       <UsageMeter
         label="Answers this month"
