@@ -76,7 +76,8 @@ const SidebarBody = ({
   email,
   planName,
   onNavigate,
-}: AppSidebarProps & { onNavigate?: () => void }) => {
+  inSheet = false,
+}: AppSidebarProps & { onNavigate?: () => void; inSheet?: boolean }) => {
   const pathname = usePathname();
   const [, startSignOut] = useTransition();
   const pending = useNavPending();
@@ -99,7 +100,8 @@ const SidebarBody = ({
 
   return (
     <div className="flex h-full flex-col gap-4 p-3">
-      <div className="flex items-center justify-between px-1 pt-1">
+      {/* In the phone sheet the close button sits top right; the toggle moves left of it. */}
+      <div className={cn('flex items-center justify-between px-1 pt-1', inSheet && 'pr-9')}>
         <Brand href={homeOf(assistant)} />
         <ThemeToggle />
       </div>
@@ -205,7 +207,7 @@ export const AppSidebar = (props: AppSidebarProps) => {
           </SheetTrigger>
           <SheetContent side="left" className="bg-sidebar w-72 p-0">
             <SheetTitle className="sr-only">Menu</SheetTitle>
-            <SidebarBody {...props} onNavigate={() => setOpen(false)} />
+            <SidebarBody {...props} inSheet onNavigate={() => setOpen(false)} />
           </SheetContent>
         </Sheet>
       </div>
