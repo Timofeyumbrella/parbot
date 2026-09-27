@@ -2,28 +2,44 @@ import { describe, expect, it } from 'vitest';
 
 import {
   bucketDaily,
+  DEFAULT_PERIOD,
   dayLabel,
   hostnameOf,
   inboxHref,
   labelIndexes,
   niceTicks,
+  overviewHref,
   parseConversationFilter,
   parseDays,
   parseInboxTab,
   percentage,
+  PERIODS,
   periodStart,
 } from './analytics';
 
 const NOW = new Date('2026-09-23T15:30:00Z');
 
 describe('parseDays', () => {
-  it('accepts the supported periods and falls back to 30', () => {
+  it('accepts the supported periods and falls back to the week', () => {
+    expect(DEFAULT_PERIOD).toBe(7);
     expect(parseDays('7')).toBe(7);
     expect(parseDays('30')).toBe(30);
-    expect(parseDays(['7', '30'])).toBe(7);
-    expect(parseDays('90')).toBe(30);
-    expect(parseDays('abc')).toBe(30);
-    expect(parseDays(undefined)).toBe(30);
+    expect(parseDays(['30', '7'])).toBe(30);
+    expect(parseDays('90')).toBe(7);
+    expect(parseDays('abc')).toBe(7);
+    expect(parseDays(undefined)).toBe(7);
+  });
+});
+
+describe('overviewHref', () => {
+  it('leaves the default period out of the URL and names the other', () => {
+    expect(overviewHref('a1', 7)).toBe('/a/a1');
+    expect(overviewHref('a1', 30)).toBe('/a/a1?days=30');
+    // Every period the switch offers round-trips through the parser.
+    for (const days of PERIODS) {
+      const query = new URL(overviewHref('a1', days), 'http://x').searchParams.get('days');
+      expect(parseDays(query ?? undefined)).toBe(days);
+    }
   });
 });
 

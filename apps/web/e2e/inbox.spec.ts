@@ -391,7 +391,8 @@ test.describe('the inbox and the overview', () => {
           }),
         );
 
-    await visit(page, `/a/${seeded.assistantId}`);
+    // The old question is ten days back, outside the Overview's default week.
+    await visit(page, `/a/${seeded.assistantId}?days=30`);
     await expect(page.getByTestId('knowledge-gaps').getByText(OLD_QUESTION)).toBeVisible();
 
     const rows = await measure();

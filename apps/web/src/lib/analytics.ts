@@ -9,7 +9,11 @@ export const PERIODS = [7, 30] as const;
 
 export type PeriodDays = (typeof PERIODS)[number];
 
-export const DEFAULT_PERIOD: PeriodDays = 30;
+/**
+ * The Overview opens on a week: what a docs team acts on is this week's gaps against last week's.
+ * Thirty days is one click away for the longer trend.
+ */
+export const DEFAULT_PERIOD: PeriodDays = 7;
 
 const DAY_MS = 86_400_000;
 
@@ -20,6 +24,10 @@ export const parseDays = (value: string | string[] | undefined): PeriodDays => {
 
   return PERIODS.find((period) => period === parsed) ?? DEFAULT_PERIOD;
 };
+
+/** The Overview URL for a period. The default is left out, so the sidebar link and it are one page. */
+export const overviewHref = (assistantId: string, days: PeriodDays) =>
+  `/a/${assistantId}${days === DEFAULT_PERIOD ? '' : `?days=${days}`}`;
 
 /** Midnight UTC of the day the period starts on, so that `days` buckets end with today. */
 export const periodStart = (days: number, now = new Date()) => {
