@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { toast } from 'sonner';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { AddSourceState } from '@/actions/sources';
@@ -77,11 +78,6 @@ const source = (overrides: Partial<Source> = {}): Source => ({
 
 /** What the database would answer a refetch with. Tests move it as the server would. */
 let serverRows: Source[] = [];
-/** Pages the server counts that the rows on screen do not show, such as a source another tab added. */
-let otherPages = 0;
-
-const pagesOnServer = () =>
-  otherPages + serverRows.reduce((sum, row) => sum + row.document_count, 0);
 
 const meter = () => screen.getAllByTestId('pages-meter')[0]!;
 
@@ -102,7 +98,6 @@ const renderScreen = (
           assistantId={ASSISTANT}
           ownerId={OWNER}
           initialSources={sources}
-          initialPagesUsed={12}
           plan={{ name: 'Hobby', pages: 100 }}
           liveAi
           {...props}
@@ -124,18 +119,20 @@ const changeHandler = async (): Promise<ChangeHandler> => {
 describe('KnowledgeScreen', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    otherPages = 0;
     channel.on.mockReturnValue(channel);
     channel.subscribe.mockReturnValue(channel);
-    supabase.from.mockImplementation((table: string) =>
-      table === 'documents'
-        ? { select: () => Promise.resolve({ count: pagesOnServer(), error: null }) }
-        : {
-            select: () => ({
-              eq: () => ({ order: () => Promise.resolve({ data: serverRows, error: null }) }),
-            }),
-          },
-    );
+    supabase.from.mockImplementation((table: string) => {
+      // The meter is the rows' own count; a second request for it could only lag them.
+      if (table !== 'sources') {
+        throw new Error(`The Knowledge screen read ${table}.`);
+      }
+
+      return {
+        select: () => ({
+          eq: () => ({ order: () => Promise.resolve({ data: serverRows, error: null }) }),
+        }),
+      };
+    });
   });
 
   it('shows the empty state with the four ways in, and opens the dialog on the chosen one', async () => {
@@ -224,6 +221,18 @@ describe('KnowledgeScreen', () => {
       }),
     );
     await waitFor(() => expect(screen.getByText('Indexing 2 of 3 pages')).toBeInTheDocument());
+    expect(meter()).toHaveTextContent(/^0 of 100 pages/);
+
+    // Each page written bumps the row's count, and the meter goes with it.
+    act(() =>
+      push({
+        eventType: 'UPDATE',
+        new: { ...row, status: 'indexing', pages_done: 2, document_count: 2, chunk_count: 6 },
+        old: { id: row.id },
+      }),
+    );
+    await waitFor(() => expect(screen.getByText(/2 pages · 6 passages/)).toBeInTheDocument());
+    expect(meter()).toHaveTextContent(/^2 of 100 pages/);
 
     const ready = {
       ...row,
@@ -234,16 +243,16 @@ describe('KnowledgeScreen', () => {
       chunk_count: 9,
     };
 
-    // A finished run makes the screen read the page count again, across every assistant.
-    otherPages = 5;
     serverRows = [ready];
     act(() => push({ eventType: 'UPDATE', new: ready, old: { id: row.id } }));
     await waitFor(() => expect(screen.getByText('Ready')).toBeInTheDocument());
+    // The same render that shows the row ready shows its pages on the meter.
     expect(screen.getByText(/3 pages · 9 passages/)).toBeInTheDocument();
-    await waitFor(() => expect(meter()).toHaveTextContent(/^8 of 100 pages/));
+    expect(meter()).toHaveTextContent(/^3 of 100 pages/);
+    expect(supabase.from).not.toHaveBeenCalledWith('documents');
   });
 
-  it('reads the page count again when the poll brings a finished row', async () => {
+  it('moves the meter with the rows when the poll brings finished runs', async () => {
     const indexing = source({
       title: 'Guide',
       status: 'indexing',
@@ -252,39 +261,33 @@ describe('KnowledgeScreen', () => {
       document_count: 1,
       chunk_count: 3,
     });
+    const other = source({
+      title: 'Handbook',
+      status: 'indexing',
+      pages_found: 6,
+      pages_done: 0,
+      document_count: 0,
+      chunk_count: 0,
+      created_at: '2026-09-19T12:00:00Z',
+    });
     const first = source({ title: 'Notes', document_count: 1, created_at: '2026-09-19T10:00:00Z' });
-    const { client } = renderScreen([indexing, first], { initialPagesUsed: 2 });
+    const { client } = renderScreen([indexing, other, first]);
 
     expect(meter()).toHaveTextContent(/^2 of 100 pages/);
 
-    // Realtime stays silent and the poll brings the finished row. The run writes its last page,
-    // then marks the row ready, and a count read beside the rows can land before that page.
-    let countedPages = 2;
-
-    serverRows = [{ ...indexing, status: 'ready', pages_done: 2, document_count: 2 }, first];
-    supabase.from.mockImplementation((table: string) =>
-      table === 'documents'
-        ? { select: () => Promise.resolve({ count: countedPages, error: null }) }
-        : {
-            select: () => ({
-              eq: () => ({
-                order: () => {
-                  // A count read after this one sees the last page.
-                  void Promise.resolve().then(() => {
-                    countedPages = pagesOnServer();
-                  });
-
-                  return Promise.resolve({ data: serverRows, error: null });
-                },
-              }),
-            }),
-          },
-    );
+    // Realtime stays silent and the poll brings both runs finished. The meter once read the count
+    // in a request of its own and showed 2 pages beside three ready rows for a few seconds.
+    serverRows = [
+      { ...indexing, status: 'ready', pages_done: 2, document_count: 2 },
+      { ...other, status: 'ready', pages_done: 6, document_count: 6, chunk_count: 18 },
+      first,
+    ];
 
     await act(() => client.refetchQueries({ queryKey: sourcesQueryKey(ASSISTANT) }));
 
-    await waitFor(() => expect(screen.getAllByText('Ready')).toHaveLength(2));
-    await waitFor(() => expect(meter()).toHaveTextContent(/^3 of 100 pages/));
+    await waitFor(() => expect(screen.getAllByText('Ready')).toHaveLength(3));
+    expect(meter()).toHaveTextContent(/^9 of 100 pages/);
+    expect(supabase.from).not.toHaveBeenCalledWith('documents');
   });
 
   it('shows a finished run that left pages out', () => {
@@ -411,7 +414,6 @@ describe('KnowledgeScreen', () => {
     const row = source({ title: 'Old notes', document_count: 1 });
     let finishDelete: () => void = () => {};
 
-    otherPages = 11;
     actions.deleteSource.mockImplementation(
       () =>
         new Promise((resolve) => {
@@ -422,7 +424,9 @@ describe('KnowledgeScreen', () => {
         }),
     );
 
-    renderScreen([row], { initialPagesUsed: 12 });
+    renderScreen([row]);
+
+    expect(meter()).toHaveTextContent(/^1 of 100 pages/);
 
     await user.click(screen.getByRole('button', { name: 'Actions for Old notes' }));
     await user.click(await screen.findByRole('menuitem', { name: 'Delete' }));
@@ -438,13 +442,39 @@ describe('KnowledgeScreen', () => {
     // Gone from the list and the meter before the server has answered.
     await waitFor(() => expect(screen.queryByTestId('source-row')).not.toBeInTheDocument());
     expect(actions.deleteSource).toHaveBeenCalledWith(row.id);
-    expect(meter()).toHaveTextContent(/^11 of 100 pages/);
+    expect(meter()).toHaveTextContent(/^0 of 100 pages/);
     expect(screen.getByRole('heading', { name: 'Point Parbot at your docs' })).toBeInTheDocument();
 
-    // Once it has, the meter reads the server's count again, pages the list does not show included.
-    otherPages = 10;
+    // Once it has, nothing is read again: the meter already says what the server counts.
     act(() => finishDelete());
-    await waitFor(() => expect(meter()).toHaveTextContent(/^10 of 100 pages/));
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Removed Old notes.'));
+    expect(meter()).toHaveTextContent(/^0 of 100 pages/);
+    expect(supabase.from).not.toHaveBeenCalledWith('documents');
+  });
+
+  it('puts the row and its pages back when the delete fails', async () => {
+    const user = userEvent.setup();
+    const row = source({ title: 'Old notes', document_count: 4 });
+
+    actions.deleteSource.mockResolvedValue({ error: 'The source could not be deleted.' });
+    renderScreen([row, source({ title: 'Guide', document_count: 8 })]);
+
+    expect(meter()).toHaveTextContent(/^12 of 100 pages/);
+
+    await user.click(screen.getByRole('button', { name: 'Actions for Old notes' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Delete' }));
+    await user.click(
+      within(await screen.findByRole('dialog', { name: 'Delete Old notes?' })).getByRole('button', {
+        name: 'Delete',
+      }),
+    );
+
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith('The source could not be deleted.'),
+    );
+    expect(screen.getAllByTestId('source-row')).toHaveLength(2);
+    expect(screen.getByText('Old notes')).toBeInTheDocument();
+    expect(meter()).toHaveTextContent(/^12 of 100 pages/);
   });
 
   it('opens an uploaded file or its text from the row', async () => {

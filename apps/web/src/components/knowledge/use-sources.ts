@@ -9,14 +9,19 @@ import { deleteSource, reindexSource } from '@/actions/sources';
 import type { Source } from '@/lib/db';
 import { getSupabaseBrowserClient, realtimeReadyClient } from '@/lib/supabase/client';
 
-import { isActiveStatus, type SourceStatus } from './format';
+import { isActiveStatus } from './format';
 
 export const sourcesQueryKey = (assistantId: string) =>
   ['knowledge', assistantId, 'sources'] as const;
 
-/** The account's pages across every assistant, as the meter on this assistant's screen shows it. */
-export const pagesUsedQueryKey = (assistantId: string) =>
-  ['knowledge', assistantId, 'pages-used'] as const;
+/**
+ * The pages the plan counts, read off the rows themselves. The server counts the account's
+ * documents; every document belongs to a source, a trigger keeps each source's document_count
+ * equal to its documents, and an account has one assistant, so the sum over this list is that
+ * count. Derived from the cached rows, the meter changes in the same render as they do.
+ */
+export const pagesUsedBy = (sources: Pick<Source, 'document_count'>[]) =>
+  sources.reduce((sum, source) => sum + source.document_count, 0);
 
 /** How often the list is refreshed while a source is being indexed, on top of realtime updates. */
 export const ACTIVE_POLL_MS = 4000;
@@ -45,23 +50,9 @@ const loadSources = async (assistantId: string) => {
   return data;
 };
 
-/** Row level security limits the count to the visitor's own documents, in every assistant. */
-const loadPagesUsed = async () => {
-  const { count, error } = await getSupabaseBrowserClient()
-    .from('documents')
-    .select('id', { count: 'exact', head: true });
-
-  if (error) {
-    throw new Error(`The page count could not be loaded (${error.message}).`);
-  }
-
-  return count ?? 0;
-};
-
 type UseSourcesOptions = {
   assistantId: string;
   initialSources: Source[];
-  initialPagesUsed: number;
 };
 
 /**
@@ -69,16 +60,11 @@ type UseSourcesOptions = {
  * realtime pushes row changes as ingestion writes them, and a slow poll covers a dropped socket
  * while anything is still indexing. Rows the screen draws ahead of the server (an added source, a
  * queued re-index, a removed row) survive a poll until the server has answered or realtime has
- * delivered the real row. The pages meter is read again whenever a row settles or goes away.
+ * delivered the real row. The pages meter is the sum of the rows drawn, so it never lags them.
  */
-export const useSources = ({
-  assistantId,
-  initialSources,
-  initialPagesUsed,
-}: UseSourcesOptions) => {
+export const useSources = ({ assistantId, initialSources }: UseSourcesOptions) => {
   const queryClient = useQueryClient();
   const queryKey = useMemo(() => sourcesQueryKey(assistantId), [assistantId]);
-  const pagesKey = useMemo(() => pagesUsedQueryKey(assistantId), [assistantId]);
   // id -> the row to show in place of the server's, or null while a delete is in flight.
   const overrides = useRef(new Map<string, Source | null>());
 
@@ -106,41 +92,8 @@ export const useSources = ({
       current.state.data?.some((source) => isActiveStatus(source.status)) ? ACTIVE_POLL_MS : false,
   });
 
-  const pages = useQuery({
-    queryKey: pagesKey,
-    queryFn: loadPagesUsed,
-    initialData: initialPagesUsed,
-  });
-
   const sources = query.data;
-  // Each row's status as last drawn; null until the first draw, which the server already counted.
-  const drawn = useRef<Map<string, SourceStatus> | null>(null);
-
-  // A run that finishes or a source that goes changes the account's page count. The news can come
-  // from realtime, the poll or the screen's own request, and the poll reads the rows and the count
-  // side by side, so the count can predate the row it came with. Reading the count once the rows
-  // show the change covers every path. Mid-run progress is left out: a large crawl would read it
-  // once per page.
-  useEffect(() => {
-    const previous = drawn.current;
-    const current = new Map(sources.map((source) => [source.id, source.status]));
-
-    drawn.current = current;
-
-    if (!previous) {
-      return;
-    }
-
-    const settled = sources.some(
-      (source) => !isActiveStatus(source.status) && previous.get(source.id) !== source.status,
-    );
-    // A row hidden by an unfinished delete is the mutation's to account for, once it succeeds.
-    const gone = [...previous.keys()].some((id) => !current.has(id) && !overrides.current.has(id));
-
-    if (settled || gone) {
-      void queryClient.invalidateQueries({ queryKey: pagesKey });
-    }
-  }, [sources, queryClient, pagesKey]);
+  const pagesUsed = useMemo(() => pagesUsedBy(sources), [sources]);
 
   const setSources = useCallback(
     (updater: (sources: Source[]) => Source[]) =>
@@ -148,12 +101,6 @@ export const useSources = ({
         current ? updater(current) : current,
       ),
     [queryClient, queryKey],
-  );
-
-  const shiftPagesUsed = useCallback(
-    (delta: number) =>
-      queryClient.setQueryData<number>(pagesKey, (used) => Math.max((used ?? 0) + delta, 0)),
-    [queryClient, pagesKey],
   );
 
   /** Shows `row` for `id` (or hides the id) until the server has spoken. */
@@ -270,29 +217,25 @@ export const useSources = ({
         throw new Error(result.error);
       }
     },
-    onMutate: async (source) => {
+    onMutate: (source) => {
+      // Hiding the row takes its pages off the meter in the same render.
       override(source.id, null);
-      // A count already on its way predates the delete and would put the pages back.
-      await queryClient.cancelQueries({ queryKey: pagesKey });
-      shiftPagesUsed(-source.document_count);
 
       return { previous: source };
     },
     onError: (error, source, context) => {
       settle(source.id, context?.previous ?? source);
-      shiftPagesUsed(source.document_count);
       toast.error(error.message);
     },
     onSuccess: (_result, source) => {
       settle(source.id, null);
       toast.success(`Removed ${source.title}.`);
-      void queryClient.invalidateQueries({ queryKey: pagesKey });
     },
   });
 
   return {
     sources,
-    pagesUsed: pages.data,
+    pagesUsed,
     error: query.error,
     isRefreshing: query.isFetching,
     refetch: query.refetch,
