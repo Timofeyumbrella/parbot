@@ -176,6 +176,71 @@ describe('ChatComposer', () => {
     );
   });
 
+  it('references a file Knowledge already has instead of uploading it again', async () => {
+    const user = userEvent.setup();
+    const onSend = vi.fn();
+    const harbor = source({
+      id: 's-harbor',
+      title: 'harbor-club.pdf',
+      kind: 'upload',
+      mime_type: 'application/pdf',
+      byte_size: 120,
+    });
+
+    db.rows = [harbor, ...db.rows];
+    renderComposer({ onSend });
+    await waitFor(() =>
+      expect(queryClient.getQueryData(referenceSourcesKey('asst-1'))).toBeTruthy(),
+    );
+
+    const copy = new File(['x'.repeat(120)], 'harbor-club.pdf', { type: 'application/pdf' });
+
+    await user.upload(screen.getByLabelText('Choose a file to attach'), copy);
+
+    expect(uploads).toHaveLength(0);
+    expect(chipTexts()).toEqual(['harbor-club.pdfAlready in Knowledge']);
+    expect(screen.getByTestId('reference-chip')).toHaveAttribute(
+      'title',
+      'harbor-club.pdf is already in Knowledge, so the question reads that file. It was not uploaded again.',
+    );
+
+    // Attached again, it is still the one chip.
+    await user.upload(screen.getByLabelText('Choose a file to attach'), copy);
+    expect(chipTexts()).toEqual(['harbor-club.pdfAlready in Knowledge']);
+
+    await user.type(box(), 'What are the opening hours?{Enter}');
+    expect(onSend).toHaveBeenCalledWith('What are the opening hours?', [
+      { id: 's-harbor', title: 'harbor-club.pdf', kind: 'upload' },
+    ]);
+    expect(uploads).toHaveLength(0);
+  });
+
+  it('uploads a file whose copy in Knowledge differs in size or failed, and joins an upload in flight', async () => {
+    const user = userEvent.setup();
+
+    db.rows = [
+      source({ id: 's-old', title: 'harbor-club.pdf', kind: 'upload', byte_size: 99 }),
+      source({ id: 's-bad', title: 'rates.pdf', kind: 'upload', byte_size: 50, status: 'failed' }),
+    ];
+    renderComposer();
+    await waitFor(() =>
+      expect(queryClient.getQueryData(referenceSourcesKey('asst-1'))).toBeTruthy(),
+    );
+
+    const newer = new File(['x'.repeat(120)], 'harbor-club.pdf', { type: 'application/pdf' });
+    const rates = new File(['x'.repeat(50)], 'rates.pdf', { type: 'application/pdf' });
+
+    await user.upload(screen.getByLabelText('Choose a file to attach'), [newer, rates]);
+
+    expect(uploads).toHaveLength(2);
+    expect(chipTexts()).toEqual(['harbor-club.pdfUploading', 'rates.pdfUploading']);
+
+    // The same file again while it is still uploading: no second upload, no second chip.
+    await user.upload(screen.getByLabelText('Choose a file to attach'), newer);
+    expect(uploads).toHaveLength(2);
+    expect(chipTexts()).toEqual(['harbor-club.pdfUploading', 'rates.pdfUploading']);
+  });
+
   it("starts from the conversation's references and lets one be removed for the next question", async () => {
     const user = userEvent.setup();
     const onSend = vi.fn();

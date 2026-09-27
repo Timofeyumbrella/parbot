@@ -10,9 +10,12 @@ import { CHAT_NAMESPACE } from '@/lib/chat/queries';
 import {
   addReference,
   chipStatus,
+  findKnownUpload,
   isIndexingStatus,
   type MessageReference,
   type ReferenceOption,
+  toReference,
+  uploadTitle,
 } from '@/lib/chat/references';
 import { composerUploads } from '@/lib/chat/uploads';
 import type { Source } from '@/lib/db';
@@ -46,6 +49,7 @@ export const toReferenceOption = (row: SourceRow): ReferenceOption => ({
   status: row.status,
   detail: describeSource(row),
   createdAt: row.created_at,
+  byteSize: row.byte_size,
 });
 
 const loadReferenceOptions = async (assistantId: string) => {
@@ -123,6 +127,7 @@ export const useReferenceChips = (
       ...reference,
       status: chipStatus({ upload, source: byId.get(reference.id), loaded: sources.isSuccess }),
       error: upload?.status === 'failed' ? upload.error : undefined,
+      ...(composerUploads.isKnown(reference.id) ? { known: true } : {}),
     };
   };
 
@@ -135,7 +140,9 @@ const KNOWLEDGE_NAMESPACE = ['knowledge'] as const;
 /**
  * Attaching files from the chat: each one is uploaded into Knowledge through the same route the
  * Add source dialog uses, and becomes a reference at once, with its upload's status on its chip.
- * Returns the references with the new files added, up to `limit`.
+ * A file Knowledge already has (same name and size, not failed), or one uploading from an attach
+ * a moment ago, is referenced as it is instead of being uploaded a second time; its chip says it
+ * is the file already in Knowledge. Returns the references with the new files added, up to `limit`.
  */
 export const useAttachFiles = (assistantId: string) => {
   const queryClient = useQueryClient();
@@ -147,6 +154,7 @@ export const useAttachFiles = (assistantId: string) => {
       options: { limit: number; limitMessage: string },
     ) => {
       let next = current;
+      const listed = queryClient.getQueryData<ReferenceOption[]>(referenceSourcesKey(assistantId));
 
       for (const file of files) {
         const problem = uploadProblem(file);
@@ -156,14 +164,41 @@ export const useAttachFiles = (assistantId: string) => {
           continue;
         }
 
+        const inKnowledge = listed ? findKnownUpload(listed, file) : undefined;
+        const inFlight = inKnowledge ? null : composerUploads.find(assistantId, file);
+        const same: MessageReference | null = inKnowledge
+          ? toReference(inKnowledge)
+          : inFlight
+            ? { id: inFlight, title: uploadTitle(file.name), kind: 'upload' }
+            : null;
+
+        if (same && next.some((reference) => reference.id === same.id)) {
+          continue;
+        }
+
         if (next.length >= options.limit) {
           toast.error(options.limitMessage);
           break;
         }
 
+        if (same) {
+          if (inKnowledge) {
+            composerUploads.markKnown(same.id);
+            // The list may be a few seconds old: read it again, so a copy deleted in the
+            // meantime shows as Removed on its chip rather than as Ready.
+            void queryClient.invalidateQueries({
+              queryKey: referenceSourcesKey(assistantId),
+              exact: true,
+            });
+          }
+
+          next = addReference(next, same, options.limit);
+          continue;
+        }
+
         const reference: MessageReference = {
           id: crypto.randomUUID(),
-          title: file.name.slice(0, 200),
+          title: uploadTitle(file.name),
           kind: 'upload',
         };
 

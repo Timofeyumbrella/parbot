@@ -10,9 +10,16 @@ import type { UploadState } from './references';
  * and a question sent while its file is still uploading waits for the upload wherever it is.
  */
 
-type Entry = { state: UploadState; done: Promise<Source | null> };
+type Entry = {
+  state: UploadState;
+  done: Promise<Source | null>;
+  /** What was sent, so the same file attached again joins this upload instead of starting one. */
+  file: { assistantId: string; name: string; size: number };
+};
 
 const entries = new Map<string, Entry>();
+/** Sources a file attached from the chat turned out to be already (see `findKnownUpload`). */
+const known = new Set<string>();
 const listeners = new Set<() => void>();
 let version = 0;
 
@@ -87,11 +94,42 @@ export const composerUploads = {
       },
     );
 
-    entries.set(input.id, { state: { status: 'uploading' }, done });
+    entries.set(input.id, {
+      state: { status: 'uploading' },
+      done,
+      file: { assistantId: input.assistantId, name: input.file.name, size: input.file.size },
+    });
     notify();
 
     return done;
   },
+
+  /**
+   * The upload of this same file (name and size) into this assistant that is still on its way or
+   * saved a moment ago, if any; a refused one does not count.
+   */
+  find: (assistantId: string, file: { name: string; size: number }) => {
+    for (const [id, entry] of entries) {
+      if (
+        entry.state.status !== 'failed' &&
+        entry.file.assistantId === assistantId &&
+        entry.file.name === file.name &&
+        entry.file.size === file.size
+      ) {
+        return id;
+      }
+    }
+
+    return null;
+  },
+
+  /** Records that an attached file was already in Knowledge, so its chip can say so. */
+  markKnown: (id: string) => {
+    known.add(id);
+    notify();
+  },
+
+  isKnown: (id: string) => known.has(id),
 
   state: (id: string): UploadState | undefined => entries.get(id)?.state,
 
@@ -128,6 +166,7 @@ export const composerUploads = {
   /** Test hook. */
   reset: () => {
     entries.clear();
+    known.clear();
     notify();
   },
 };

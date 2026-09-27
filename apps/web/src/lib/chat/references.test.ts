@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest';
 
 import {
   addReference,
+  chipLabel,
   chipStatus,
   filterReferenceOptions,
+  findKnownUpload,
   findMention,
   MAX_REFERENCES,
   parseReferences,
@@ -144,5 +146,68 @@ describe('uploadingMessage', () => {
   it('names the file, or the first and how many more', () => {
     expect(uploadingMessage(['limits.md'])).toBe('Uploading limits.md…');
     expect(uploadingMessage(['limits.md', 'a.pdf'])).toBe('Uploading limits.md and 1 more…');
+  });
+});
+
+describe('findKnownUpload', () => {
+  const upload = (title: string, patch: Partial<ReferenceOption> = {}): ReferenceOption => ({
+    id: `s-${title}-${patch.status ?? 'ready'}`,
+    title,
+    kind: 'upload',
+    status: 'ready',
+    detail: 'PDF · 2 KB',
+    createdAt: '2026-09-20T00:00:00Z',
+    byteSize: 2048,
+    ...patch,
+  });
+
+  it('finds the upload with the same name and size', () => {
+    const options = [upload('rates.pdf'), upload('harbor-club.pdf')];
+
+    expect(findKnownUpload(options, { name: 'harbor-club.pdf', size: 2048 })?.title).toBe(
+      'harbor-club.pdf',
+    );
+  });
+
+  it('takes one still being indexed, but never a failed one', () => {
+    expect(
+      findKnownUpload([upload('guide.pdf', { status: 'indexing' })], {
+        name: 'guide.pdf',
+        size: 2048,
+      })?.status,
+    ).toBe('indexing');
+    expect(
+      findKnownUpload([upload('guide.pdf', { status: 'failed' })], {
+        name: 'guide.pdf',
+        size: 2048,
+      }),
+    ).toBeUndefined();
+  });
+
+  it('is not fooled by a different size, a pasted text of that name, or a missing size', () => {
+    expect(
+      findKnownUpload([upload('guide.pdf')], { name: 'guide.pdf', size: 2049 }),
+    ).toBeUndefined();
+    expect(
+      findKnownUpload([upload('guide.pdf', { kind: 'text' })], { name: 'guide.pdf', size: 2048 }),
+    ).toBeUndefined();
+    expect(
+      findKnownUpload([upload('guide.pdf', { byteSize: null })], { name: 'guide.pdf', size: 2048 }),
+    ).toBeUndefined();
+  });
+
+  it('compares names as the upload route stores them', () => {
+    const long = `${'a'.repeat(210)}.pdf`;
+
+    expect(findKnownUpload([upload(long.slice(0, 200))], { name: long, size: 2048 })).toBeDefined();
+  });
+});
+
+describe('chipLabel', () => {
+  it('says a known file is the one already in Knowledge while it can be read', () => {
+    expect(chipLabel('ready', true)).toBe('Already in Knowledge');
+    expect(chipLabel('indexing', true)).toBe('Already in Knowledge, indexing');
+    expect(chipLabel('missing', true)).toBe('Removed');
+    expect(chipLabel('ready')).toBe('Ready');
   });
 });
