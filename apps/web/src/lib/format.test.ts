@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatDuration, plural, pluralWord } from './format';
+import { formatDuration, formatDurationChange, plural, pluralWord } from './format';
 
 describe('formatDuration', () => {
   it('reads as precise as it is useful', () => {
@@ -14,6 +14,20 @@ describe('formatDuration', () => {
     expect(formatDuration(59_600)).toBe('1 min');
     expect(formatDuration(95_330)).toBe('1 min 35 s');
     expect(formatDuration(-5)).toBe('0 ms');
+  });
+});
+
+describe('formatDurationChange', () => {
+  it('speaks the unit of the duration it follows', () => {
+    // Regression: the Overview read "1.8 s" above "Down 364 ms".
+    expect(formatDurationChange(364, 1800)).toBe('0.4 s');
+    expect(formatDurationChange(999, 1800)).toBe('1.0 s');
+    expect(formatDurationChange(2400, 3100)).toBe('2.4 s');
+    expect(formatDurationChange(364, 850)).toBe('364 ms');
+    expect(formatDurationChange(364, null)).toBe('364 ms');
+    // Too small for tenths of a second.
+    expect(formatDurationChange(30, 1800)).toBe('30 ms');
+    expect(formatDurationChange(-5, 1800)).toBe('0 ms');
   });
 });
 

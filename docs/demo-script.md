@@ -599,10 +599,13 @@ _Lead form after 1.4 to 1.5 s, and Send took 0.26 s._
   cost a few seconds, not twenty. It still retries and falls back on errors. If a message fails, it
   says so with a Retry button. Say "the free tier is rate limited" and click Retry. If it stays
   slow, stop and record the section later.
-- **A row fails.** "Failed · The embedding model is busy right now" means an embedding limit, not a
-  problem with the source. Keep going with the other sources while it waits. After a minute, open
-  the row's ⋯ menu and choose Re-index: pages already indexed are kept. If every new source fails
-  after its first page, the daily quota is gone: stop for the day, since chat answers fail too.
+- **A row is slow or stops early.** A per-minute embedding limit makes indexing wait and carry on
+  by itself, so a crawl can take longer than rehearsed; keep going with the other sources. If a
+  row ends Ready with "stopped after N of M pages" or fails as "busy", wait a minute, open the
+  row's ⋯ menu and choose Re-index: pages already indexed are kept.
+- **A row says Paused, or chat says "Answers are paused".** The daily quota is used up ("the AI
+  provider's daily limit for this deployment is used up"), and the message says when it resets.
+  Stop for the day: nothing is indexed or answered until then.
 - **hono.dev is slow or down.** Use `https://docs.lemonsqueezy.com/help/webhooks/signing-requests`
   as the website: 5 pages, 21 passages, Ready in 6.4 s, and the row becomes "Signing Requests".
   The Hono questions no longer apply. Ask `Which webhook event fires when an order is refunded?`

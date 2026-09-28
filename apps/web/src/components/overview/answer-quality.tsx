@@ -1,5 +1,11 @@
 import { inboxHref, type DailyRow } from '@/lib/analytics';
-import { formatCount, formatDuration, plural, pluralWord } from '@/lib/format';
+import {
+  formatCount,
+  formatDuration,
+  formatDurationChange,
+  plural,
+  pluralWord,
+} from '@/lib/format';
 import {
   answerRate,
   type Change,
@@ -129,7 +135,7 @@ export const AnswerQuality = ({
         >
           <ChangeLine
             change={latencyChange}
-            amount={formatDuration(latencyChange?.amount ?? 0)}
+            amount={formatDurationChange(latencyChange?.amount ?? 0, current.medianLatencyMs)}
             days={days}
           />
           <Caption>The median, from the question to the finished answer.</Caption>

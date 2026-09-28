@@ -78,7 +78,8 @@ describe('AnswerQuality', () => {
     // Faster is better: down and good.
     expect(time.change).toHaveAttribute('data-direction', 'down');
     expect(time.change).toHaveAttribute('data-tone', 'good');
-    expect(time.change).toHaveTextContent('Down 500 ms');
+    // In the unit of the value above it: "1.4 s", so "0.5 s", not "500 ms".
+    expect(time.change).toHaveTextContent('Down 0.5 s');
 
     expect(screen.getByRole('link', { name: /Read the 9 unanswered questions/ })).toHaveAttribute(
       'href',

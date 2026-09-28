@@ -94,3 +94,15 @@ export const formatDuration = (ms: number) => {
 
   return rest === 0 ? `${minutes} min` : `${minutes} min ${rest} s`;
 };
+
+/**
+ * A change in a duration, in the unit the duration itself is shown in: "1.8 s" is followed by
+ * "Down 0.4 s", not "Down 364 ms". A change too small to show in tenths of a second keeps its ms.
+ */
+export const formatDurationChange = (amountMs: number, shownMs: number | null) => {
+  const amount = Math.max(Math.round(amountMs), 0);
+
+  return shownMs !== null && Math.round(shownMs) >= 1000 && amount >= 50 && amount < 1000
+    ? `${(Math.round(amount / 100) / 10).toFixed(1)} s`
+    : formatDuration(amount);
+};

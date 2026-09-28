@@ -193,7 +193,7 @@ export default async function OverviewPage({
               now={clock}
             />
 
-            <div className="grid gap-6 lg:grid-cols-2">
+            <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
               <DislikedAnswers
                 assistantId={assistantId}
                 answers={(disliked.data ?? []).map((row) => ({
