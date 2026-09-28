@@ -1,4 +1,4 @@
-import { createGeminiProvider, firstChunkDeadlineFrom } from './gemini';
+import { createGeminiProvider, firstChunkDeadlineFrom, totalFirstChunkBudgetFrom } from './gemini';
 import { createStubProvider } from './stub';
 import type { AiProvider } from './types';
 
@@ -6,8 +6,10 @@ export * from './types';
 export {
   createGeminiProvider,
   DEFAULT_FIRST_CHUNK_DEADLINE_MS,
+  DEFAULT_TOTAL_FIRST_CHUNK_BUDGET_MS,
   embeddingText,
   firstChunkDeadlineFrom,
+  totalFirstChunkBudgetFrom,
 } from './gemini';
 export {
   activeDailyLimit,
@@ -47,6 +49,9 @@ export const getAiProvider = (): AiProvider => {
           embeddingModel: setting(process.env.GEMINI_EMBEDDING_MODEL),
           thinkingLevel: setting(process.env.GEMINI_THINKING_LEVEL),
           firstChunkDeadlineMs: firstChunkDeadlineFrom(process.env.GEMINI_FIRST_CHUNK_DEADLINE_MS),
+          totalFirstChunkBudgetMs: totalFirstChunkBudgetFrom(
+            process.env.GEMINI_FIRST_CHUNK_TOTAL_MS,
+          ),
         })
       : createStubProvider();
 

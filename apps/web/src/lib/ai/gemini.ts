@@ -56,6 +56,12 @@ export const DEFAULT_EMBED_WAIT_BUDGET_MS = 120_000;
  * Past this, the next model starts beside the stalled one.
  */
 export const DEFAULT_FIRST_CHUNK_DEADLINE_MS = 3500;
+/**
+ * How long the whole chain may go without a first chunk before the race gives up as busy. On a
+ * serverless host the route has a hard time limit (60 s on the chat routes); when every model
+ * stalls, giving up under it turns "the connection closed" into a clean, retryable busy error.
+ */
+export const DEFAULT_TOTAL_FIRST_CHUNK_BUDGET_MS = 25_000;
 
 export type GeminiOptions = {
   apiKey: string;
@@ -68,6 +74,12 @@ export type GeminiOptions = {
    * it. 0 turns hedging off, so a model is left only after an error.
    */
   firstChunkDeadlineMs?: number;
+  /**
+   * How long the chain as a whole may go without a first chunk before the answer is refused as
+   * busy, so the route fails cleanly instead of being cut by the host's time limit. 0 turns it
+   * off, so a stalled chain waits as long as its last model does.
+   */
+  totalFirstChunkBudgetMs?: number;
   /** Test hook: replaces the wait between retries. */
   waitImpl?: (ms: number) => Promise<void>;
   /** Test hook: replaces the SDK client. */
@@ -85,6 +97,19 @@ export const firstChunkDeadlineFrom = (value: string | undefined) => {
   const ms = Number(text);
 
   return Number.isFinite(ms) && ms >= 0 ? Math.round(ms) : DEFAULT_FIRST_CHUNK_DEADLINE_MS;
+};
+
+/** Reads GEMINI_FIRST_CHUNK_TOTAL_MS: whole milliseconds, 0 for off, the default otherwise. */
+export const totalFirstChunkBudgetFrom = (value: string | undefined) => {
+  const text = value?.trim();
+
+  if (!text) {
+    return DEFAULT_TOTAL_FIRST_CHUNK_BUDGET_MS;
+  }
+
+  const ms = Number(text);
+
+  return Number.isFinite(ms) && ms >= 0 ? Math.round(ms) : DEFAULT_TOTAL_FIRST_CHUNK_BUDGET_MS;
 };
 
 /** One model's run in the race for the first chunk, retries included. */
@@ -112,6 +137,7 @@ type RaceEvent =
   | { type: 'opened'; lane: Lane }
   | { type: 'failed'; lane: Lane; cause: unknown }
   | { type: 'deadline'; lane: Lane }
+  | { type: 'exhausted' }
   | { type: 'aborted' };
 
 /** Lets lanes, timers and the reader's stop report in any order to the one loop that decides. */
@@ -236,6 +262,10 @@ export const createGeminiProvider = (options: GeminiOptions): AiProvider => {
   const firstChunkDeadlineMs = Math.max(
     0,
     options.firstChunkDeadlineMs ?? DEFAULT_FIRST_CHUNK_DEADLINE_MS,
+  );
+  const totalFirstChunkBudgetMs = Math.max(
+    0,
+    options.totalFirstChunkBudgetMs ?? DEFAULT_TOTAL_FIRST_CHUNK_BUDGET_MS,
   );
 
   /**
@@ -544,12 +574,21 @@ export const createGeminiProvider = (options: GeminiOptions): AiProvider => {
       };
 
       lanes.push(lane);
-      void run(lane);
+      // A failure the error handling itself chokes on still ends the lane, never the process.
+      void run(lane).catch((cause: unknown) => {
+        clearTimer(lane);
+        events.push({ type: 'failed', lane, cause });
+      });
     };
 
     const onAbort = () => events.push({ type: 'aborted' });
 
     input.signal?.addEventListener('abort', onAbort, { once: true });
+
+    const budgetTimer =
+      totalFirstChunkBudgetMs > 0
+        ? setTimeout(() => events.push({ type: 'exhausted' }), totalFirstChunkBudgetMs)
+        : null;
 
     try {
       start(0);
@@ -559,6 +598,25 @@ export const createGeminiProvider = (options: GeminiOptions): AiProvider => {
 
         if (event.type === 'aborted') {
           throw input.signal?.reason ?? new DOMException('The answer was stopped.', 'AbortError');
+        }
+
+        if (event.type === 'exhausted') {
+          // A chunk that arrived in the same beat still wins; otherwise every lane has stalled.
+          const ready = lanes.find((other) => other.opened && !other.over);
+
+          if (ready) {
+            winner = ready;
+            clearDailyLimit('chat');
+
+            return ready;
+          }
+
+          const stalled = lanes.map((other) => other.model);
+
+          console.warn(
+            `[ai] no model sent a first chunk within ${totalFirstChunkBudgetMs} ms (${stalled.join(', ')}); giving up as busy before the host cuts the stream`,
+          );
+          throw new ModelBusyError(stalled);
         }
 
         const { lane } = event;
@@ -613,12 +671,23 @@ export const createGeminiProvider = (options: GeminiOptions): AiProvider => {
     } finally {
       input.signal?.removeEventListener('abort', onAbort);
 
+      if (budgetTimer) {
+        clearTimeout(budgetTimer);
+      }
+
       for (const lane of lanes) {
         clearTimer(lane);
 
         if (lane !== winner) {
           lane.over = true;
           lane.controller?.abort();
+
+          if (lane.opened) {
+            // Opened but lost: close its generator so nothing is left half-read.
+            void lane.opened.generator
+              .return({ model: lane.model, promptTokens: 0, completionTokens: 0 })
+              .catch(() => undefined);
+          }
         }
       }
     }

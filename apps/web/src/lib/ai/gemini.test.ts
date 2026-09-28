@@ -5,8 +5,10 @@ import { afterEach, beforeEach, describe, expect, it, type MockInstance, vi } fr
 import {
   createGeminiProvider,
   DEFAULT_FIRST_CHUNK_DEADLINE_MS,
+  DEFAULT_TOTAL_FIRST_CHUNK_BUDGET_MS,
   firstChunkDeadlineFrom,
   type GeminiOptions,
+  totalFirstChunkBudgetFrom,
 } from './gemini';
 import { activeDailyLimit, forgetDailyLimits } from './quota';
 import { DAILY_CHAT_QUOTA, dailyLimit, MINUTE_CHAT_QUOTA, minuteLimit } from './quota.fixtures';
@@ -373,6 +375,74 @@ describe('the Gemini chat stream', () => {
     expect(hedgeLogs()).toEqual([]);
   });
 
+  it('gives up as busy, aborting every lane, when no model sends a chunk in the total budget', async () => {
+    // The chat routes have 60 s before the host kills them mid-stream, killing the reader's
+    // error event with them. This is the stall that closed a connection on the live site.
+    const { calls, provider } = setup({
+      [PRIMARY]: [{ delay: 90_000 }],
+      [SECOND]: [{ delay: 90_000 }],
+      [LAST]: [{ delay: 90_000 }],
+    });
+
+    const done = drain(provider.stream(input()));
+
+    await vi.advanceTimersByTimeAsync(DEFAULT_FIRST_CHUNK_DEADLINE_MS);
+    await vi.advanceTimersByTimeAsync(DEFAULT_FIRST_CHUNK_DEADLINE_MS);
+    expect(models(calls)).toEqual([PRIMARY, SECOND, LAST]);
+
+    await vi.advanceTimersByTimeAsync(DEFAULT_TOTAL_FIRST_CHUNK_BUDGET_MS);
+
+    const outcome = await done;
+
+    expect(!outcome.ok && outcome.error).toBeInstanceOf(ModelBusyError);
+    expect(calls).toHaveLength(3);
+    expect(calls.every((call) => call.signal.aborted)).toBe(true);
+  });
+
+  it('waits as long as the last model does when the total budget is 0', async () => {
+    const { provider } = setup(
+      {
+        [PRIMARY]: [{ delay: 90_000 }],
+        [SECOND]: [{ delay: 90_000 }],
+        [LAST]: [{ delay: 40_000, chunks: ['Eventually.'] }],
+      },
+      { totalFirstChunkBudgetMs: 0 },
+    );
+
+    const done = drain(provider.stream(input()));
+
+    await vi.advanceTimersByTimeAsync(60_000);
+
+    const outcome = await done;
+
+    expect(outcome.ok && outcome.result.model).toBe(LAST);
+  });
+
+  it('ends a lane cleanly when even reading its failure throws', async () => {
+    // A rejection escaping a lane would otherwise crash the process on a serverless host.
+    const poisoned = new Error('boom');
+
+    Object.defineProperty(poisoned, 'status', {
+      get(): number {
+        throw new Error('poisoned status');
+      },
+    });
+
+    const { calls, provider } = setup({
+      [PRIMARY]: [{ error: poisoned }],
+      [SECOND]: [{ delay: 100, chunks: ['From the second.'] }],
+    });
+
+    const done = drain(provider.stream(input()));
+
+    await vi.advanceTimersByTimeAsync(200);
+
+    const outcome = await done;
+
+    expect(outcome.ok && outcome.result.model).toBe(SECOND);
+    expect(models(calls)).toEqual([PRIMARY, SECOND]);
+  });
+
   it('retries a busy model once and then falls back, as before hedging', async () => {
     const { calls, waits, provider } = setup({
       [PRIMARY]: [{ status: 503 }],
@@ -630,5 +700,9 @@ describe('firstChunkDeadlineFrom', () => {
     expect(firstChunkDeadlineFrom(' 0 ')).toBe(0);
     expect(firstChunkDeadlineFrom('soon')).toBe(DEFAULT_FIRST_CHUNK_DEADLINE_MS);
     expect(firstChunkDeadlineFrom('-5')).toBe(DEFAULT_FIRST_CHUNK_DEADLINE_MS);
+    expect(totalFirstChunkBudgetFrom(undefined)).toBe(DEFAULT_TOTAL_FIRST_CHUNK_BUDGET_MS);
+    expect(totalFirstChunkBudgetFrom('20000')).toBe(20_000);
+    expect(totalFirstChunkBudgetFrom(' 0 ')).toBe(0);
+    expect(totalFirstChunkBudgetFrom('later')).toBe(DEFAULT_TOTAL_FIRST_CHUNK_BUDGET_MS);
   });
 });
