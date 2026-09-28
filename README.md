@@ -4,7 +4,7 @@
 
 **Live: https://parbot-web.vercel.app** · demo login `demo@parbot.dev` / `parbot-demo`
 
-**Video walkthrough: coming soon**
+**Video walkthrough (9 min):** https://drive.google.com/file/d/1bcgZzH-YuVPtUuPwENs8HokJcMqgilbx/view
 
 Parbot is an Ask-AI assistant for developer docs. Point it at your documentation, and readers ask
 in plain language and get a streamed answer drawn from your docs with the pages it used listed
@@ -25,6 +25,7 @@ charged.
 
 | What                                                     | Where                                                                                                                                                                                           |
 | -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The video walkthrough, 9 minutes                         | [demo.mov on Google Drive](https://drive.google.com/file/d/1bcgZzH-YuVPtUuPwENs8HokJcMqgilbx/view)                                                                                              |
 | Landing page: features, embed modes, pricing             | https://parbot-web.vercel.app                                                                                                                                                                   |
 | Your own account, free, no card                          | https://parbot-web.vercel.app/signup                                                                                                                                                            |
 | The demo account, with two weeks of seeded conversations | https://parbot-web.vercel.app/login as `demo@parbot.dev` / `parbot-demo`                                                                                                                        |
