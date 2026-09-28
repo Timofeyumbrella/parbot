@@ -451,7 +451,9 @@ describe('streamAnswer error copy', () => {
           "Answers are paused: the AI provider's daily limit for this deployment is used up. Try again in about 5 hours.",
         retryAt: '2026-09-28T07:00:00.000Z',
       });
-      expect(JSON.stringify(events)).not.toMatch(/gemini|quota|429|busy/i);
+      // Only the words a reader sees: the other events carry random ids, and one may hold "429".
+      const shown = events.flatMap((event) => ('message' in event ? [event.message] : []));
+      expect(shown.join(' ')).not.toMatch(/gemini|quota|429|busy/i);
       // Nothing was answered: the question is rolled back and the slot given back.
       expect(fake.rpcNames()).toEqual(['release_message']);
     } finally {

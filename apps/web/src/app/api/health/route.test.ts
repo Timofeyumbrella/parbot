@@ -36,6 +36,8 @@ describe('GET /api/health', () => {
     vi.setSystemTime(NOW);
     vi.stubEnv('AI_PROVIDER', 'gemini');
     vi.stubEnv('GEMINI_API_KEY', 'test-key');
+    // CI's unit job runs without a database key; the route reads it through serverEnv().
+    vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY', 'service-role-key');
     vi.spyOn(console, 'warn').mockImplementation(() => undefined);
   });
 
