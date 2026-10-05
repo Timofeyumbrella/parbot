@@ -1,0 +1,22 @@
+name: Keep alive
+
+# The hosted Supabase project is on the free plan, which pauses a project after seven days
+# without an API request; a paused project takes the live demo down with it. One real database
+# read a day resets that clock. The widget-config endpoint looks the demo assistant up in the
+# database, so it exercises the live path end to end, and --fail turns a dead deployment into
+# a red run, which GitHub mails the owner about.
+
+on:
+  schedule:
+    # Twice a day, off the top of the hour, so a skipped run never costs the whole day.
+    - cron: '17 6,18 * * *'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    name: One database read against the live deployment
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          curl --fail --silent --show-error --output /dev/null --max-time 60 \
+            'https://parbot-web.vercel.app/api/widget/config?key=pb_6270ea27a00043b5aa0967eb4bec490f'
